@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRM Vendas Pro com IndexedDB</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  
+  <!-- Importação do CSS Customizado -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-slate-300">
+  
+  <!-- Cabeçalho -->
+  <header class="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700 sticky top-0 z-20">
+    <div class="max-w-7xl mx-auto px-4 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <i data-lucide="bar-chart-3" class="w-6 h-6 text-white"></i>
+          </div>
+          <div>
+            <h1 class="text-xl sm:text-2xl font-bold text-white">CRM Vendas Pro</h1>
+            <p class="text-sm text-slate-400 hidden sm:block">Gestão Inteligente de Comissões</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-notificacoes" class="px-3 py-2 rounded-lg flex items-center gap-2 transition-all bg-slate-700 text-slate-300 hover:bg-slate-600">
+            <i data-lucide="bell" class="w-4 h-4"></i>
+            <span id="label-notificacoes" class="hidden sm:inline">Ativar Notificações</span>
+          </button>
+          <button id="btn-open-quick-forms" class="px-3 py-2 rounded-lg flex items-center gap-2 transition-all bg-purple-600 text-white hover:bg-purple-700">
+            <i data-lucide="file-plus" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">Abrir Forms</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navegação por Abas -->
+  <nav class="bg-slate-800/30 backdrop-blur-sm border-b border-slate-700 sticky top-[77px] z-20">
+    <div class="max-w-7xl mx-auto px-4">
+      <div id="tabs-container" class="flex gap-1 overflow-x-auto -mb-px">
+        <button data-tab="dashboard" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-white border-b-2 border-blue-500 bg-slate-700/50">
+          <i data-lucide="bar-chart-3" class="w-4 h-4"></i><span>Dashboard</span>
+        </button>
+        <button data-tab="vendas" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-slate-400 hover:text-white hover:bg-slate-700/30 border-b-2 border-transparent">
+          <i data-lucide="trending-up" class="w-4 h-4"></i><span>Vendas</span>
+        </button>
+        <button data-tab="clientes" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-slate-400 hover:text-white hover:bg-slate-700/30 border-b-2 border-transparent">
+          <i data-lucide="users" class="w-4 h-4"></i><span>Clientes</span>
+        </button>
+        <button data-tab="posvenda" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-slate-400 hover:text-white hover:bg-slate-700/30 border-b-2 border-transparent">
+          <i data-lucide="bell-ring" class="w-4 h-4"></i><span>Pós-Venda</span>
+        </button>
+        <button data-tab="comissoes" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-slate-400 hover:text-white hover:bg-slate-700/30 border-b-2 border-transparent">
+          <i data-lucide="dollar-sign" class="w-4 h-4"></i><span>Comissões</span>
+        </button>
+        <button data-tab="metas" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-slate-400 hover:text-white hover:bg-slate-700/30 border-b-2 border-transparent">
+          <i data-lucide="target" class="w-4 h-4"></i><span>Metas</span>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Conteúdo Principal -->
+  <main class="max-w-7xl mx-auto px-4 py-8">
+    
+    <!-- Seção Dashboard -->
+    <section id="tab-dashboard" class="tab-content space-y-6">
+      <div class="flex justify-end">
+        <select id="dashboard-period-filter" class="px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+          <option value="this_month">Analisar Período: Este Mês</option>
+          <option value="last_month">Analisar Período: Mês Passado</option>
+          <option value="this_quarter">Analisar Período: Este Trimestre</option>
+          <option value="last_30_days">Analisar Período: Últimos 30 Dias</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-xl">
+          <div class="flex items-center justify-between mb-2"><i data-lucide="users" class="w-8 h-8 opacity-80"></i><span id="metric-totalClientes" class="text-3xl font-bold">0</span></div>
+          <p class="text-blue-100">Total de Clientes</p>
+        </div>
+        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-xl">
+          <div class="flex items-center justify-between mb-2"><i data-lucide="trending-up" class="w-8 h-8 opacity-80"></i><span id="metric-vendasPeriodo" class="text-3xl font-bold">0</span></div>
+          <p class="text-green-100">Vendas no Período</p>
+        </div>
+        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-xl">
+          <div class="flex items-center justify-between mb-2"><i data-lucide="dollar-sign" class="w-8 h-8 opacity-80"></i><span id="metric-totalVendas" class="text-3xl font-bold">R$ 0</span></div>
+          <p class="text-purple-100">Vendas no Período</p>
+        </div>
+        <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-xl">
+          <div class="flex items-center justify-between mb-2"><i data-lucide="bar-chart-3" class="w-8 h-8 opacity-80"></i><span id="metric-totalComissoes" class="text-3xl font-bold">R$ 0</span></div>
+          <p class="text-orange-100">Comissões no Período</p>
+        </div>
+      </div>
+      <div id="metas-progresso-container" class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
+        <div class="flex items-center gap-3 mb-4"><i data-lucide="target" class="w-6 h-6 text-blue-400"></i><h3 class="text-xl font-bold text-white">Progresso da Meta</h3></div>
+        <div id="metas-progresso-content" class="grid grid-cols-1 md:grid-cols-2 gap-6"></div>
+        <div id="metas-progresso-empty" class="text-center text-slate-400 py-4 hidden">Nenhuma meta definida para este período.</div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700"><h3 class="text-xl font-bold text-white mb-4">Evolução Mensal (Ano Atual)</h3><div class="h-80"><canvas id="line-chart"></canvas></div></div>
+        <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700"><h3 class="text-xl font-bold text-white mb-4">Distribuição por Produto (Período)</h3><div class="h-80"><canvas id="pie-chart"></canvas></div></div>
+      </div>
+      <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-xl font-bold text-white">Vendas Recentes</h3>
+          <button id="btn-export-vendas-dash" class="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-all flex items-center gap-2 border border-blue-500/30"><i data-lucide="download" class="w-4 h-4"></i>Exportar CSV</button>
+        </div>
+        <div id="vendas-recentes-container" class="space-y-3"></div>
+        <div id="vendas-recentes-empty" class="text-center text-slate-400 py-4 hidden">Nenhuma venda registrada ainda.</div>
+      </div>
+    </section>
+    
+    <!-- Seção Vendas -->
+    <section id="tab-vendas" class="tab-content space-y-6 hidden">
+      <div class="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+        <div class="flex gap-3 flex-wrap">
+          <div class="relative">
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></i>
+            <input type="text" id="search-vendas" placeholder="Buscar cliente..." class="pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
+          </div>
+          <select id="filter-vendas-status" class="px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+            <option value="">Todos os Status</option>
+            <option value="Negociando">Negociando</option>
+            <option value="Aguardando Aceite">Aguardando Aceite</option>
+            <option value="Inputado">Inputado</option>
+            <option value="Concluído">Concluído</option>
+            <option value="Cancelado">Cancelado</option>
+          </select>
+          <input type="month" id="filter-vendas-month" class="px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
+        </div>
+        <div class="flex gap-2">
+          <button id="btn-export-vendas" class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-all flex items-center gap-2 border border-green-500/30"><i data-lucide="download" class="w-4 h-4"></i>Exportar</button>
+          <button id="btn-import-clientes-vendas" class="px-4 py-2 bg-purple-500/20 text-purple-300 rounded-lg hover:bg-purple-500/30 transition-all flex items-center gap-2 border border-purple-500/30" title="Importar clientes de outro CRM (Excel .xlsx ou .csv)" onclick="document.getElementById('input-import-clientes').click()"><i data-lucide="upload" class="w-4 h-4"></i>Importar Excel</button>
+          <button id="btn-nova-venda" class="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"><i data-lucide="plus" class="w-5 h-5"></i>Nova Venda</button>
+        </div>
+      </div>
+      <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-slate-700/50">
+              <tr>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Cliente</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Produto</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Operadora</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Valor</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Comissão</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Status</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="vendas-table-body" class="divide-y divide-slate-700"></tbody>
+          </table>
+          <div id="vendas-table-empty" class="text-center text-slate-400 py-12 hidden">
+            <i data-lucide="zap-off" class="w-12 h-12 mx-auto mb-4 text-slate-500"></i><p>Nenhuma venda encontrada</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Seção Clientes -->
+    <section id="tab-clientes" class="tab-content space-y-6 hidden">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 class="text-2xl font-bold text-white">Gerenciar Clientes</h2>
+        <div class="flex gap-2">
+          <button id="btn-export-clientes" class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-all flex items-center gap-2 border border-green-500/30"><i data-lucide="download" class="w-4 h-4"></i>Exportar</button>
+          <button id="btn-import-clientes" class="px-4 py-2 bg-purple-500/20 text-purple-300 rounded-lg hover:bg-purple-500/30 transition-all flex items-center gap-2 border border-purple-500/30" title="Importar clientes de outro CRM (Excel .xlsx ou .csv)"><i data-lucide="upload" class="w-4 h-4"></i>Importar Excel</button>
+          <input id="input-import-clientes" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+          <button id="btn-novo-cliente" class="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"><i data-lucide="plus" class="w-5 h-5"></i>Novo Cliente</button>
+        </div>
+      </div>
+      <div id="clientes-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      <div id="clientes-grid-empty" class="text-center text-slate-400 py-20 hidden">
+        <i data-lucide="users-round" class="w-16 h-16 mx-auto mb-4 text-slate-500"></i><p class="text-lg">Nenhum cliente cadastrado</p>
+      </div>
+    </section>
+    
+    <!-- Seção Pós-Venda -->
+    <section id="tab-posvenda" class="tab-content space-y-6 hidden">
+      <div class="flex items-center gap-3 mb-6">
+        <i data-lucide="bell-ring" class="w-8 h-8 text-blue-400"></i>
+        <div><h2 class="text-2xl font-bold text-white">Lembretes de Pós-Venda</h2><p class="text-slate-400">Acompanhe seus clientes em 7, 30 e 90 dias após a venda</p></div>
+      </div>
+      <div id="posvenda-container" class="space-y-4"></div>
+      <div id="posvenda-empty" class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-12 border border-slate-700 text-center hidden">
+        <i data-lucide="calendar-check" class="w-16 h-16 text-slate-500 mx-auto mb-4"></i><p class="text-slate-400 text-lg">Nenhum lembrete pendente no momento</p>
+      </div>
+    </section>
+    
+    <!-- Seção Comissões -->
+    <section id="tab-comissoes" class="tab-content space-y-6 hidden">
+      <div class="flex justify-between items-center">
+        <h2 class="text-2xl font-bold text-white">Tabela de Comissões</h2>
+        <button id="btn-nova-comissao" class="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"><i data-lucide="plus" class="w-5 h-5"></i>Adicionar Regra</button>
+      </div>
+      <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-slate-700/50">
+              <tr>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Produto</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Tipo Cliente</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Operadora</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Comissão</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="comissoes-table-body" class="divide-y divide-slate-700"></tbody>
+          </table>
+          <div id="comissoes-table-empty" class="text-center text-slate-400 py-12 hidden">
+             <i data-lucide="percent-circle" class="w-12 h-12 mx-auto mb-4 text-slate-500"></i><p>Nenhuma regra de comissão definida</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- Seção Metas -->
+    <section id="tab-metas" class="tab-content space-y-6 hidden">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center gap-3">
+          <i data-lucide="target" class="w-8 h-8 text-blue-400"></i>
+          <div><h2 class="text-2xl font-bold text-white">Metas e Objetivos</h2><p class="text-slate-400">Defina suas metas mensais de vendas e comissões</p></div>
+        </div>
+        <button id="btn-nova-meta" class="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"><i data-lucide="plus" class="w-5 h-5"></i>Nova Meta</button>
+      </div>
+      <div id="metas-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      <div id="metas-grid-empty" class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-12 border border-slate-700 text-center hidden">
+        <i data-lucide="target" class="w-16 h-16 text-slate-500 mx-auto mb-4"></i><p class="text-slate-400 text-lg">Nenhuma meta cadastrada</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- PAINEL DE FORMULÁRIO RÁPIDO -->
+  <div id="quick-forms-panel" class="fixed top-0 right-0 h-full w-full max-w-sm sm:w-80 bg-slate-900 border-l border-slate-700 shadow-lg transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+    <div class="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800 sticky top-0">
+      <h3 class="text-lg font-bold text-white">Formulários Rápidos</h3>
+      <button id="btn-close-quick-forms" class="p-1 hover:bg-slate-700 rounded-lg"><i data-lucide="x" class="w-5 h-5 text-slate-400"></i></button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-4 space-y-6">
+      <div id="quick-form-message" class="rounded-lg p-3 text-sm hidden mb-4"></div>
+      
+      <!-- Novo Cliente Rápido -->
+      <form id="quick-form-cliente" class="space-y-3" novalidate>
+        <h4 class="text-md font-semibold text-white border-b border-slate-700 pb-2">Novo Cliente</h4>
+        <input type="text" id="qf-cliente-nome" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="Nome *" required>
+        <input type="text" id="qf-cliente-cpfCnpj" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="CPF/CNPJ *" required>
+        <input type="tel" id="qf-cliente-telefone" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="Telefone *" required>
+        <input type="email" id="qf-cliente-email" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="Email" >
+        <input type="date" id="qf-cliente-dataNascimento" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" title="Data de Nascimento">
+        <!-- Campos de endereço (preenchidos automaticamente pela API do CNPJ) -->
+        <input type="hidden" id="qf-cliente-cep">
+        <input type="hidden" id="qf-cliente-logradouro">
+        <input type="hidden" id="qf-cliente-numero">
+        <input type="hidden" id="qf-cliente-complemento">
+        <input type="hidden" id="qf-cliente-bairro">
+        <input type="hidden" id="qf-cliente-cidade">
+        <input type="hidden" id="qf-cliente-uf">
+        <div class="text-xs text-slate-400 mt-1">💡 Dica: Digite o CNPJ e deixe o campo para carregar os dados automaticamente</div>
+        <button type="submit" class="w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all">Salvar Cliente</button>
+      </form>
+      <hr class="border-slate-700">
+      
+      <!-- Nova Venda Rápida -->
+      <form id="quick-form-venda" class="space-y-3" novalidate>
+        <h4 class="text-md font-semibold text-white border-b border-slate-700 pb-2">Nova Venda</h4>
+        <select id="qf-venda-clienteId" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" required><option value="">Selecione cliente *</option></select>
+        <select id="qf-venda-produto" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" required><option value="">Selecione produto *</option></select>
+        <select id="qf-venda-operadora" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" required><option value="">Selecione operadora *</option></select>
+        <input type="number" step="0.01" id="qf-venda-valorVenda" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="Valor (R$) *" required>
+        <select id="qf-venda-tipoCliente" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" required><option value="">Tipo de Cliente *</option><option value="Novo">Novo</option><option value="Base">Base</option></select>
+        <select id="qf-venda-status" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" required>
+          <option value="Negociando">Negociando</option><option value="Aguardando Aceite">Aguardando Aceite</option><option value="Inputado">Inputado</option><option value="Concluído">Concluído</option><option value="Cancelado">Cancelado</option><option value="Aguardando fatura">Aguardando fatura</option><option value="Aguardando Distribuidora">Aguardando Distribuidora</option>
+        </select>
+        <input type="date" id="qf-venda-dataConclusao" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white hidden" title="Data de Conclusão">
+        <textarea id="qf-venda-observacao" rows="2" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="Observação (Opcional)"></textarea>
+        <button type="submit" class="w-full px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-700 transition-all">Salvar Venda</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Genérico -->
+  <div id="modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="sticky top-0 bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+        <h3 id="modal-title" class="text-xl font-bold text-white"></h3>
+        <button id="btn-modal-close" class="p-2 hover:bg-slate-700 rounded-lg transition-colors"><i data-lucide="x" class="w-5 h-5 text-slate-400"></i></button>
+      </div>
+      <div class="overflow-y-auto p-6">
+        <form id="modal-form" novalidate>
+          <input type="hidden" id="modal-type-input"><input type="hidden" id="modal-editing-id-input">
+          <div id="modal-form-content" class="space-y-4"></div>
+          <div id="modal-error-message" class="text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm mt-4 hidden"></div>
+          <div class="flex gap-3 mt-6">
+            <button type="button" id="btn-modal-cancel" class="flex-1 px-6 py-3 bg-slate-700 text-white rounded-lg font-medium hover:bg-slate-600 transition-colors">Cancelar</button>
+            <button type="submit" id="btn-modal-save" class="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Importar Vendas -->
+  <div id="import-vendas-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50">
+    <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="sticky top-0 bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3"><i data-lucide="upload" class="w-6 h-6 text-green-300"></i><h3 class="text-xl font-bold text-white">Importar Vendas do Excel</h3></div>
+        <button id="btn-import-vendas-close" class="p-2 hover:bg-slate-700 rounded-lg"><i data-lucide="x" class="w-5 h-5 text-slate-400"></i></button>
+      </div>
+      <div class="overflow-y-auto p-6 space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Selects para mapeamento de vendas -->
+          <div><label class="block text-sm text-slate-300 mb-2">Data (Requerido)</label><select id="map-venda-data" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Cliente (Requerido)</label><select id="map-venda-cliente" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Produto (Requerido)</label><select id="map-venda-produto" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Operadora (Requerido)</label><select id="map-venda-operadora" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Tipo Cliente (Requerido)</label><select id="map-venda-tipoCliente" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Valor (Requerido)</label><select id="map-venda-valor" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Status (Requerido)</label><select id="map-venda-status" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Comissão (Opcional)</label><select id="map-venda-comissao" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+        </div>
+        <div class="bg-slate-900/40 rounded-xl p-4">
+          <div class="flex justify-between mb-3"><p class="text-white">Prévia</p><span id="import-vendas-preview-count" class="text-slate-400">0 linhas</span></div>
+          <table class="w-full text-sm text-slate-200">
+            <thead><tr><th class="text-left">Data</th><th class="text-left">Cliente</th><th class="text-left">Produto</th><th class="text-left">Valor</th><th class="text-left">Status</th></tr></thead>
+            <tbody id="import-vendas-preview-body"></tbody>
+          </table>
+        </div>
+        <div id="import-vendas-error" class="text-red-300 bg-red-500/10 p-3 rounded-lg hidden"></div>
+        <div class="flex gap-3">
+          <button id="btn-import-vendas-cancel" class="flex-1 px-6 py-3 bg-slate-700 text-white rounded-lg">Cancelar</button>
+          <button id="btn-import-vendas-run" class="flex-1 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg">Importar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Perfil Cliente -->
+  <div id="client-profile-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="sticky top-0 bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3"><i data-lucide="user-round" class="w-6 h-6 text-blue-400"></i><h3 id="client-profile-name" class="text-xl font-bold text-white"></h3></div>
+        <button id="btn-client-profile-close" class="p-2 hover:bg-slate-700 rounded-lg transition-colors"><i data-lucide="x" class="w-5 h-5 text-slate-400"></i></button>
+      </div>
+      <div class="overflow-y-auto p-6 space-y-6">
+        <div class="bg-slate-700/50 rounded-lg p-4">
+            <h4 class="text-lg font-semibold text-white mb-3">Informações de Contato</h4>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <div><p class="text-slate-400">CPF/CNPJ</p><p id="client-profile-cpfCnpj" class="text-white font-medium"></p></div>
+                <div><p class="text-slate-400">Telefone</p><p id="client-profile-telefone" class="text-white font-medium"></p></div>
+                <div><p class="text-slate-400">Email</p><p id="client-profile-email" class="text-white font-medium"></p></div>
+                <div><p class="text-slate-400">Data de Nascimento</p><p id="client-profile-dataNascimento" class="text-white font-medium"></p></div>
+                <div class="sm:col-span-2"><p class="text-slate-400">Endereço</p><p id="client-profile-endereco" class="text-white font-medium"></p></div>
+                <div><p class="text-slate-400">Conta Contrato / Instalação</p><p id="client-profile-contaContrato" class="text-white font-medium"></p></div>
+            </div>
+        </div>
+        <div>
+            <h4 class="text-lg font-semibold text-white mb-3">Histórico de Vendas</h4>
+            <div class="bg-slate-700/50 rounded-lg overflow-hidden border border-slate-700">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-slate-700 text-slate-300 font-semibold">
+                        <tr><th class="px-4 py-3">Produto</th><th class="px-4 py-3">Valor</th><th class="px-4 py-3">Comissão</th><th class="px-4 py-3">Data</th><th class="px-4 py-3">Status</th></tr>
+                    </thead>
+                    <tbody id="client-profile-vendas-body" class="divide-y divide-slate-700"></tbody>
+                </table>
+                <div id="client-profile-vendas-empty" class="text-center text-slate-400 p-6 hidden">Nenhuma venda registrada.</div>
+            </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div id="confirm-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-sm shadow-xl p-6">
+        <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center"><i data-lucide="alert-triangle" class="w-5 h-5 text-red-400"></i></div><h3 id="confirm-modal-title" class="text-lg font-bold text-white">Tem certeza?</h3></div>
+        <p id="confirm-modal-text" class="text-slate-400 text-sm mt-3 mb-6">Esta ação não pode ser desfeita.</p>
+        <div class="flex gap-3"><button id="btn-confirm-cancel" class="flex-1 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-colors">Cancelar</button><button id="btn-confirm-delete" class="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors">Excluir</button></div>
+    </div>
+  </div>
+
+  <!-- Modal Importar Clientes -->
+  <div id="import-clientes-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+      <div class="sticky top-0 bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3"><i data-lucide="upload" class="w-6 h-6 text-purple-300"></i><h3 class="text-xl font-bold text-white">Importar Clientes do Excel</h3></div>
+        <button id="btn-import-clientes-close" class="p-2 hover:bg-slate-700 rounded-lg"><i data-lucide="x" class="w-5 h-5 text-slate-400"></i></button>
+      </div>
+      <div class="overflow-y-auto p-6 space-y-5">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Selects gerados dinamicamente via JS -->
+          <div><label class="block text-sm text-slate-300 mb-2">CPF/CNPJ</label><select id="map-cpfCnpj" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Nome</label><select id="map-nome" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Telefone</label><select id="map-telefone" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Email</label><select id="map-email" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">CEP</label><select id="map-cep" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Logradouro</label><select id="map-logradouro" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Número</label><select id="map-numero" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Complemento</label><select id="map-complemento" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Bairro</label><select id="map-bairro" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Cidade</label><select id="map-cidade" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">UF</label><select id="map-uf" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Conta Contrato</label><select id="map-contaContrato" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+          <div><label class="block text-sm text-slate-300 mb-2">Data Nascimento</label><select id="map-dataNascimento" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></select></div>
+        </div>
+        <div class="bg-slate-900/40 rounded-xl p-4">
+          <div class="flex justify-between mb-3"><p class="text-white">Prévia</p><span id="import-preview-count" class="text-slate-400">0 linhas</span></div>
+          <table class="w-full text-sm text-slate-200">
+            <thead><tr><th class="text-left">CPF/CNPJ</th><th class="text-left">Nome</th><th class="text-left">Telefone</th><th class="text-left">Email</th></tr></thead>
+            <tbody id="import-preview-body"></tbody>
+          </table>
+        </div>
+        <div id="import-clientes-error" class="text-red-300 bg-red-500/10 p-3 rounded-lg hidden"></div>
+        <div class="flex gap-3">
+          <button id="btn-import-clientes-cancel" class="flex-1 px-6 py-3 bg-slate-700 text-white rounded-lg">Cancelar</button>
+          <button id="btn-import-clientes-run" class="flex-1 px-6 py-3 bg-gradient-to-r from-purple-500 to-fuchsia-600 text-white rounded-lg">Importar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Templates Dinâmicos -->
+  <template id="template-form-cliente">
+    <div><label class="block text-sm text-slate-300 mb-2">CPF/CNPJ *</label><input type="text" id="cliente-cpfCnpj" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Nome Completo *</label><input type="text" id="cliente-nome" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Telefone *</label><input type="tel" id="cliente-telefone" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Email</label><input type="email" id="cliente-email" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Data Nascimento</label><input type="date" id="cliente-dataNascimento" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
+    <div class="grid grid-cols-2 gap-4">
+      <div><label class="block text-sm text-slate-300 mb-2">CEP</label><input type="text" id="cliente-cep" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
+      <div><label class="block text-sm text-slate-300 mb-2">Conta Contrato</label><input type="text" id="cliente-contaContrato" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
+    </div>
+    <div><label class="block text-sm text-slate-300 mb-2">Logradouro</label><input type="text" id="cliente-logradouro" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
+    <div class="grid grid-cols-3 gap-4">
+      <div><label class="block text-sm text-slate-300 mb-2">Número</label><input type="text" id="cliente-numero" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
+      <div class="col-span-2"><label class="block text-sm text-slate-300 mb-2">Complemento</label><input type="text" id="cliente-complemento" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
+    </div>
+    <div class="grid grid-cols-3 gap-4">
+      <div class="col-span-2"><label class="block text-sm text-slate-300 mb-2">Bairro</label><input type="text" id="cliente-bairro" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
+      <div><label class="block text-sm text-slate-300 mb-2">UF</label><input type="text" id="cliente-uf" maxlength="2" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
+    </div>
+    <div><label class="block text-sm text-slate-300 mb-2">Cidade</label><input type="text" id="cliente-cidade" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
+  </template>
+
+  <template id="template-form-venda">
+    <div>
+      <label class="block text-sm text-slate-300 mb-2">Cliente *</label>
+      <input id="venda-clienteNome" list="lista-clientes-venda" placeholder="Digite o nome..." class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" />
+      <datalist id="lista-clientes-venda"></datalist><p id="venda-clienteNome-hint" class="text-xs text-slate-400 mt-1"></p>
+      <select style="display:none;" id="venda-clienteId" class="w-full" required></select>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div><label class="block text-sm text-slate-300 mb-2">Produto *</label><select id="venda-produto" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></select></div>
+      <div><label class="block text-sm text-slate-300 mb-2">Operadora *</label><select id="venda-operadora" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></select></div>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div><label class="block text-sm text-slate-300 mb-2">Tipo de Cliente *</label><select id="venda-tipoCliente" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required><option value="Novo">Novo</option><option value="Base">Base</option></select></div>
+      <div><label class="block text-sm text-slate-300 mb-2">Valor Venda *</label><input type="number" step="0.01" id="venda-valorVenda" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+    </div>
+    <div>
+      <label class="block text-sm text-slate-300 mb-2">Status *</label>
+      <select id="venda-status" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required>
+        <option value="Negociando">Negociando</option><option value="Aguardando Aceite">Aguardando Aceite</option><option value="Inputado">Inputado</option><option value="Concluído">Concluído</option><option value="Cancelado">Cancelado</option><option value="Aguardando fatura">Aguardando fatura</option><option value="Aguardando Distribuidora">Aguardando Distribuidora</option>
+      </select>
+    </div>
+    <div id="venda-data-conclusao-container" class="hidden">
+      <label class="block text-sm text-slate-300 mb-2">Data Conclusão *</label><input type="date" id="venda-dataConclusao" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white">
+    </div>
+    <div class="mt-4">
+      <label class="block text-sm text-slate-300 mb-2">Observação</label><textarea id="venda-observacao" rows="2" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></textarea>
+    </div>
+    <div id="venda-comissao-estimada" class="bg-green-500/10 p-4 hidden mt-4 rounded-lg"><p class="text-sm text-slate-300 mb-1">Comissão Estimada:</p><p id="venda-comissao-valor" class="text-2xl font-bold text-green-400">R$ 0,00</p></div>
+  </template>
+
+  <template id="template-form-comissao">
+    <div><label class="block text-sm text-slate-300 mb-2">Produto *</label><input type="text" id="comissao-produto" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Tipo Cliente *</label><select id="comissao-tipoCliente" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required><option value="Novo">Novo</option><option value="Base">Base</option></select></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Operadora *</label><input type="text" id="comissao-operadora" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Comissão (%) *</label><input type="number" step="0.01" id="comissao-comissao" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+  </template>
+
+  <template id="template-form-meta">
+    <div class="grid grid-cols-2 gap-4">
+      <div><label class="block text-sm text-slate-300 mb-2">Mês *</label><select id="meta-mes" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select></div>
+      <div><label class="block text-sm text-slate-300 mb-2">Ano *</label><input type="number" id="meta-ano" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+    </div>
+    <div><label class="block text-sm text-slate-300 mb-2">Meta Vendas (R$) *</label><input type="number" step="0.01" id="meta-valorMeta" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Meta Comissão (R$) *</label><input type="number" step="0.01" id="meta-comissaoMeta" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+  </template>
+
+  <!-- Importação dos Módulos JS -->
+  <script src="js/globals.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/cnpj-api.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

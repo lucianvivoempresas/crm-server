@@ -1,0 +1,23 @@
+:root { font-family: 'Inter', sans-serif; }
+html { scroll-behavior: smooth; }
+@import url('[https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap)');
+
+/* Scrollbar personalizada */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #1e293b; }
+::-webkit-scrollbar-thumb { background: #475569; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+/* Remove ícone de calendário nativo */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  display: none;
+  -webkit-appearance: none;
+}
+
+/* Z-index para modais e painéis */
+#quick-forms-panel { z-index: 30; }
+#modal { z-index: 50; }
+#confirm-modal { z-index: 60; }
+#import-clientes-modal { z-index: 50; }
+#import-vendas-modal { z-index: 50; }
+#client-profile-modal { z-index: 50; }
