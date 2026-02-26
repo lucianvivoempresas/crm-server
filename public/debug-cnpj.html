@@ -1,0 +1,277 @@
+<!-- Debug CNPJ Page -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug CNPJ API</title>
+    <style>
+        body { 
+            font-family: monospace; 
+            background: #1e293b; 
+            color: #e2e8f0; 
+            padding: 20px; 
+            max-width: 1200px; 
+            margin: 0 auto;
+        }
+        h1 { color: #60a5fa; margin-bottom: 20px; }
+        .test-section { 
+            background: #334155; 
+            border: 1px solid #475569; 
+            padding: 15px; 
+            margin-bottom: 20px; 
+            border-radius: 8px;
+        }
+        input { 
+            background: #0f172a; 
+            color: #e2e8f0; 
+            border: 1px solid #475569; 
+            padding: 8px; 
+            border-radius: 4px; 
+            width: 300px;
+            margin: 5px 0;
+        }
+        button { 
+            background: #3b82f6; 
+            color: white; 
+            border: none; 
+            padding: 8px 16px; 
+            border-radius: 4px; 
+            cursor: pointer;
+            margin: 5px 0;
+        }
+        button:hover { background: #2563eb; }
+        .log { 
+            background: #0f172a; 
+            border: 1px solid #475569; 
+            padding: 10px; 
+            border-radius: 4px; 
+            max-height: 300px; 
+            overflow-y: auto; 
+            margin-top: 10px;
+            font-size: 12px;
+        }
+        .log-entry { 
+            padding: 5px 0; 
+            border-bottom: 1px solid #334155; 
+        }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+        .info { color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug CNPJ API Integration</h1>
+
+    <!-- Test 1: Backend Endpoint -->
+    <div class="test-section">
+        <h2>Test 1: Backend CNPJ Endpoint</h2>
+        <p>Teste se o servidor consegue buscar CNPJ</p>
+        <input type="text" id="test-cnpj-input" placeholder="Digite um CNPJ (ex: 11444777000161)" value="11444777000161">
+        <button onclick="testBackendEndpoint()">Test Backend</button>
+        <div id="test1-log" class="log"></div>
+    </div>
+
+    <!-- Test 2: Fetch Function -->
+    <div class="test-section">
+        <h2>Test 2: fetchCNPJData() Function</h2>
+        <p>Teste a função JavaScript de fetch</p>
+        <input type="text" id="test-cnpj-fetch" placeholder="Digite um CNPJ" value="11444777000161">
+        <button onclick="testFetchFunction()">Test fetchCNPJData()</button>
+        <div id="test2-log" class="log"></div>
+    </div>
+
+    <!-- Test 3: Form Preenchimento -->
+    <div class="test-section">
+        <h2>Test 3: Form Population</h2>
+        <p>Teste o preenchimento dos formulários</p>
+        <label>Tipo de Formulário:</label>
+        <select id="form-type" style="width: 150px;">
+            <option value="modal">Modal (cliente-...)</option>
+            <option value="quick">Quick Form (qf-cliente-...)</option>
+        </select>
+        <br>
+        <input type="text" id="test-cnpj-form" placeholder="Digite um CNPJ" value="11444777000161">
+        <button onclick="testFormPopulation()">Test Form Population</button>
+        <div id="test3-log" class="log"></div>
+    </div>
+
+    <!-- Test 4: Listener Setup -->
+    <div class="test-section">
+        <h2>Test 4: setupCNPJListener()</h2>
+        <p>Teste se o listener é configurado corretamente</p>
+        <label>Tipo de Formulário:</label>
+        <select id="listener-type" style="width: 150px;">
+            <option value="modal">Modal (cliente-cpfCnpj)</option>
+            <option value="quick">Quick Form (qf-cliente-cpfCnpj)</option>
+        </select>
+        <br>
+        <button onclick="testListenerSetup()">Setup Listener</button>
+        <p id="listener-status" class="info"></p>
+        <label>Agora digite no campo e pressione Tab:</label>
+        <input type="text" id="listener-test-input" placeholder="Digite aqui e pressione Tab">
+        <div id="test4-log" class="log"></div>
+    </div>
+
+    <!-- Logs Consolidados -->
+    <div class="test-section">
+        <h2>📋 Console Log Consolidado</h2>
+        <div id="console-log" class="log"></div>
+    </div>
+
+    <script>
+        // Intercepta console.log
+        const originalLog = console.log;
+        const originalWarn = console.warn;
+        const originalError = console.error;
+        const logContainer = document.getElementById('console-log');
+
+        function addLogEntry(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = `[${type.toUpperCase()}] ${message}`;
+            logContainer.appendChild(entry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        console.log = function(...args) {
+            originalLog(...args);
+            addLogEntry(args.join(' '), 'info');
+        };
+
+        console.warn = function(...args) {
+            originalWarn(...args);
+            addLogEntry(args.join(' '), 'error');
+        };
+
+        console.error = function(...args) {
+            originalError(...args);
+            addLogEntry(args.join(' '), 'error');
+        };
+
+        async function testBackendEndpoint() {
+            const log = document.getElementById('test1-log');
+            log.innerHTML = '';
+            const cnpj = document.getElementById('test-cnpj-input').value;
+            
+            addTestLog('test1-log', `🔍 Testando: GET /api-cnpj/buscar/${cnpj}`);
+            
+            try {
+                const response = await fetch(`/api-cnpj/buscar/${cnpj}`);
+                addTestLog('test1-log', `📊 Status: ${response.status}`, 'success');
+                
+                const data = await response.json();
+                addTestLog('test1-log', `✅ Dados: ${JSON.stringify(data, null, 2)}`, 'success');
+            } catch (error) {
+                addTestLog('test1-log', `❌ Erro: ${error.message}`, 'error');
+            }
+        }
+
+        async function testFetchFunction() {
+            const log = document.getElementById('test2-log');
+            log.innerHTML = '';
+            const cnpj = document.getElementById('test-cnpj-fetch').value;
+            
+            addTestLog('test2-log', `🔍 Chamando fetchCNPJData('${cnpj}')`);
+            
+            try {
+                const result = await fetchCNPJData(cnpj);
+                if (result.success) {
+                    addTestLog('test2-log', `✅ Sucesso! Dados: ${JSON.stringify(result, null, 2)}`, 'success');
+                } else {
+                    addTestLog('test2-log', `⚠️ Erro: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                addTestLog('test2-log', `❌ Exception: ${error.message}`, 'error');
+            }
+        }
+
+        async function testFormPopulation() {
+            const log = document.getElementById('test3-log');
+            log.innerHTML = '';
+            const cnpj = document.getElementById('test-cnpj-form').value;
+            const formType = document.getElementById('form-type').value;
+            
+            addTestLog('test3-log', `📋 Testando preenchimento (${formType})`);
+            
+            // Cria inputs de teste
+            const prefix = formType === 'quick' ? 'qf-cliente-' : 'cliente-';
+            createTestInputs(prefix);
+            
+            const result = await loadCNPJDataInForm(cnpj, formType);
+            
+            if (result) {
+                addTestLog('test3-log', `✅ Formulário preenchido!`, 'success');
+                // Mostra valores dos campos
+                ['nome', 'logradouro', 'numero', 'cep', 'cidade', 'uf'].forEach(field => {
+                    const input = document.getElementById(`${prefix}${field}`);
+                    if (input) {
+                        addTestLog('test3-log', `  ${prefix}${field}: "${input.value}"`);
+                    }
+                });
+            } else {
+                addTestLog('test3-log', `❌ Falha ao preencher formulário`, 'error');
+            }
+        }
+
+        function testListenerSetup() {
+            const log = document.getElementById('test4-log');
+            log.innerHTML = '';
+            const formType = document.getElementById('listener-type').value;
+            const inputId = formType === 'quick' ? 'qf-cliente-cpfCnpj' : 'cliente-cpfCnpj';
+            
+            addTestLog('test4-log', `🔧 Configurando listener para ${inputId}`);
+            
+            // Remove input anterior se existir
+            let testInput = document.getElementById(inputId);
+            if (testInput) testInput.remove();
+            
+            // Cria novo input de teste
+            testInput = document.createElement('input');
+            testInput.type = 'text';
+            testInput.id = inputId;
+            testInput.placeholder = 'Digite CNPJ aqui';
+            testInput.style.cssText = 'display: block; margin: 10px 0; padding: 8px; width: 300px; background: #0f172a; color: #e2e8f0; border: 1px solid #475569; border-radius: 4px;';
+            document.querySelector('.test-section:nth-child(4)').appendChild(testInput);
+            
+            // Setup listener
+            setupCNPJListener(inputId, formType);
+            addTestLog('test4-log', `✅ Listener configurado! Pressione Tab após digitar.`, 'success');
+            
+            testInput.addEventListener('blur', function() {
+                addTestLog('test4-log', `📤 Blur event disparado com valor: "${this.value}"`);
+            });
+        }
+
+        function createTestInputs(prefix) {
+            const container = document.getElementById('test3-log').parentElement;
+            const fields = ['nome', 'logradouro', 'numero', 'complemento', 'bairro', 'cidade', 'uf', 'cep', 'email'];
+            
+            fields.forEach(field => {
+                let input = document.getElementById(`${prefix}${field}`);
+                if (!input) {
+                    input = document.createElement('input');
+                    input.type = 'text';
+                    input.id = `${prefix}${field}`;
+                    input.style.display = 'none';
+                    container.appendChild(input);
+                }
+            });
+        }
+
+        function addTestLog(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = message;
+            element.appendChild(entry);
+            element.scrollTop = element.scrollHeight;
+        }
+    </script>
+
+    <!-- Import das funções de CNPJ -->
+    <script src="/js/cnpj-api.js"></script>
+    <script src="/js/globals.js"></script>
+    <script src="/js/db.js"></script>
+</body>
+</html>

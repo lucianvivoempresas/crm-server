@@ -15,8 +15,63 @@
 </head>
 <body class="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-slate-300">
   
+  <!-- Tela de Login (Mostrada inicialmente) -->
+  <div id="login-container" class="fixed inset-0 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex items-center justify-center z-50 backdrop-blur-sm">
+    <div class="bg-slate-800/80 backdrop-blur-md border border-slate-700 rounded-2xl shadow-2xl p-8 w-full max-w-md">
+      <!-- Logo -->
+      <div class="flex justify-center mb-6">
+        <div class="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+          <i data-lucide="bar-chart-3" class="w-8 h-8 text-white"></i>
+        </div>
+      </div>
+      
+      <!-- Título -->
+      <h1 class="text-3xl font-bold text-white text-center mb-2">CRM Vendas Pro</h1>
+      <p class="text-slate-400 text-center mb-8">Gestão Inteligente de Comissões</p>
+      
+      <!-- Form de Login -->
+      <form id="login-form" class="space-y-5">
+        <!-- Email -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Email</label>
+          <input 
+            type="email" 
+            id="login-email" 
+            placeholder="seu.email@empresa.com"
+            class="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+            required
+          >
+        </div>
+        
+        <!-- Senha -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Senha</label>
+          <input 
+            type="password" 
+            id="login-senha" 
+            placeholder="••••••••"
+            class="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+            required
+          >
+        </div>
+        
+        <!-- Mensagem de Erro -->
+        <div id="login-error" class="hidden bg-red-900/30 border border-red-600 rounded-lg p-3 text-red-200 text-sm"></div>
+        
+        <!-- Botão de Login -->
+        <button 
+          type="submit" 
+          class="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-purple-700 transition-all duration-200 flex items-center justify-center gap-2"
+        >
+          <i data-lucide="log-in" class="w-5 h-5"></i>
+          <span>Entrar</span>
+        </button>
+      </form>
+    </div>
+  </div>
+  
   <!-- Cabeçalho -->
-  <header class="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700 sticky top-0 z-20">
+  <header id="app-header" class="bg-slate-800/50 backdrop-blur-sm border-b border-slate-700 sticky top-0 z-20 hidden">
     <div class="max-w-7xl mx-auto px-4 py-4">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-3">
@@ -28,22 +83,37 @@
             <p class="text-sm text-slate-400 hidden sm:block">Gestão Inteligente de Comissões</p>
           </div>
         </div>
-        <div class="flex items-center gap-2">
-          <button id="btn-notificacoes" class="px-3 py-2 rounded-lg flex items-center gap-2 transition-all bg-slate-700 text-slate-300 hover:bg-slate-600">
-            <i data-lucide="bell" class="w-4 h-4"></i>
-            <span id="label-notificacoes" class="hidden sm:inline">Ativar Notificações</span>
-          </button>
-          <button id="btn-open-quick-forms" class="px-3 py-2 rounded-lg flex items-center gap-2 transition-all bg-purple-600 text-white hover:bg-purple-700">
-            <i data-lucide="file-plus" class="w-4 h-4"></i>
-            <span class="hidden sm:inline">Abrir Forms</span>
-          </button>
+        <div class="flex items-center gap-4">
+          <!-- Informações do Usuário -->
+          <div class="hidden sm:block text-right">
+            <p id="header-usuario-nome" class="font-semibold text-white">Carregando...</p>
+            <p id="header-usuario-perfil" class="text-sm text-slate-400">Usuário</p>
+            <p id="header-usuario-email" class="text-xs text-slate-500">email@empresa.com</p>
+          </div>
+          
+          <!-- Botões -->
+          <div class="flex items-center gap-2">
+            <button id="btn-notificacoes" class="px-3 py-2 rounded-lg flex items-center gap-2 transition-all bg-slate-700 text-slate-300 hover:bg-slate-600">
+              <i data-lucide="bell" class="w-4 h-4"></i>
+              <span id="label-notificacoes" class="hidden sm:inline">Ativar Notificações</span>
+            </button>
+            <button id="btn-open-quick-forms" class="px-3 py-2 rounded-lg flex items-center gap-2 transition-all bg-purple-600 text-white hover:bg-purple-700">
+              <i data-lucide="file-plus" class="w-4 h-4"></i>
+              <span class="hidden sm:inline">Abrir Forms</span>
+            </button>
+            <!-- Botão Logout -->
+            <button id="btn-logout" class="px-3 py-2 rounded-lg flex items-center gap-2 transition-all bg-red-600/20 text-red-400 hover:bg-red-600/30">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+              <span class="hidden sm:inline">Sair</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
   </header>
 
   <!-- Navegação por Abas -->
-  <nav class="bg-slate-800/30 backdrop-blur-sm border-b border-slate-700 sticky top-[77px] z-20">
+  <nav id="app-nav" class="bg-slate-800/30 backdrop-blur-sm border-b border-slate-700 sticky top-[77px] z-20 hidden">
     <div class="max-w-7xl mx-auto px-4">
       <div id="tabs-container" class="flex gap-1 overflow-x-auto -mb-px">
         <button data-tab="dashboard" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-white border-b-2 border-blue-500 bg-slate-700/50">
@@ -58,22 +128,27 @@
         <button data-tab="posvenda" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-slate-400 hover:text-white hover:bg-slate-700/30 border-b-2 border-transparent">
           <i data-lucide="bell-ring" class="w-4 h-4"></i><span>Pós-Venda</span>
         </button>
-        <button data-tab="comissoes" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-slate-400 hover:text-white hover:bg-slate-700/30 border-b-2 border-transparent">
+        <button data-tab="comissoes" data-tab-name="comissoes" data-permission="master-only" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-slate-400 hover:text-white hover:bg-slate-700/30 border-b-2 border-transparent hidden">
           <i data-lucide="dollar-sign" class="w-4 h-4"></i><span>Comissões</span>
         </button>
-        <button data-tab="metas" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-slate-400 hover:text-white hover:bg-slate-700/30 border-b-2 border-transparent">
+        <button data-tab="metas" data-tab-name="metas" data-permission="master-only" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-slate-400 hover:text-white hover:bg-slate-700/30 border-b-2 border-transparent hidden">
           <i data-lucide="target" class="w-4 h-4"></i><span>Metas</span>
+        </button>
+        <button data-tab="usuarios" data-permission="master-only" class="tab-btn flex items-center gap-2 px-4 sm:px-6 py-3 font-medium transition-all whitespace-nowrap text-slate-400 hover:text-white hover:bg-slate-700/30 border-b-2 border-transparent hidden" data-permission="master-only">
+          <i data-lucide="users-round" class="w-4 h-4"></i><span>Usuários</span>
         </button>
       </div>
     </div>
   </nav>
 
   <!-- Conteúdo Principal -->
-  <main class="max-w-7xl mx-auto px-4 py-8">
+  <main id="app-main" class="max-w-7xl mx-auto px-4 py-8 hidden">
     
     <!-- Seção Dashboard -->
     <section id="tab-dashboard" class="tab-content space-y-6">
-      <div class="flex justify-end">
+      <div id="dashboard-saudacao" class="mb-6">
+        <!-- Será preenchido por renderizarSaudacao() -->
+      </div>
         <select id="dashboard-period-filter" class="px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
           <option value="this_month">Analisar Período: Este Mês</option>
           <option value="last_month">Analisar Período: Mês Passado</option>
@@ -195,7 +270,7 @@
     </section>
     
     <!-- Seção Comissões -->
-    <section id="tab-comissoes" class="tab-content space-y-6 hidden">
+    <section id="tab-comissoes" class="tab-content space-y-6 hidden" data-permission="master-only">
       <div class="flex justify-between items-center">
         <h2 class="text-2xl font-bold text-white">Tabela de Comissões</h2>
         <button id="btn-nova-comissao" class="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"><i data-lucide="plus" class="w-5 h-5"></i>Adicionar Regra</button>
@@ -222,7 +297,7 @@
     </section>
     
     <!-- Seção Metas -->
-    <section id="tab-metas" class="tab-content space-y-6 hidden">
+    <section id="tab-metas" class="tab-content space-y-6 hidden" data-permission="master-only">
       <div class="flex justify-between items-center">
         <div class="flex items-center gap-3">
           <i data-lucide="target" class="w-8 h-8 text-blue-400"></i>
@@ -233,6 +308,39 @@
       <div id="metas-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
       <div id="metas-grid-empty" class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-12 border border-slate-700 text-center hidden">
         <i data-lucide="target" class="w-16 h-16 text-slate-500 mx-auto mb-4"></i><p class="text-slate-400 text-lg">Nenhuma meta cadastrada</p>
+      </div>
+    </section>
+    
+    <!-- Seção Usuários (Master Only) -->
+    <section id="tab-usuarios" class="tab-content space-y-6 hidden" data-permission="master-only">
+      <div class="flex justify-between items-center">
+        <div class="flex items-center gap-3">
+          <i data-lucide="users-round" class="w-8 h-8 text-blue-400"></i>
+          <div><h2 class="text-2xl font-bold text-white">Gerenciar Usuários</h2><p class="text-slate-400">Crie, edite ou remova vendedores do sistema</p></div>
+        </div>
+        <button id="btn-novo-usuario" class="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"><i data-lucide="plus" class="w-5 h-5"></i>Novo Vendedor</button>
+      </div>
+      
+      <!-- Tabela de Usuários -->
+      <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-slate-700/50">
+              <tr>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Nome</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Email</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Perfil</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Status</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Último Acesso</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="usuarios-table-body" class="divide-y divide-slate-700"></tbody>
+          </table>
+          <div id="usuarios-table-empty" class="text-center text-slate-400 py-12 hidden">
+            <i data-lucide="users-round" class="w-12 h-12 mx-auto mb-4 text-slate-500"></i><p>Nenhum usuário cadastrado</p>
+          </div>
+        </div>
       </div>
     </section>
   </main>
@@ -494,11 +602,22 @@
     <div><label class="block text-sm text-slate-300 mb-2">Meta Comissão (R$) *</label><input type="number" step="0.01" id="meta-comissaoMeta" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
   </template>
 
+  <template id="template-form-usuario">
+    <div><label class="block text-sm text-slate-300 mb-2">Nome Completo *</label><input type="text" id="usuario-nome" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Email *</label><input type="email" id="usuario-email" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Senha *</label><input type="password" id="usuario-senha" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" placeholder="Deixe em branco para gerar automaticamente"></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Confirmar Senha *</label><input type="password" id="usuario-confirmaSenha" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" placeholder="Confirmação"></div>
+    <div id="usuario-ativo-container"><label class="flex items-center gap-2 text-slate-300 cursor-pointer"><input type="checkbox" id="usuario-ativo" class="w-4 h-4 rounded" checked><span>Ativo</span></label></div>
+  </template>
+
   <!-- Importação dos Módulos JS -->
   <script src="js/globals.js"></script>
   <script src="js/db.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/cnpj-api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/permissions.js"></script>
+  <script src="js/usuarios.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/render.js"></script>
   <script src="js/app.js"></script>

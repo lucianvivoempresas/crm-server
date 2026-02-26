@@ -1,14 +1,146 @@
 // js/app.js
+
+// INICIALIZAÇÃO PRINCIPAL
 window.addEventListener('load', async () => {
   try {
     if (window.lucide) lucide.createIcons();
-    await initDB();
-    await renderAll();
-    setupEventListeners();
+    
+    // Verificar se usuário está autenticado
+    if (estaLogado()) {
+      // Usuário logado - inicializar aplicação
+      console.log('👤 Usuário autenticado. Inicializando aplicação...');
+      await initDB();
+      await renderAll();
+      setupEventListeners();
+      
+      // Se é master, renderizar usuários
+      if (ehMaster()) {
+        await renderUsuarios();
+        setupUsuariosListeners();
+      }
+      
+      aplicarPermissoes();
+      renderizarSaudacao();
+      mostraInterfacePrincipal();
+    } else {
+      // Usuário não logado - mostrar tela de login
+      console.log('🔐 Nenhum usuário autenticado. Mostrando tela de login...');
+      setupLoginListeners();
+      ocultaInterfacePrincipal();
+    }
   } catch (err) { 
     console.error('Erro de inicialização:', err); 
   }
 });
+
+// ============ AUTENTICAÇÃO ============
+
+async function handleLogin(e) {
+  e.preventDefault();
+  
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  const errorEl = document.getElementById('login-error');
+  const form = document.getElementById('login-form');
+  
+  // Limpar erro anterior
+  errorEl.classList.add('hidden');
+  errorEl.textContent = '';
+  
+  // Desabilitar botão
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const originalText = submitBtn.textContent;
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Entrando...';
+  
+  try {
+    // Tentar login
+    await login(email, senha);
+    
+    // Login bem-sucedido
+    console.log('✅ Login realizado com sucesso!');
+    
+    // Esconder tela de login
+    document.getElementById('login-container').classList.add('hidden');
+    
+    // Inicializar aplicação
+    if (window.lucide) lucide.createIcons();
+    await initDB();
+    await renderAll();
+    setupEventListeners();
+    
+    // Se é master, renderizar usuários
+    if (ehMaster()) {
+      await renderUsuarios();
+      setupUsuariosListeners();
+    }
+    
+    aplicarPermissoes();
+    renderizarSaudacao();
+    mostraInterfacePrincipal();
+    
+  } catch (err) {
+    // Erro no login
+    console.error('❌ Erro ao fazer login:', err.message);
+    errorEl.textContent = err.message || 'Erro ao fazer login. Tente novamente.';
+    errorEl.classList.remove('hidden');
+  } finally {
+    // Reabilitar botão
+    submitBtn.disabled = false;
+    submitBtn.textContent = originalText;
+  }
+}
+
+async function handleLogout() {
+  if (!confirm('Tem certeza que deseja fazer logout?')) return;
+  
+  try {
+    await logout();
+    
+    // Limpar dados da aplicação
+    clientes = [];
+    vendas = [];
+    comissoes = [];
+    metas = [];
+    
+    // Esconder interface
+    ocultaInterfacePrincipal();
+    
+    // Mostrar tela de login
+    document.getElementById('login-container').classList.remove('hidden');
+    document.getElementById('login-form').reset();
+    
+    // Recriar listeners de login
+    setupLoginListeners();
+    
+  } catch (err) {
+    console.error('Erro ao fazer logout:', err);
+    alert('Erro ao fazer logout. Tente novamente.');
+  }
+}
+
+function setupLoginListeners() {
+  const loginForm = document.getElementById('login-form');
+  if (loginForm) {
+    loginForm.onsubmit = handleLogin;
+  }
+}
+
+// ============ UI ESTADO ============
+
+function mostraInterfacePrincipal() {
+  document.getElementById('login-container').classList.add('hidden');
+  document.getElementById('app-header').classList.remove('hidden');
+  document.getElementById('app-nav').classList.remove('hidden');
+  document.getElementById('app-main').classList.remove('hidden');
+}
+
+function ocultaInterfacePrincipal() {
+  document.getElementById('login-container').classList.remove('hidden');
+  document.getElementById('app-header').classList.add('hidden');
+  document.getElementById('app-nav').classList.add('hidden');
+  document.getElementById('app-main').classList.add('hidden');
+}
 
 function setupEventListeners() {
   // == ABAS E NAVEGAÇÃO ==
@@ -258,6 +390,7 @@ function setupQuickFormListeners() {
         telefone: document.getElementById('qf-cliente-telefone').value, 
         email: document.getElementById('qf-cliente-email').value || '',
         dataNascimento: document.getElementById('qf-cliente-dataNascimento').value || '',
+        vendedor_id: obterIdUsuario(),
         endereco: {
           cep: document.getElementById('qf-cliente-cep')?.value || '',
           logradouro: document.getElementById('qf-cliente-logradouro')?.value || '',
@@ -282,6 +415,7 @@ function setupQuickFormListeners() {
     qfVenda.onsubmit = async (e) => {
       e.preventDefault();
       const data = { 
+        vendedor_id: obterIdUsuario(),
         clienteId: parseInt(document.getElementById('qf-venda-clienteId').value), 
         produto: document.getElementById('qf-venda-produto').value, 
         operadora: document.getElementById('qf-venda-operadora').value, 
@@ -302,6 +436,13 @@ function setupQuickFormListeners() {
 async function handleModalSave(e) {
   e.preventDefault();
   const type = modalTypeInput.value;
+  
+  // Se é usuário, usar handler especial
+  if (type === 'usuario') {
+    await handleSalvarUsuario();
+    return;
+  }
+  
   const id = editingIdInput.value;
   const store = type === 'comissao' ? 'comissoes' : `${type}s`;
   let data = {};
@@ -324,6 +465,10 @@ async function handleModalSave(e) {
         uf: document.getElementById('cliente-uf').value
       }
     };
+    // Se é novo cliente, adicionar vendedor_id
+    if (!id) {
+      data.vendedor_id = obterIdUsuario();
+    }
   } else if (type === 'venda') {
     const existing = id ? vendas.find(v => Number(v.id) === Number(id)) : null;
     data = { 
@@ -336,10 +481,16 @@ async function handleModalSave(e) {
       dataConclusao: document.getElementById('venda-dataConclusao').value, 
       observacao: document.getElementById('venda-observacao').value,
       dataRegistro: existing ? existing.dataRegistro : new Date().toISOString().split('T')[0],
-      posVendaDismissed: existing ? (existing.posVendaDismissed || []) : [] 
+      posVendaDismissed: existing ? (existing.posVendaDismissed || []) : []
     };
+    // Se é nova venda, adicionar vendedor_id
+    if (!id) {
+      data.vendedor_id = obterIdUsuario();
+    } else if (existing) {
+      data.vendedor_id = existing.vendedor_id;
+    }
   } else if (type === 'comissao') {
-    data = { produto: document.getElementById('comissao-produto').value, operadora: document.getElementById('comissao-operadora').value, comissao: document.getElementById('comissao-comissao').value, tipoCliente: document.getElementById('comissao-tipoCliente').value };
+    data = { produto: document.getElementById('comissao-produto').value, operadora: document.getElementById('comissao-operadora').value, comissao: document.getElementById('comissao-comissao').value, tipoCliente: document.getElementById('comissao-tipoCliente').value, vendedor_id: obterIdUsuario() };
   } else if (type === 'meta') {
     data = { mes: document.getElementById('meta-mes').value, ano: document.getElementById('meta-ano').value, valorMeta: document.getElementById('meta-valorMeta').value, comissaoMeta: document.getElementById('meta-comissaoMeta').value };
   }

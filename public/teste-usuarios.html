@@ -1,0 +1,220 @@
+<!-- Teste Simples de Usuários -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Usuários</title>
+    <style>
+        body { font-family: 'Courier New', monospace; background: #0f172a; color: #e2e8f0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { color: #60a5fa; }
+        .section { background: #1e293b; border: 1px solid #334155; padding: 20px; margin-bottom: 20px; border-radius: 6px; }
+        button { background: #3b82f6; color: white; border: none; padding: 12px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; margin: 5px 0; }
+        button:hover { background: #2563eb; }
+        button.danger { background: #ef4444; }
+        button.success { background: #10b981; }
+        .log { background: #0f172a; border: 1px solid #475569; padding: 15px; border-radius: 4px; max-height: 300px; overflow-y: auto; margin-top: 10px; font-size: 12px; line-height: 1.6; }
+        .log-entry { padding: 4px 0; border-bottom: 1px solid #334155; }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .info { color: #94a3b8; }
+        .warning { color: #f59e0b; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Teste de Funcionalidade de Usuários</h1>
+
+        <div class="section">
+            <h2>Status da Sessão</h2>
+            <button onclick="verificarSessao()">Verificar Sessão</button>
+            <button onclick="limparSessao()" class="danger">Limpar Sessão</button>
+            <div id="session-log" class="log"></div>
+        </div>
+
+        <div class="section">
+            <h2>Teste de Botões</h2>
+            <button onclick="testarBotaoNovoUsuario()" class="success">Simular: Clicar em "Novo Vendedor"</button>
+            <button onclick="testarBotaoEditar()" class="success">Simular: Clicar em "Editar"</button>
+            <div id="buttons-log" class="log"></div>
+        </div>
+
+        <div class="section">
+            <h2>Teste de API</h2>
+            <button onclick="testarAPIGetUsuarios()">GET /api/usuarios</button>
+            <button onclick="testarAPICriarUsuario()">POST /api/usuarios (criar)</button>
+            <div id="api-log" class="log"></div>
+        </div>
+
+        <div class="section">
+            <h2>Reset e Retorno ao Login</h2>
+            <button onclick="retornarAoLogin()" class="danger">Voltar ao Login</button>
+            <div id="reset-log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        function log(elementId, message, type = 'info') {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = message;
+            el.appendChild(entry);
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function clearLog(elementId) {
+            const el = document.getElementById(elementId);
+            if (el) el.innerHTML = '';
+        }
+
+        async function verificarSessao() {
+            clearLog('session-log');
+            const session = localStorage.getItem('CRM_USER_SESSION');
+            
+            if (!session) {
+                log('session-log', '❌ Nenhuma sessão encontrada', 'error');
+                log('session-log', 'Você precisa estar logado para usar este teste', 'warning');
+                return;
+            }
+
+            try {
+                const user = JSON.parse(session);
+                log('session-log', `✅ Sessão encontrada!`, 'success');
+                log('session-log', `Name: ${user.nome}`, 'info');
+                log('session-log', `Email: ${user.email}`, 'info');
+                log('session-log', `Perfil: ${user.perfil}`, 'info');
+                
+                if (user.perfil === 'master') {
+                    log('session-log', `✅ Você é MASTER - pode gerenciar usuários`, 'success');
+                } else {
+                    log('session-log', `⚠️ Você é ${user.perfil.toUpperCase()} - funcionalidade limitada`, 'warning');
+                }
+            } catch (e) {
+                log('session-log', `❌ Erro ao parse: ${e.message}`, 'error');
+            }
+        }
+
+        function limparSessao() {
+            clearLog('session-log');
+            localStorage.clear();
+            log('session-log', '✅ localStorage limpo!', 'success');
+            log('session-log', 'Recarregando em 2 segundos...', 'info');
+            setTimeout(() => location.reload(), 2000);
+        }
+
+        async function testarBotaoNovoUsuario() {
+            clearLog('buttons-log');
+            log('buttons-log', '🔍 Verificando disponibilidade da função abrirModalUsuario...', 'info');
+            
+            if (typeof abrirModalUsuario === 'function') {
+                log('buttons-log', `✅ Função abrirModalUsuario está disponível`, 'success');
+                log('buttons-log', `Chamando abrirModalUsuario(null)...`, 'info');
+                try {
+                    abrirModalUsuario(null);
+                    log('buttons-log', `✅ Modal de novo usuário aberto!`, 'success');
+                    log('buttons-log', `Procure pelo modal na página principal`, 'info');
+                } catch (e) {
+                    log('buttons-log', `❌ Erro: ${e.message}`, 'error');
+                }
+            } else {
+                log('buttons-log', `❌ Função abrirModalUsuario NÃO ENCONTRADA`, 'error');
+            }
+        }
+
+        async function testarBotaoEditar() {
+            clearLog('buttons-log');
+            log('buttons-log', '🔍 Buscando usuários para edição...', 'info');
+            
+            try {
+                const response = await fetch('/api/usuarios');
+                const usuarios = await response.json();
+                
+                if (usuarios.length === 0) {
+                    log('buttons-log', '❌ Nenhum usuário encontrado', 'error');
+                    return;
+                }
+
+                const usuario = usuarios[0];
+                log('buttons-log', `✅ Encontrado usuário: ${usuario.nome}`, 'success');
+                log('buttons-log', `Chamando abrirModalUsuario(${usuario.id})...`, 'info');
+                
+                if (typeof abrirModalUsuario === 'function') {
+                    abrirModalUsuario(usuario.id);
+                    log('buttons-log', `✅ Modal de edição aberto!`, 'success');
+                } else {
+                    log('buttons-log', `❌ Função não encontrada`, 'error');
+                }
+            } catch (e) {
+                log('buttons-log', `❌ Erro: ${e.message}`, 'error');
+            }
+        }
+
+        async function testarAPIGetUsuarios() {
+            clearLog('api-log');
+            log('api-log', '📡 GET /api/usuarios...', 'info');
+            
+            try {
+                const response = await fetch('/api/usuarios');
+                const usuarios = await response.json();
+                
+                log('api-log', `✅ Retornou ${usuarios.length} usuário(s)`, 'success');
+                usuarios.forEach(u => {
+                    log('api-log', `  - ${u.nome} (${u.email}) [${u.perfil}]`, 'info');
+                });
+            } catch (e) {
+                log('api-log', `❌ Erro: ${e.message}`, 'error');
+            }
+        }
+
+        async function testarAPICriarUsuario() {
+            clearLog('api-log');
+            const newUser = {
+                nome: `Teste ${Date.now()}`,
+                email: `teste${Date.now()}@empresa.com`,
+                senha: 'teste123',
+                perfil: 'vendedor',
+                ativo: 1
+            };
+            
+            log('api-log', `📡 POST /api/usuarios com dados:`, 'info');
+            log('api-log', `  nome: ${newUser.nome}`, 'info');
+            log('api-log', `  email: ${newUser.email}`, 'info');
+            
+            try {
+                const response = await fetch('/api/usuarios', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newUser)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success || result.id) {
+                    log('api-log', `✅ Usuário criado com ID: ${result.id}`, 'success');
+                } else {
+                    log('api-log', `❌ Erro: ${result.error}`, 'error');
+                }
+            } catch (e) {
+                log('api-log', `❌ Erro: ${e.message}`, 'error');
+            }
+        }
+
+        function retornarAoLogin() {
+            clearLog('reset-log');
+            log('reset-log', '🔄 Limpando e voltando ao login...', 'warning');
+            localStorage.clear();
+            log('reset-log', '✅ Redirecionando em 2 segundos...', 'success');
+            setTimeout(() => location.href = 'http://localhost:3000', 2000);
+        }
+
+        // Verificar sessão ao carregar
+        window.addEventListener('load', () => {
+            verificarSessao();
+        });
+    </script>
+</body>
+</html>

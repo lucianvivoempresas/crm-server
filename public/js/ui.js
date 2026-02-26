@@ -22,6 +22,26 @@ function showModal(type, id=null) {
     setupClienteAutocomplete('venda-clienteNome','venda-clienteId','venda-clienteNome-hint');
   }
 
+  if (type === 'usuario') {
+    // Preencher dados se for edição
+    if (id) {
+      const user = usuariosList?.find(u => u.id == id);
+      if (user) {
+        const nomeEl = document.getElementById('usuario-nome');
+        const emailEl = document.getElementById('usuario-email');
+        const ativoEl = document.getElementById('usuario-ativo');
+        
+        if (nomeEl) nomeEl.value = user.nome || '';
+        if (emailEl) emailEl.value = user.email || '';
+        if (ativoEl) ativoEl.checked = user.ativo ? true : false;
+        
+        // Alertar que senha é opcional quando editando
+        const senhaEl = document.getElementById('usuario-senha');
+        if (senhaEl) senhaEl.placeholder = 'Deixe em branco para não alterar';
+      }
+    }
+  }
+
   if (id) {
     document.getElementById('btn-modal-save').textContent = 'Atualizar';
     const storeName = (type === 'comissao') ? 'comissoes' : `${type}s`;

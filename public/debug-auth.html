@@ -1,0 +1,160 @@
+<!-- Debug de Autenticação -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Autenticação</title>
+    <style>
+        body { font-family: monospace; background: #1e293b; color: #e2e8f0; padding: 20px; max-width: 1000px; margin: 0 auto; }
+        h1 { color: #60a5fa; }
+        .section { background: #334155; border: 1px solid #475569; padding: 15px; margin-bottom: 20px; border-radius: 8px; }
+        button { background: #3b82f6; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; margin: 5px 0; }
+        button:hover { background: #2563eb; }
+        .log { background: #0f172a; border: 1px solid #475569; padding: 10px; border-radius: 4px; max-height: 200px; overflow-y: auto; margin-top: 10px; font-size: 12px; }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+        .info { color: #94a3b8; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug de Autenticação</h1>
+
+    <div class="section">
+        <h2>1. Estado do localStorage</h2>
+        <button onclick="verificarLocalStorage()">Verificar localStorage</button>
+        <div id="ls-info" class="log"></div>
+    </div>
+
+    <div class="section">
+        <h2>2. Limpar Sessão</h2>
+        <button onclick="limparSessao()" style="background: #ef4444;">LIMPAR localStorage</button>
+        <button onclick="verificarLocalStorage()">Verificar após limpeza</button>
+        <div id="clear-info" class="log"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. Testar Login</h2>
+        <input type="email" id="test-email" placeholder="Email" value="master@empresa.com">
+        <input type="password" id="test-senha" placeholder="Senha" value="123456">
+        <button onclick="testarLogin()">Testar Login</button>
+        <div id="login-info" class="log"></div>
+    </div>
+
+    <div class="section">
+        <h2>4. Testar Funções Auth</h2>
+        <button onclick="testarFuncoesAuth()">Testar Funções</button>
+        <div id="functions-info" class="log"></div>
+    </div>
+
+    <script src="/js/globals.js"></script>
+    <script src="/js/auth.js"></script>
+
+    <script>
+        const AUTH_STORAGE_KEY = 'CRM_USER_SESSION';
+
+        function log(message, type = 'info') {
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function addOutput(elementId, message, type = 'info') {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = message;
+            el.appendChild(entry);
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function verificarLocalStorage() {
+            const el = document.getElementById('ls-info');
+            el.innerHTML = '';
+
+            const session = localStorage.getItem(AUTH_STORAGE_KEY);
+            addOutput('ls-info', `localStorage.getItem('${AUTH_STORAGE_KEY}'):`, 'info');
+            
+            if (session) {
+                try {
+                    const user = JSON.parse(session);
+                    addOutput('ls-info', `✅ Sessão encontrada:`, 'success');
+                    addOutput('ls-info', `  ID: ${user.id}`, 'success');
+                    addOutput('ls-info', `  Nome: ${user.nome}`, 'success');
+                    addOutput('ls-info', `  Email: ${user.email}`, 'success');
+                    addOutput('ls-info', `  Perfil: ${user.perfil}`, 'success');
+                } catch (e) {
+                    addOutput('ls-info', `❌ Erro ao parse: ${e.message}`, 'error');
+                }
+            } else {
+                addOutput('ls-info', `❌ Nenhuma sessão salva`, 'error');
+            }
+
+            // Verificar outras chaves
+            addOutput('ls-info', '', 'info');
+            addOutput('ls-info', 'Todas as chaves no localStorage:', 'info');
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                addOutput('ls-info', `  ${key}: ${localStorage.getItem(key).substring(0, 50)}...`, 'info');
+            }
+        }
+
+        function limparSessao() {
+            const el = document.getElementById('clear-info');
+            el.innerHTML = '';
+
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+            localStorage.removeItem('CRM_AUTH_TOKEN');
+            
+            addOutput('clear-info', `✅ localStorage limpo!`, 'success');
+            addOutput('clear-info', `Recarregue a página para voltar ao login`, 'info');
+        }
+
+        async function testarLogin() {
+            const el = document.getElementById('login-info');
+            el.innerHTML = '';
+
+            const email = document.getElementById('test-email').value;
+            const senha = document.getElementById('test-senha').value;
+
+            addOutput('login-info', `🔐 Tentando login com: ${email}`, 'info');
+
+            try {
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, senha })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    addOutput('login-info', `✅ Login bem-sucedido!`, 'success');
+                    addOutput('login-info', `Usuário: ${result.usuario.nome}`, 'success');
+                    addOutput('login-info', `Perfil: ${result.usuario.perfil}`, 'success');
+                    addOutput('login-info', ``, 'info');
+                    addOutput('login-info', `🔍 Agora verifique localStorage:`, 'info');
+                } else {
+                    addOutput('login-info', `❌ Login falhou: ${result.error}`, 'error');
+                }
+            } catch (e) {
+                addOutput('login-info', `❌ Erro: ${e.message}`, 'error');
+            }
+        }
+
+        function testarFuncoesAuth() {
+            const el = document.getElementById('functions-info');
+            el.innerHTML = '';
+
+            addOutput('functions-info', `estaLogado(): ${estaLogado()}`, 'info');
+            addOutput('functions-info', `obterUsuarioLogado(): ${JSON.stringify(obterUsuarioLogado(), null, 2)}`, 'info');
+            addOutput('functions-info', `ehMaster(): ${ehMaster()}`, 'info');
+            addOutput('functions-info', `ehVendedor(): ${ehVendedor()}`, 'info');
+            addOutput('functions-info', `obterIdUsuario(): ${obterIdUsuario()}`, 'info');
+        }
+
+        // Executar ao carregar
+        verificarLocalStorage();
+    </script>
+</body>
+</html>

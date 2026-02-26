@@ -23,10 +23,18 @@ async function fetchCNPJData(cnpj) {
     }
 
     // Requisita para o backend (contorna CORS)
-    const url = `/api-cnpj/buscar/${cleanCnpj}`;
+    const baseUrl = window.location.protocol + '//' + window.location.host;
+    const url = `${baseUrl}/api-cnpj/buscar/${cleanCnpj}`;
     console.log(`📡 Requisitando: ${url}`);
 
     const response = await fetch(url);
+    
+    console.log(`📊 Status da resposta: ${response.status}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
     const data = await response.json();
 
     console.log(`📥 Resposta recebida:`, data);

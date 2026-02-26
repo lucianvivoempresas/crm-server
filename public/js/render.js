@@ -19,8 +19,20 @@ function renderDashboard() {
   const filterValue = filterEl ? filterEl.value : 'this_month';
   const range = getDateRangeFromFilter(filterValue);
 
-  const vendasPeriodo = filterVendasByDateRange(vendas, range);
-  const totalClientes = clientes.length;
+  // Filtrar vendas por vendedor se não for master
+  const user = obterUsuarioLogado();
+  let vendasUsuario = vendas;
+  if (user && user.perfil === 'vendedor') {
+    vendasUsuario = vendas.filter(v => v.vendedor_id === user.id);
+  }
+
+  const vendasPeriodo = filterVendasByDateRange(vendasUsuario, range);
+  // Filtrar clientes também por vendedor se não for master
+  let clientesUsuario = clientes;
+  if (user && user.perfil === 'vendedor') {
+    clientesUsuario = clientes.filter(c => c.vendedor_id === user.id);
+  }
+  const totalClientes = clientesUsuario.length;
   const totalVendasConcluidas = vendasPeriodo.reduce((acc, v) => acc + (Number(v.valorVenda) || 0), 0);
   const totalComissoesPeriodo = vendasPeriodo.reduce((acc, v) => acc + calcularComissao(v), 0);
 
@@ -110,7 +122,15 @@ function chartOptions(isLineChart) {
 function renderVendasRecentes() {
   const container = document.getElementById('vendas-recentes-container');
   const emptyEl = document.getElementById('vendas-recentes-empty');
-  const recentes = [...vendas].sort((a,b) => (new Date(b.dataConclusao||b.dataRegistro).getTime() || 0) - (new Date(a.dataConclusao||a.dataRegistro).getTime() || 0)).slice(0,5);
+  
+  // Filtrar vendas por vendedor se não for master
+  const user = obterUsuarioLogado();
+  let vendasFiltradas = vendas;
+  if (user && user.perfil === 'vendedor') {
+    vendasFiltradas = vendas.filter(v => v.vendedor_id === user.id);
+  }
+  
+  const recentes = [...vendasFiltradas].sort((a,b) => (new Date(b.dataConclusao||b.dataRegistro).getTime() || 0) - (new Date(a.dataConclusao||a.dataRegistro).getTime() || 0)).slice(0,5);
 
   if (!recentes.length) { container.innerHTML = ''; emptyEl.classList.remove('hidden'); return; }
   emptyEl.classList.add('hidden');
@@ -128,8 +148,14 @@ function renderVendasTable() {
   const filterStatus = document.getElementById('filter-vendas-status')?.value;
   const filterMonth = document.getElementById('filter-vendas-month')?.value;
 
-  const filtradas = vendas.filter(v => {
+  const user = obterUsuarioLogado();
+  
+  let filtradas = vendas.filter(v => {
     const c = clientes.find(cl => cl.id === v.clienteId);
+    // Se é vendedor, filtrar apenas suas vendas
+    if (user && user.perfil === 'vendedor' && v.vendedor_id !== user.id) {
+      return false;
+    }
     return (!searchTerm || (c?.nome||'').toLowerCase().includes(searchTerm)) &&
            (!filterStatus || v.status === filterStatus) &&
            (!filterMonth || (v.dataConclusao && v.dataConclusao.startsWith(filterMonth)));
@@ -159,10 +185,21 @@ function renderVendasTable() {
 function renderClientesGrid() {
   const container = document.getElementById('clientes-grid-container');
   const emptyEl = document.getElementById('clientes-grid-empty');
-  if (!clientes.length) { container.innerHTML = ''; emptyEl.classList.remove('hidden'); return; }
+  
+  // Filtrar clientes baseado no perfil
+  let clientesFiltrados = clientes;
+  const user = obterUsuarioLogado();
+  
+  if (user && user.perfil === 'vendedor') {
+    // Vendedor vê apenas seus clientes
+    clientesFiltrados = clientes.filter(c => c.vendedor_id === user.id);
+  }
+  // Master vê todos
+  
+  if (!clientesFiltrados.length) { container.innerHTML = ''; emptyEl.classList.remove('hidden'); return; }
   
   emptyEl.classList.add('hidden');
-  container.innerHTML = clientes.map(cliente => {
+  container.innerHTML = clientesFiltrados.map(cliente => {
     const inicial = cliente.nome ? cliente.nome.charAt(0).toUpperCase() : '?';
     return `
       <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700 hover:border-blue-500/50 transition-all">
@@ -256,10 +293,18 @@ function renderPosVenda() {
 function renderComissoesTable() {
   const tbody = document.getElementById('comissoes-table-body');
   const emptyEl = document.getElementById('comissoes-table-empty');
-  if (!comissoes.length) { tbody.innerHTML = ''; emptyEl.classList.remove('hidden'); return; }
+  
+  // Filtra comissões por vendedor se estiver logado como vendedor
+  const user = obterUsuarioLogado();
+  let comissoesVisíveis = comissoes;
+  if (user && user.perfil === 'vendedor') {
+    comissoesVisíveis = comissoes.filter(c => !c.vendedor_id || c.vendedor_id === user.id);
+  }
+  
+  if (!comissoesVisíveis.length) { tbody.innerHTML = ''; emptyEl.classList.remove('hidden'); return; }
   
   emptyEl.classList.add('hidden');
-  tbody.innerHTML = comissoes.map(c => `
+  tbody.innerHTML = comissoesVisíveis.map(c => `
     <tr class="hover:bg-slate-700/30 transition-colors">
       <td class="px-6 py-4 text-white font-medium">${c.produto}</td>
       <td class="px-6 py-4 text-slate-300">${c.tipoCliente}</td>

@@ -1,0 +1,356 @@
+<!-- Diagnóstico Completo do Sistema -->
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico CRM</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Courier New', monospace; background: #0f172a; color: #e2e8f0; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #60a5fa; margin-bottom: 20px; }
+        h2 { color: #93c5fd; margin-top: 20px; margin-bottom: 10px; border-bottom: 2px solid #475569; padding-bottom: 5px; }
+        .section { background: #1e293b; border: 1px solid #334155; padding: 15px; margin-bottom: 15px; border-radius: 6px; }
+        button { background: #3b82f6; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; margin: 5px 0; font-family: monospace; }
+        button:hover { background: #2563eb; }
+        button.danger { background: #ef4444; }
+        input { background: #334155; color: #e2e8f0; border: 1px solid #475569; padding: 8px; border-radius: 4px; margin: 5px 0; font-family: monospace; }
+        .log { background: #0f172a; border: 1px solid #475569; padding: 12px; border-radius: 4px; max-height: 300px; overflow-y: auto; margin-top: 10px; font-size: 11px; }
+        .log-entry { padding: 4px 0; border-bottom: 1px solid #334155; }
+        .success { color: #10b981; }
+        .error { color: #ef4444; }
+        .warning { color: #f59e0b; }
+        .info { color: #94a3b8; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Diagnóstico Completo do CRM</h1>
+
+        <!-- Status do Servidor -->
+        <div class="section">
+            <h2>1️⃣ Status do Servidor</h2>
+            <button onclick="testarServidorStatus()">Testar Conexão</button>
+            <div id="server-status" class="log"></div>
+        </div>
+
+        <!-- APIs -->
+        <div class="section">
+            <h2>2️⃣ Testar APIs</h2>
+            <div class="grid">
+                <div>
+                    <h3 style="color: #a78bfa;">GET /api/usuarios</h3>
+                    <button onclick="testarAPI('/api/usuarios', 'GET')">Testar</button>
+                    <div id="api-usuarios" class="log"></div>
+                </div>
+                <div>
+                    <h3 style="color: #a78bfa;">POST /api/usuarios</h3>
+                    <button onclick="testarAPIPost()">Testar Criar</button>
+                    <div id="api-create" class="log"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- localStorage -->
+        <div class="section">
+            <h2>3️⃣ localStorage</h2>
+            <div style="margin-bottom: 10px;">
+                <button onclick="verificarLocalStorage()">Verificar</button>
+                <button onclick="limparLocalStorage()" class="danger">LIMPAR TUDO</button>
+            </div>
+            <div id="ls-status" class="log"></div>
+        </div>
+
+        <!-- Autenticação -->
+        <div class="section">
+            <h2>4️⃣ Testar Autenticação</h2>
+            <div>
+                <input type="email" id="login-email" placeholder="Email" value="master@empresa.com">
+                <input type="password" id="login-senha" placeholder="Senha" value="123456">
+                <button onclick="testarLogin()">Login</button>
+            </div>
+            <div id="login-result" class="log"></div>
+        </div>
+
+        <!-- Funções JS -->
+        <div class="section">
+            <h2>5️⃣ Verificar Funções JS</h2>
+            <button onclick="verificarFuncoes()">Verificar</button>
+            <div id="functions-status" class="log"></div>
+        </div>
+
+        <!-- HTML Elements -->
+        <div class="section">
+            <h2>6️⃣ Verificar Elementos HTML</h2>
+            <button onclick="verificarElementosHTML()">Verificar</button>
+            <div id="elements-status" class="log"></div>
+        </div>
+
+        <!-- Event Listeners -->
+        <div class="section">
+            <h2>7️⃣ Verificar Event Listeners</h2>
+            <button onclick="verificarEventListeners()">Verificar</button>
+            <div id="listeners-status" class="log"></div>
+        </div>
+
+        <!-- Reset Completo -->
+        <div class="section">
+            <h2>8️⃣ Reset Completo</h2>
+            <button onclick="resetCompleto()" class="danger">🔄 RESET TOTAL (limpar e recarregar)</button>
+            <div id="reset-status" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        function log(elementId, message, type = 'info') {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            entry.textContent = message;
+            el.appendChild(entry);
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function clearLog(elementId) {
+            const el = document.getElementById(elementId);
+            if (el) el.innerHTML = '';
+        }
+
+        // 1. Testar Servidor
+        async function testarServidorStatus() {
+            clearLog('server-status');
+            try {
+                const response = await fetch('http://localhost:3000/');
+                if (response.ok) {
+                    log('server-status', '✅ Servidor está rodando', 'success');
+                    log('server-status', `Status: ${response.status}`, 'info');
+                } else {
+                    log('server-status', `⚠️ Servidor respondeu com código: ${response.status}`, 'warning');
+                }
+            } catch (e) {
+                log('server-status', `❌ Erro: ${e.message}`, 'error');
+            }
+        }
+
+        // 2. Testar APIs
+        async function testarAPI(endpoint, method = 'GET') {
+            clearLog('api-usuarios');
+            try {
+                const response = await fetch(`http://localhost:3000${endpoint}`, { method });
+                if (response.ok) {
+                    const data = await response.json();
+                    log('api-usuarios', `✅ ${method} ${endpoint}`, 'success');
+                    log('api-usuarios', `Retornou ${Array.isArray(data) ? data.length : 1} item(ns)`, 'info');
+                    log('api-usuarios', JSON.stringify(data, null, 2), 'info');
+                } else {
+                    log('api-usuarios', `❌ Status ${response.status}`, 'error');
+                }
+            } catch (e) {
+                log('api-usuarios', `❌ Erro: ${e.message}`, 'error');
+            }
+        }
+
+        async function testarAPIPost() {
+            clearLog('api-create');
+            try {
+                const newUser = {
+                    nome: 'Teste User',
+                    email: `teste${Date.now()}@empresa.com`,
+                    senha: 'teste123',
+                    perfil: 'vendedor',
+                    ativo: 1
+                };
+                
+                const response = await fetch('http://localhost:3000/api/usuarios', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(newUser)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success || result.id) {
+                    log('api-create', `✅ Usuário criado com sucesso!`, 'success');
+                    log('api-create', `ID: ${result.id}`, 'info');
+                    log('api-create', `Response: ${JSON.stringify(result, null, 2)}`, 'info');
+                } else {
+                    log('api-create', `⚠️ Resposta: ${JSON.stringify(result, null, 2)}`, 'warning');
+                }
+            } catch (e) {
+                log('api-create', `❌ Erro: ${e.message}`, 'error');
+            }
+        }
+
+        // 3. localStorage
+        function verificarLocalStorage() {
+            clearLog('ls-status');
+            const keys = ['CRM_USER_SESSION', 'CRM_AUTH_TOKEN'];
+            
+            keys.forEach(key => {
+                const value = localStorage.getItem(key);
+                if (value) {
+                    log('ls-status', `✅ ${key} está salvo`, 'success');
+                    if (key === 'CRM_USER_SESSION') {
+                        try {
+                            const user = JSON.parse(value);
+                            log('ls-status', `   User: ${user.nome} (${user.perfil})`, 'info');
+                        } catch (e) {
+                            log('ls-status', `   ⚠️ Erro ao parse: ${e.message}`, 'warning');
+                        }
+                    }
+                } else {
+                    log('ls-status', `❌ ${key} não encontrado`, 'warning');
+                }
+            });
+
+            log('ls-status', `Total de itens no localStorage: ${localStorage.length}`, 'info');
+        }
+
+        function limparLocalStorage() {
+            clearLog('ls-status');
+            localStorage.clear();
+            sessionStorage.clear();
+            log('ls-status', '✅ localStorage limpo', 'success');
+            log('ls-status', 'Recarregue a página após 2 segundos...', 'info');
+            setTimeout(() => location.reload(), 2000);
+        }
+
+        // 4. Login
+        async function testarLogin() {
+            clearLog('login-result');
+            const email = document.getElementById('login-email').value;
+            const senha = document.getElementById('login-senha').value;
+            
+            log('login-result', `🔐 Tentando login: ${email}`, 'info');
+            
+            try {
+                const response = await fetch('http://localhost:3000/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, senha })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success && result.usuario) {
+                    log('login-result', `✅ Login bem-sucedido!`, 'success');
+                    log('login-result', `Usuário: ${result.usuario.nome}`, 'info');
+                    log('login-result', `Perfil: ${result.usuario.perfil}`, 'info');
+                    log('login-result', `Token: ${result.token ? 'Sim' : 'Não'}`, 'info');
+                } else {
+                    log('login-result', `❌ Login falhou: ${result.error}`, 'error');
+                }
+            } catch (e) {
+                log('login-result', `❌ Erro: ${e.message}`, 'error');
+            }
+        }
+
+        // 5. Funções JS
+        function verificarFuncoes() {
+            clearLog('functions-status');
+            const funcoes = [
+                'recuperarSessao',
+                'estaLogado',
+                'obterUsuarioLogado',
+                'ehMaster',
+                'ehVendedor',
+                'renderUsuarios',
+                'abrirModalUsuario',
+                'handleSalvarUsuario',
+                'setupUsuariosListeners',
+                'showModal',
+                'hideModal'
+            ];
+
+            funcoes.forEach(funcao => {
+                if (typeof window[funcao] === 'function') {
+                    log('functions-status', `✅ ${funcao}()`, 'success');
+                } else {
+                    log('functions-status', `❌ ${funcao} não encontrada`, 'error');
+                }
+            });
+        }
+
+        // 6. Elementos HTML
+        function verificarElementosHTML() {
+            clearLog('elements-status');
+            const elementos = [
+                'modal',
+                'modal-form',
+                'modal-form-content',
+                'modal-type-input',
+                'modal-editing-id-input',
+                'modal-error-message',
+                'btn-novo-usuario',
+                'usuarios-table-body',
+                'usuario-nome',
+                'usuario-email',
+                'usuario-senha',
+                'usuario-confirmaSenha',
+                'usuario-ativo',
+                'usuario-ativo-container'
+            ];
+
+            elementos.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) {
+                    log('elements-status', `✅ #${id}`, 'success');
+                } else {
+                    log('elements-status', `❌ #${id} não encontrado`, 'error');
+                }
+            });
+        }
+
+        // 7. Event Listeners
+        function verificarEventListeners() {
+            clearLog('listeners-status');
+            
+            const btnNovoUsuario = document.getElementById('btn-novo-usuario');
+            if (btnNovoUsuario) {
+                log('listeners-status', `✅ #btn-novo-usuario encontrado`, 'success');
+                log('listeners-status', `   onclick: ${btnNovoUsuario.onclick ? 'Sim' : 'Não'}`, 'info');
+            } else {
+                log('listeners-status', `❌ #btn-novo-usuario não encontrado`, 'error');
+            }
+
+            const modalForm = document.getElementById('modal-form');
+            if (modalForm) {
+                log('listeners-status', `✅ #modal-form encontrado`, 'success');
+                log('listeners-status', `   onsubmit: ${modalForm.onsubmit ? 'Sim' : 'Não'}`, 'info');
+            } else {
+                log('listeners-status', `❌ #modal-form não encontrado`, 'error');
+            }
+
+            log('listeners-status', '', 'info');
+            log('listeners-status', 'Testando listener do botão...', 'info');
+            if (btnNovoUsuario && typeof abrirModalUsuario === 'function') {
+                log('listeners-status', '✅ Função abrirModalUsuario está disponível', 'success');
+            }
+        }
+
+        // 8. Reset
+        function resetCompleto() {
+            clearLog('reset-status');
+            log('reset-status', '🔄 Iniciando reset...', 'warning');
+            localStorage.clear();
+            sessionStorage.clear();
+            log('reset-status', '✅ localStorage e sessionStorage limpos', 'success');
+            log('reset-status', '⏳ Recarregando página em 2 segundos...', 'info');
+            setTimeout(() => location.href = 'http://localhost:3000', 2000);
+        }
+
+        // Auto-executar testes ao carregar
+        window.addEventListener('load', () => {
+            testarServidorStatus();
+            verificarLocalStorage();
+            verificarFuncoes();
+            verificarElementosHTML();
+            verificarEventListeners();
+        });
+    </script>
+</body>
+</html>
