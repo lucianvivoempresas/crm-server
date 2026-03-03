@@ -772,6 +772,7 @@
     <div><label class="block text-sm text-slate-300 mb-2">Cidade</label><input type="text" id="cliente-cidade" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
     <!-- campo de vendedor só aparece para master, preenchido dinamicamente -->
     <div id="cliente-vendedor-field" class="hidden"><label class="block text-sm text-slate-300 mb-2">Vendedor (só master)</label><select id="cliente-vendedor_id" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"><option value="">(nenhum)</option></select></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Meses desde última venda</label><input type="number" id="cliente-mesesDesdeUltimaVenda" min="0" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" placeholder="Ex: 3"></div>
   </template>
 
   <template id="template-form-venda">
@@ -840,6 +841,12 @@
     <div><label class="block text-sm text-slate-300 mb-2">Email *</label><input type="email" id="usuario-email" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
     <div><label class="block text-sm text-slate-300 mb-2">Senha *</label><input type="password" id="usuario-senha" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" placeholder="Deixe em branco para gerar automaticamente"></div>
     <div><label class="block text-sm text-slate-300 mb-2">Confirmar Senha *</label><input type="password" id="usuario-confirmaSenha" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" placeholder="Confirmação"></div>
+    <div><label class="block text-sm text-slate-300 mb-2">Perfil</label>
+      <select id="usuario-perfil" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white">
+        <option value="vendedor">Vendedor</option>
+        <option value="master">Administrador (master)</option>
+      </select>
+    </div>
     <div id="usuario-ativo-container"><label class="flex items-center gap-2 text-slate-300 cursor-pointer"><input type="checkbox" id="usuario-ativo" class="w-4 h-4 rounded" checked><span>Ativo</span></label></div>
   </template>
 

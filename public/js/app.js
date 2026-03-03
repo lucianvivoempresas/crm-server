@@ -439,6 +439,20 @@ function setupEventListeners() {
     };
   }
 
+  // Esconder opções de importação para perfis que não são master
+  try {
+    const user = obterUsuarioLogado();
+    const isMasterUser = user && user.perfil === 'master';
+    if (!isMasterUser) {
+      // esconder botões que disparam a importação
+      btnsImportClientes.forEach(b => b.style.display = 'none');
+      if (btnImportClientesVendas) btnImportClientesVendas.style.display = 'none';
+      if (btnImportVendas) btnImportVendas.style.display = 'none';
+    }
+  } catch (e) {
+    console.warn('Falha ao checar perfil para esconder import:', e);
+  }
+
   // Inicializa a lógica complementar
   setupQuickFormListeners();
 }
@@ -578,6 +592,11 @@ async function handleModalSave(e) {
         uf: document.getElementById('cliente-uf').value
       }
     };
+    // novo campo: meses desde a última venda
+    const mesesEl = document.getElementById('cliente-mesesDesdeUltimaVenda');
+    if (mesesEl && mesesEl.value !== '') {
+      data.mesesDesdeUltimaVenda = parseInt(mesesEl.value, 10) || 0;
+    }
     // se campo de vendedor estiver disponível (master), pegar valor
     const vendedorEl = document.getElementById('cliente-vendedor_id');
     if (vendedorEl && vendedorEl.value) {

@@ -127,6 +127,8 @@ async function handleSalvarUsuario() {
     
     const nome = nomeInput?.value?.trim();
     const email = emailInput?.value?.trim();
+    const perfilSelect = document.getElementById('usuario-perfil');
+    const perfilValue = perfilSelect ? perfilSelect.value : 'vendedor';
     const senha = senhaInput?.value?.trim();
     const confirma = confirmInput?.value?.trim();
     const ativo = ativoCheckbox?.checked !== false;
@@ -159,8 +161,17 @@ async function handleSalvarUsuario() {
     }
     
     try {
-        const dados = { nome, email, ativo };
-        if (senha) dados.senha = senha;
+                const dados = { nome, email, ativo };
+                if (senha) dados.senha = senha;
+                // Somente master pode alterar o perfil dos usuários
+                try {
+                    const usuarioLogado = obterUsuarioLogado();
+                    if (usuarioLogado && usuarioLogado.perfil === 'master') {
+                        dados.perfil = perfilValue || 'vendedor';
+                    }
+                } catch(e) {
+                    console.warn('Não foi possível checar perfil do usuário atual', e);
+                }
         
         const url = usuarioId 
             ? `${API_URL.replace('/api', '')}/api/usuarios/${usuarioId}`

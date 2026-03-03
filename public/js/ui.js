@@ -53,6 +53,20 @@ function showModal(type, id=null) {
         if (senhaEl) senhaEl.placeholder = 'Deixe em branco para não alterar';
       }
     }
+    // Mostrar/ocultar campo de perfil dependendo do usuário atual (apenas master pode ver/editar)
+    try {
+      const userLogado = obterUsuarioLogado();
+      const perfilEl = document.getElementById('usuario-perfil');
+      if (perfilEl) {
+        if (userLogado && userLogado.perfil === 'master') {
+          perfilEl.parentElement.classList.remove('hidden');
+        } else {
+          perfilEl.parentElement.classList.add('hidden');
+        }
+      }
+    } catch (e) {
+      console.warn('Erro ao aplicar controle de perfil no modal:', e);
+    }
   }
 
   if (type === 'comissao') {
