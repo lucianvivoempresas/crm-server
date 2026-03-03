@@ -556,43 +556,62 @@ app.get('/api-cnpj/buscar/:cnpj', async (req, res) => {
     }
 
     try {
-        const url = `https://www.receitaws.com.br/v1/cnpj/${cnpj}`;
-        console.log(`📡 Backend: Requisitando ${url}`);
-        
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        console.log(`✅ Backend: Resposta recebida`, data);
+        let data;
+        // primeira tentativa com receitaws
+        const url1 = `https://www.receitaws.com.br/v1/cnpj/${cnpj}`;
+        console.log(`📡 Backend: Requisitando ${url1}`);
+        try {
+            const resp1 = await fetch(url1);
+            data = await resp1.json();
+            console.log(`✅ Backend: Receitaws respondeu`, data);
+        } catch (err1) {
+            console.warn('⚠️ Receitaws falhou:', err1.message);
+        }
 
-        if (data.status === '400' || data.status === 400 || data.message) {
+        // se a primeira não retornou dados válidos, tente brasilapi
+        if (!data || data.status === '400' || data.status === 400 || data.message) {
+            console.log('🔁 Tentando fallback para brasilapi');
+            const url2 = `https://brasilapi.com.br/api/cnpj/v1/${cnpj}`;
+            try {
+                const resp2 = await fetch(url2);
+                data = await resp2.json();
+                console.log('✅ Backend: BrasilAPI respondeu', data);
+            } catch (err2) {
+                console.warn('⚠️ BrasilAPI falhou:', err2.message);
+            }
+        }
+
+        // se mesmo assim não temos objeto útil ou há mensagem de erro, responder erro
+        if (!data || data.status === '400' || data.status === 400 || data.message || data.error) {
+            const msg = data && (data.message || data.error) ? (data.message || data.error) : 'CNPJ não encontrado ou serviço indisponível';
             return res.status(200).json({
                 success: false,
-                error: data.message || 'CNPJ não encontrado'
+                error: msg
             });
         }
 
-        // Formata os dados
+        // Formata os dados (os campos podem variar entre APIs)
         const resultado = {
             success: true,
-            razaoSocial: data.nome || '',
-            endereco: data.logradouro || '',
-            numero: data.numero || '',
-            complemento: data.complemento || '',
-            bairro: data.bairro || '',
-            cidade: data.municipio || '',
-            uf: data.uf || '',
-            cep: data.cep || '',
-            telefone: data.telefone || '',
-            email: data.email || ''
+            razaoSocial: data.nome || data.razao_social || '',
+            endereco: data.logradouro || data.estabelecimento?.logradouro || '',
+            numero: data.numero || data.estabelecimento?.numero || '',
+            complemento: data.complemento || data.estabelecimento?.complemento || '',
+            bairro: data.bairro || data.estabelecimento?.bairro || '',
+            cidade: data.municipio || data.estabelecimento?.municipio || '',
+            uf: data.uf || data.estabelecimento?.uf || '',
+            cep: data.cep || data.estabelecimento?.cep || '',
+            telefone: data.telefone || data.telefone || '',
+            email: data.email || data.email || ''
         };
 
         res.json(resultado);
 
     } catch (error) {
-        console.error(`❌ Backend: Erro ao buscar CNPJ`, error.message);
+        console.error(`❌ Backend: Erro inesperado ao buscar CNPJ`, error.message);
         return res.status(200).json({
             success: false,
-            error: error.message
+            error: error.message || 'falha interna'
         });
     }
 });
