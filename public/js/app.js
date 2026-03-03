@@ -142,6 +142,110 @@ function ocultaInterfacePrincipal() {
   document.getElementById('app-main').classList.add('hidden');
 }
 
+/* ---- helpers para vendedores ---- */
+
+/**
+ * Carrega lista de usuários de perfil "vendedor" do backend
+ * Retorna Promise<array>
+ */
+function carregarVendedores() {
+  return getAllData('usuarios').then(u => (u||[]).filter(x => x.perfil === 'vendedor' && x.ativo)).catch(err => { console.error(err); return []; });
+}
+
+/**
+ * Preenche um <select> com as opções de vendedores
+ */
+function popularSelectVendedores(selectEl, includeEmpty = true) {
+  if (!selectEl) return;
+  selectEl.innerHTML = includeEmpty ? '<option value="">(nenhum)</option>' : '';
+  carregarVendedores().then(lista => {
+    lista.forEach(u => {
+      const opt = document.createElement('option');
+      opt.value = u.id;
+      opt.textContent = u.nome;
+      selectEl.appendChild(opt);
+    });
+  });
+}
+
+/**
+ * Exibe modal que permite ao master atribuir vendedores a um conjunto de clientes
+ */
+function showAssignVendorModal(clients) {
+  const modal = document.getElementById('assign-vendor-modal');
+  const container = document.getElementById('assign-vendor-list');
+  if (!modal || !container) return;
+  container.innerHTML = '';
+  clients.forEach(c => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center gap-2 mb-2';
+    row.innerHTML = `
+      <span class="flex-1 text-white truncate" title="${c.nome}">${c.nome}</span>
+      <select data-client-id="${c.id}" class="assign-vendor-select w-1/3 px-2 py-1 bg-slate-700 text-white rounded">
+        <option value="">(nenhum)</option>
+      </select>
+    `;
+    container.appendChild(row);
+    // preencher select individual
+    const sel = row.querySelector('select');
+    popularSelectVendedores(sel);
+  });
+  modal.classList.remove('hidden');
+}
+
+function hideAssignVendorModal() {
+  const modal = document.getElementById('assign-vendor-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+// vincular botões do modal
+window.addEventListener('load', () => {
+  const btnCancel = document.getElementById('assign-vendor-cancel');
+  const btnSave = document.getElementById('assign-vendor-save');
+  if (btnCancel) btnCancel.onclick = hideAssignVendorModal;
+  if (btnSave) {
+    btnSave.onclick = async () => {
+      const selects = document.querySelectorAll('.assign-vendor-select');
+      for (let sel of selects) {
+        const vendId = sel.value;
+        const clientId = sel.dataset.clientId;
+        if (vendId && clientId) {
+          const client = clientes.find(x => String(x.id) === String(clientId));
+          if (client) {
+            client.vendedor_id = parseInt(vendId, 10);
+            await updateData('clientes', client);
+          }
+        }
+      }
+      await renderAll();
+      hideAssignVendorModal();
+    };
+  }
+});
+
+function deduplicateClients() {
+  if (!confirm('Remover duplicados por CPF/CNPJ? Esta ação não pode ser desfeita.')) return;
+  const seen = new Map();
+  let removed = 0;
+  const listCopy = [...clientes];
+  for (const c of listCopy) {
+    const key = normalizeDoc(c.cpfCnpj);
+    if (!key) continue;
+    if (seen.has(key)) {
+      try {
+        await deleteData('clientes', c.id);
+        removed++;
+      } catch(e) {
+        console.error('Erro ao deletar duplicado', e);
+      }
+    } else {
+      seen.set(key, c);
+    }
+  }
+  if (removed) showQuickMessage(`${removed} duplicado(s) removido(s)`);
+  await renderAll();
+}
+
 function setupEventListeners() {
   // == ABAS E NAVEGAÇÃO ==
   const tabsContainer = document.getElementById('tabs-container');
@@ -184,6 +288,15 @@ function setupEventListeners() {
 
   const elExportClientes = document.getElementById('btn-export-clientes');
   if (elExportClientes) elExportClientes.onclick = () => exportToCSV('clientes');
+  const elDedupe = document.getElementById('btn-dedupe-clientes');
+  if (elDedupe) {
+    const user = obterUsuarioLogado();
+    if (user && user.perfil !== 'master') {
+      elDedupe.style.display = 'none';
+    } else {
+      elDedupe.onclick = () => deduplicateClients();
+    }
+  }
 
   // == BOTÕES DE NOVO (MODAIS) ==
   const btnNovaVenda = document.getElementById('btn-nova-venda');
@@ -465,8 +578,13 @@ async function handleModalSave(e) {
         uf: document.getElementById('cliente-uf').value
       }
     };
-    // Se é novo cliente, adicionar vendedor_id
-    if (!id) {
+    // se campo de vendedor estiver disponível (master), pegar valor
+    const vendedorEl = document.getElementById('cliente-vendedor_id');
+    if (vendedorEl && vendedorEl.value) {
+      data.vendedor_id = parseInt(vendedorEl.value, 10);
+    }
+    // Se é novo cliente e não foi definido pelo master, adicionar vendedor_id
+    if (!id && data.vendedor_id == null) {
       data.vendedor_id = obterIdUsuario();
     }
   } else if (type === 'venda') {
@@ -636,6 +754,7 @@ async function runImportClientes() {
     });
 
     let created = 0, updated = 0, duplicated = 0;
+    const newClients = [];
     for (const row of importRowsCache) {
       const doc = normalizeDoc(getMappedValue(row,'cpfCnpj'));
       if (!doc) continue;
@@ -668,6 +787,7 @@ async function runImportClientes() {
         clientes.push(clientePayload);
         byDoc.set(doc, clientePayload);
         created++;
+        newClients.push(clientePayload);
       } else if (existing && existing.id) {
         // Cliente já existe - atualizar dados sem duplicar
         const merged = JSON.parse(JSON.stringify(existing));
@@ -703,6 +823,12 @@ async function runImportClientes() {
     await renderAll();
     hideImportClientesModal();
     showQuickMessage(`Importação: ${created} novo(s), ${updated} atualizado(s), ${duplicated} duplicado(s) ignorado(s).`);
+
+    // se foi master e há novos clientes, permite atribuir vendedor
+    if (ehMaster() && newClients.length) {
+      // aguarda um pouco para interface refrescar
+      setTimeout(() => showAssignVendorModal(newClients), 100);
+    }
   } catch (err) {
     console.error(err);
     if (importClientesError) { importClientesError.textContent = err.message || String(err); importClientesError.classList.remove('hidden'); }

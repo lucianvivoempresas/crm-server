@@ -14,6 +14,19 @@ function showModal(type, id=null) {
       console.log('⏰ Ativando listener CNPJ para cliente...');
       setupCNPJListener('cliente-cpfCnpj', 'modal');
     }, 200);
+
+    // mostra campo vendedor apenas para master
+    const userLogado = obterUsuarioLogado();
+    const field = document.getElementById('cliente-vendedor-field');
+    const select = document.getElementById('cliente-vendedor_id');
+    if (userLogado && userLogado.perfil === 'master') {
+      if (field) field.classList.remove('hidden');
+      if (select) {
+        popularSelectVendedores(select, true);
+      }
+    } else {
+      if (field) field.classList.add('hidden');
+    }
   }
 
   if (type === 'venda') {
@@ -79,6 +92,10 @@ function showModal(type, id=null) {
           if (st) st.dispatchEvent(new Event('change'));
           const val = document.getElementById('venda-valorVenda');
           if (val) val.dispatchEvent(new Event('input'));
+        }
+        if (type === 'cliente') {
+          const sel = document.getElementById('cliente-vendedor_id');
+          if (sel && item.vendedor_id) sel.value = item.vendedor_id;
         }
       }
     });

@@ -216,6 +216,13 @@ function renderClientesGrid() {
   emptyEl.classList.add('hidden');
   container.innerHTML = clientesFiltrados.map(cliente => {
     const inicial = cliente.nome ? cliente.nome.charAt(0).toUpperCase() : '?';
+    // para master, mostrar nome do vendedor responsável
+    const user = obterUsuarioLogado();
+    let vendorInfo = '';
+    if (user && user.perfil === 'master') {
+      const v = usuariosList?.find(u => Number(u.id) === Number(cliente.vendedor_id));
+      if (v) vendorInfo = `<p class="text-xs text-slate-400">Vendedor: ${v.nome}</p>`;
+    }
     return `
       <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700 hover:border-blue-500/50 transition-all">
         <div class="flex justify-between items-start mb-4">
@@ -240,6 +247,7 @@ function renderClientesGrid() {
           <p>Tel: ${cliente.telefone || 'N/A'}</p>
           <p>Email: ${cliente.email || 'N/A'}</p>
           <p>Aniversário: ${formatDate(cliente.dataNascimento)}</p>
+          ${vendorInfo}
         </div>
       </div>
     `;
