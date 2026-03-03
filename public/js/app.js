@@ -223,7 +223,7 @@ window.addEventListener('load', () => {
   }
 });
 
-function deduplicateClients() {
+async function deduplicateClients() {
   if (!confirm('Remover duplicados por CPF/CNPJ? Esta ação não pode ser desfeita.')) return;
   const seen = new Map();
   let removed = 0;
