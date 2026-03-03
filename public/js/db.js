@@ -28,6 +28,10 @@ async function getAllData(storeName) {
     const userId = obterIdUsuario();
     const perfil = obterUsuarioLogado()?.perfil;
 
+    if (perfil === 'vendedor' && !userId) {
+      console.warn('getAllData: perfil vendedor sem userId - sessão possivelmente perdida');
+    }
+
     // constrói URL com query params para compatibilidade
     let url = new URL(`${API_URL}/${storeName}`, window.location.href);
     if (userId) {
@@ -61,6 +65,8 @@ async function addData(storeName, data) {
     if (userId) {
       headers['X-User-Id'] = userId;
       headers['X-User-Perfil'] = perfil;
+    } else if (perfil === 'vendedor') {
+      console.warn('addData: vendedor sem userId tentando criar', storeName);
     }
 
     const res = await fetch(`${API_URL}/${storeName}`, {

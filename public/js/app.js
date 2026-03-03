@@ -554,16 +554,29 @@ async function requestNotificationPermission() {
 
 function exportToCSV(type) { 
   let dataExport = [], headers = [], filename = 'export.csv';
+
+  // sempre aplicar filtro local adicional para vendedores (redundância de segurança)
+  const user = obterUsuarioLogado();
+  let clientesBase = clientes;
+  let vendasBase = vendas;
+  if (user && user.perfil === 'vendedor') {
+    if (!user.id) {
+      console.warn('exportToCSV: usuário sem ID (sessão possivelmente expirada)');
+    }
+    clientesBase = clientes.filter(c => c.vendedor_id === user.id);
+    vendasBase = vendas.filter(v => v.vendedor_id === user.id);
+  }
+
   if (type === 'vendas') {
     headers = ['Data','Cliente','Produto','Operadora','Tipo Cliente','Valor','Comissão','Status'];
-    dataExport = vendas.map(v => {
-      const cliente = clientes.find(c => c.id === v.clienteId);
+    dataExport = vendasBase.map(v => {
+      const cliente = clientesBase.find(c => c.id === v.clienteId);
       return [v.dataConclusao || v.dataRegistro, cliente?.nome || 'N/A', v.produto, v.operadora, v.tipoCliente, v.valorVenda, (calcularComissao(v)||0).toFixed(2), v.status];
     });
     filename = 'vendas.csv';
   } else if (type === 'clientes') {
     headers = ['CPF/CNPJ','Nome','Telefone','Email','Aniversário'];
-    dataExport = clientes.map(c => [c.cpfCnpj||'', c.nome||'', c.telefone||'', c.email||'', c.dataNascimento||'']);
+    dataExport = clientesBase.map(c => [c.cpfCnpj||'', c.nome||'', c.telefone||'', c.email||'', c.dataNascimento||'']);
     filename = 'clientes.csv';
   }
 
@@ -610,6 +623,9 @@ async function handleImportClientesFile(file) {
 
 async function runImportClientes() {
   try {
+    const userId = obterIdUsuario();
+    if (!userId) throw new Error('Sessão expirada ou usuário não identificado. Faça login novamente.');
+
     if (!importRowsCache.length) throw new Error('Nenhuma linha carregada. Selecione um arquivo.');
     if (!importMappings.cpfCnpj.value) throw new Error('Mapeie a coluna de CPF/CNPJ (obrigatório).');
 
@@ -730,6 +746,9 @@ async function handleImportVendasFile(file) {
 
 async function runImportVendas() {
   try {
+    const userId = obterIdUsuario();
+    if (!userId) throw new Error('Sessão expirada ou usuário não identificado. Faça login novamente.');
+
     if (!importVendasRowsCache.length) throw new Error('Nenhuma linha carregada. Selecione um arquivo.');
     if (!importVendasMappings.data.value) throw new Error('Mapeie a coluna de Data (obrigatório).');
     if (!importVendasMappings.cliente.value) throw new Error('Mapeie a coluna de Cliente (obrigatório).');
