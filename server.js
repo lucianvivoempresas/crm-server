@@ -439,6 +439,9 @@ app.get('/api/:collection', (req, res) => {
     const perfil = req.get('X-User-Perfil') || req.query.perfil;
     const userId = userIdRaw ? parseInt(userIdRaw, 10) : null;
 
+    // DEBUG: log filtering inputs (will be removed once issue is resolved)
+    console.log(`GET /api/${collection} called (userIdRaw='${userIdRaw}', userId=${userId}, perfil='${perfil}')`);
+
     // base da query
     let sql = "SELECT id, payload FROM documents WHERE collection = ?";
     const params = [collection];
@@ -448,6 +451,7 @@ app.get('/api/:collection', (req, res) => {
         // somente retorna itens cadastrados pelo próprio vendedor (inteiro)
         sql += " AND json_extract(payload, '$.vendedor_id') = ?";
         params.push(userId);
+        console.log(` -> aplicando filtro vendedor_id=${userId}`);
     }
 
     db.all(sql, params, (err, rows) => {
