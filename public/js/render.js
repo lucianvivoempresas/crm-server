@@ -41,7 +41,15 @@ function renderDashboard() {
   document.getElementById('metric-totalVendas').textContent = formatCurrency(totalVendasConcluidas);
   document.getElementById('metric-totalComissoes').textContent = formatCurrency(totalComissoesPeriodo);
 
-  const metaPeriodo = metas.find(m => Number(m.mes) === (range.start.getMonth() + 1) && Number(m.ano) === range.start.getFullYear());
+  // Filtrar metas por período e por vendedor
+  let metasPeriodo = metas.filter(m => Number(m.mes) === (range.start.getMonth() + 1) && Number(m.ano) === range.start.getFullYear());
+  if (user && user.perfil === 'vendedor') {
+    // Vendedor vê apenas suas metas + metas globais (sem vendedor_id)
+    metasPeriodo = metasPeriodo.filter(m => !m.vendedor_id || m.vendedor_id === user.id);
+  }
+  // Master vê todas as metas
+  
+  const metaPeriodo = metasPeriodo[0]; // Pega primeira meta do período
   const container = document.getElementById('metas-progresso-content');
   const emptyEl = document.getElementById('metas-progresso-empty');
 
@@ -78,10 +86,17 @@ function renderDashboardCharts(vendasFiltradas) {
 
   const meses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const anoAtual = new Date().getFullYear();
-  const vendasAno = vendas.filter(v => v.dataConclusao && v.status === 'Concluído' && new Date(v.dataConclusao).getFullYear() === anoAtual);
+  
+  // Filtrar vendas por vendedor se não for master
+  const user = obterUsuarioLogado();
+  let vendasAnoFiltradas = vendas.filter(v => v.dataConclusao && v.status === 'Concluído' && new Date(v.dataConclusao).getFullYear() === anoAtual);
+  if (user && user.perfil === 'vendedor') {
+    vendasAnoFiltradas = vendasAnoFiltradas.filter(v => v.vendedor_id === user.id);
+  }
+  // Master vê todas
 
   const lineData = meses.map((m, idx) => {
-    const vMes = vendasAno.filter(v => new Date(v.dataConclusao).getMonth() === idx);
+    const vMes = vendasAnoFiltradas.filter(v => new Date(v.dataConclusao).getMonth() === idx);
     return { vendas: vMes.reduce((a, v) => a + (Number(v.valorVenda)||0), 0), comissoes: vMes.reduce((a, v) => a + calcularComissao(v), 0) };
   });
 
@@ -238,7 +253,15 @@ function renderPosVenda() {
   const lembretes = [];
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   
-  vendas.filter(v => v.status === 'Concluído' && v.dataConclusao).forEach(v => {
+  // Filtrar vendas por vendedor se não for master
+  const user = obterUsuarioLogado();
+  let vendasFiltradas = vendas.filter(v => v.status === 'Concluído' && v.dataConclusao);
+  if (user && user.perfil === 'vendedor') {
+    vendasFiltradas = vendasFiltradas.filter(v => v.vendedor_id === user.id);
+  }
+  // Master vê todas
+  
+  vendasFiltradas.forEach(v => {
     const d = Math.round(Math.abs(hoje - new Date(v.dataConclusao+'T00:00:00')) / 86400000);
     const dis = v.posVendaDismissed || [];
     let tipo = null;
@@ -294,21 +317,31 @@ function renderComissoesTable() {
   const tbody = document.getElementById('comissoes-table-body');
   const emptyEl = document.getElementById('comissoes-table-empty');
   
-  // Filtra comissões por vendedor se estiver logado como vendedor
+  // Filtra comissões por vendedor - cada vendedor vê suas comissões + globais (sem vendedor_id)
   const user = obterUsuarioLogado();
   let comissoesVisíveis = comissoes;
   if (user && user.perfil === 'vendedor') {
+    // Vendedor vê: comissões globais (sem vendedor_id) OU com seu ID específico
     comissoesVisíveis = comissoes.filter(c => !c.vendedor_id || c.vendedor_id === user.id);
   }
+  // Master vê TODAS as comissoes (globais e específicas por vendedor)
   
   if (!comissoesVisíveis.length) { tbody.innerHTML = ''; emptyEl.classList.remove('hidden'); return; }
   
   emptyEl.classList.add('hidden');
-  tbody.innerHTML = comissoesVisíveis.map(c => `
+  tbody.innerHTML = comissoesVisíveis.map(c => {
+    // Obter nome do vendedor se houver vendedor_id
+    let perfilText = 'Global';
+    if (c.vendedor_id && usuariosList) {
+      const vendedor = usuariosList.find(u => u.id === c.vendedor_id);
+      perfilText = vendedor ? vendedor.nome : `Vendedor #${c.vendedor_id}`;
+    }
+    return `
     <tr class="hover:bg-slate-700/30 transition-colors">
       <td class="px-6 py-4 text-white font-medium">${c.produto}</td>
       <td class="px-6 py-4 text-slate-300">${c.tipoCliente}</td>
       <td class="px-6 py-4 text-slate-300">${c.operadora}</td>
+      <td class="px-6 py-4 text-slate-300 text-sm">${perfilText}</td>
       <td class="px-6 py-4 text-green-400 font-bold">${c.comissao}%</td>
       <td class="px-6 py-4">
         <div class="flex gap-2">
@@ -321,27 +354,48 @@ function renderComissoesTable() {
         </div>
       </td>
     </tr>
-  `).join('');
+    `;
+  }).join('');
   if(window.lucide) lucide.createIcons();
 }
 
 function renderMetasGrid() {
   const container = document.getElementById('metas-grid-container');
   const emptyEl = document.getElementById('metas-grid-empty');
-  if (!metas.length) { container.innerHTML = ''; emptyEl.classList.remove('hidden'); return; }
+  
+  // Filtrar metas por vendedor se não for master
+  const user = obterUsuarioLogado();
+  let metasFiltradas = metas;
+  if (user && user.perfil === 'vendedor') {
+    // Vendedor vê apenas metas globais (sem vendedor_id) ou suas metas específicas
+    metasFiltradas = metas.filter(m => !m.vendedor_id || m.vendedor_id === user.id);
+  }
+  // Master vê todas as metas
+  
+  if (!metasFiltradas.length) { container.innerHTML = ''; emptyEl.classList.remove('hidden'); return; }
   
   emptyEl.classList.add('hidden');
-  const metasOrdenadas = [...metas].sort((a,b) => {
+  const metasOrdenadas = [...metasFiltradas].sort((a,b) => {
     if (Number(a.ano) !== Number(b.ano)) return Number(a.ano) - Number(b.ano);
     return Number(a.mes) - Number(b.mes);
   });
 
   container.innerHTML = metasOrdenadas.map(meta => {
-    const vendasMeta = (vendas || []).filter(v => {
+    // Filtrar vendas da meta também por vendedor se aplicável
+    const user = obterUsuarioLogado();
+    let vendasParaMeta = (vendas || []).filter(v => {
       if (!v.dataConclusao || v.status !== 'Concluído') return false;
       const d = new Date(v.dataConclusao + 'T00:00:00');
       return d.getMonth() === Number(meta.mes) - 1 && d.getFullYear() === Number(meta.ano);
     });
+    
+    // Se é vendedor, filtrar apenas suas vendas
+    if (user && user.perfil === 'vendedor') {
+      vendasParaMeta = vendasParaMeta.filter(v => v.vendedor_id === user.id);
+    }
+    // Master vê todas
+    
+    const vendasMeta = vendasParaMeta;
     const totalVendas = vendasMeta.reduce((acc,v) => acc + (Number(v.valorVenda)||0),0);
     const totalComissoes = vendasMeta.reduce((acc,v) => acc + calcularComissao(v), 0);
     const metaVendas = Number(meta.valorMeta) || 0;

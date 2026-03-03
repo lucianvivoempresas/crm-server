@@ -42,6 +42,28 @@ function showModal(type, id=null) {
     }
   }
 
+  if (type === 'comissao') {
+    // Popular select de vendedores (apenas para master)
+    const userLogado = obterUsuarioLogado();
+    const vendedorSelect = document.getElementById('comissao-vendedor_id');
+    if (vendedorSelect && typeof usuariosList !== 'undefined' && usuariosList && userLogado && userLogado.perfil === 'master') {
+      // Limpar e repopular com usuários vendedores
+      vendedorSelect.innerHTML = '<option value="">Global (Todos)</option>';
+      usuariosList.forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = `${u.nome} (${u.email})`;
+        vendedorSelect.appendChild(opt);
+      });
+      vendedorSelect.disabled = false;
+    } else if (vendedorSelect && userLogado && userLogado.perfil === 'vendedor') {
+      // Vendedor vê apenas sua comissão (desabilita select)
+      vendedorSelect.disabled = true;
+      vendedorSelect.innerHTML = `<option value="${userLogado.id}">${userLogado.nome}</option>`;
+      vendedorSelect.value = userLogado.id;
+    }
+  }
+
   if (id) {
     document.getElementById('btn-modal-save').textContent = 'Atualizar';
     const storeName = (type === 'comissao') ? 'comissoes' : `${type}s`;
@@ -112,7 +134,16 @@ function showClientProfileModal(id) {
   document.getElementById('client-profile-endereco').textContent = enderecoText || 'N/A';
   document.getElementById('client-profile-contaContrato').textContent = cliente.contaContrato || 'N/A';
 
-  const vendasCliente = vendas.filter(v => Number(v.clienteId) === Number(cliente.id));
+  // Filtrar vendas do cliente por vendedor se não for master
+  const user = obterUsuarioLogado();
+  let vendasCliente = vendas.filter(v => Number(v.clienteId) === Number(cliente.id));
+  
+  // Se é vendedor, mostrar apenas suas vendas daquele cliente
+  if (user && user.perfil === 'vendedor') {
+    vendasCliente = vendasCliente.filter(v => v.vendedor_id === user.id);
+  }
+  // Se é master, mostra todas
+  
   const tbody = document.getElementById('client-profile-vendas-body');
   const emptyEl = document.getElementById('client-profile-vendas-empty');
 

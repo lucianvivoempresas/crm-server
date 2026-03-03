@@ -490,7 +490,25 @@ async function handleModalSave(e) {
       data.vendedor_id = existing.vendedor_id;
     }
   } else if (type === 'comissao') {
-    data = { produto: document.getElementById('comissao-produto').value, operadora: document.getElementById('comissao-operadora').value, comissao: document.getElementById('comissao-comissao').value, tipoCliente: document.getElementById('comissao-tipoCliente').value, vendedor_id: obterIdUsuario() };
+    const vendedorIdEl = document.getElementById('comissao-vendedor_id');
+    const vendedorIdValue = vendedorIdEl ? vendedorIdEl.value : '';
+    // Se master seleciona um vendedor específico, usa esse; senão deixa em branco (global)
+    // Se vendedor, não pode selecionar (será preenchido automaticamente com seu ID)
+    const user = obterUsuarioLogado();
+    data = { 
+      produto: document.getElementById('comissao-produto').value, 
+      operadora: document.getElementById('comissao-operadora').value, 
+      comissao: document.getElementById('comissao-comissao').value, 
+      tipoCliente: document.getElementById('comissao-tipoCliente').value
+    };
+    // Se é vendedor, atribui sua comissão ao seu perfil
+    if (user && user.perfil === 'vendedor') {
+      data.vendedor_id = user.id;
+    } else if (vendedorIdValue) {
+      // Se é master e selecionou um vendedor, atribui a ele
+      data.vendedor_id = parseInt(vendedorIdValue);
+    }
+    // Se master não selecionou vendedor, deixa sem vendedor_id (global)
   } else if (type === 'meta') {
     data = { mes: document.getElementById('meta-mes').value, ano: document.getElementById('meta-ano').value, valorMeta: document.getElementById('meta-valorMeta').value, comissaoMeta: document.getElementById('meta-comissaoMeta').value };
   }
@@ -601,7 +619,7 @@ async function runImportClientes() {
       if (d) byDoc.set(d, c);
     });
 
-    let created = 0, updated = 0;
+    let created = 0, updated = 0, duplicated = 0;
     for (const row of importRowsCache) {
       const doc = normalizeDoc(getMappedValue(row,'cpfCnpj'));
       if (!doc) continue;
@@ -627,12 +645,15 @@ async function runImportClientes() {
 
       const existing = byDoc.get(doc);
       if (!existing) {
-        const newId = await addData('clientes', clientePayload);
+          // Atribui o usuário que está fazendo a importação como vendedor/dono do cliente
+          clientePayload.vendedor_id = obterIdUsuario();
+          const newId = await addData('clientes', clientePayload);
         clientePayload.id = newId;
         clientes.push(clientePayload);
         byDoc.set(doc, clientePayload);
         created++;
-      } else {
+      } else if (existing && existing.id) {
+        // Cliente já existe - atualizar dados sem duplicar
         const merged = JSON.parse(JSON.stringify(existing));
         merged.nome = merged.nome || clientePayload.nome;
         merged.telefone = merged.telefone || clientePayload.telefone;
@@ -650,17 +671,22 @@ async function runImportClientes() {
         end.uf = end.uf || clientePayload.endereco.uf;
         merged.importedAt = clientePayload.importedAt;
 
+        // PRESERVAR vendedor_id original - não atribuir cliente existente ao importador
+        // Master verá todos independente; vendedor verá apenas os seus
         await updateData('clientes', merged);
         const idx = clientes.findIndex(c => Number(c.id) === Number(merged.id));
         if (idx >= 0) clientes[idx] = merged;
         byDoc.set(doc, merged);
         updated++;
+      } else {
+        // CNPJ já foi processado nesta importação (duplicata dentro da planilha)
+        duplicated++;
       }
     }
 
     await renderAll();
     hideImportClientesModal();
-    showQuickMessage(`Importação concluída: ${created} novos, ${updated} atualizados.`, 'success');
+    showQuickMessage(`Importação: ${created} novo(s), ${updated} atualizado(s), ${duplicated} duplicado(s) ignorado(s).`);
   } catch (err) {
     console.error(err);
     if (importClientesError) { importClientesError.textContent = err.message || String(err); importClientesError.classList.remove('hidden'); }
@@ -724,8 +750,11 @@ async function runImportVendas() {
         let clienteId;
         
         if (!cliente) {
-          clienteId = await addData('clientes', { nome: clienteNome, cpfCnpj: '', telefone: '' });
-          cliente = { id: clienteId, nome: clienteNome };
+          // Ao criar cliente automaticamente durante importação de vendas,
+          // atribuir o vendedor atual como dono para que ele veja o cliente.
+          const clienteObj = { nome: clienteNome, cpfCnpj: '', telefone: '', vendedor_id: obterIdUsuario() };
+          clienteId = await addData('clientes', clienteObj);
+          cliente = { id: clienteId, nome: clienteNome, vendedor_id: clienteObj.vendedor_id };
           clientes.push(cliente);
         } else {
           clienteId = cliente.id;
@@ -744,6 +773,9 @@ async function runImportVendas() {
           observacao: '',
           posVendaDismissed: []
         };
+
+        // Atribui a venda ao usuário que está fazendo a importação
+        vendaPayload.vendedor_id = obterIdUsuario();
 
         // Não verificar duplicatas exatas - apenas adicionar
         const newId = await addData('vendas', vendaPayload);

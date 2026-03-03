@@ -3,6 +3,7 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 const app = express();
 
@@ -64,6 +65,45 @@ db.serialize(() => {
             
             // Criar usuários padrão se não existirem
             criarUsuariosPadroes();
+        }
+    });
+
+    // Tabela de Campanhas de Email (NOVA)
+    db.run(`CREATE TABLE IF NOT EXISTS email_campanhas (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        usuario_id INTEGER NOT NULL,
+        assunto TEXT NOT NULL,
+        corpo TEXT NOT NULL,
+        total_destinos INTEGER DEFAULT 0,
+        total_enviados INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'enviado',
+        data_criacao DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+    )`, (err) => {
+        if (err) {
+            console.error('❌ Erro ao criar tabela email_campanhas:', err.message);
+        } else {
+            console.log('✅ Tabela email_campanhas verificada/criada');
+        }
+    });
+
+    // Tabela de Email Log (para rastrear envios individuais)
+    db.run(`CREATE TABLE IF NOT EXISTS email_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        campanha_id INTEGER NOT NULL,
+        cliente_id INTEGER,
+        email_destinatario TEXT NOT NULL,
+        nome_cliente TEXT,
+        status TEXT DEFAULT 'enviado',
+        erro_mensagem TEXT,
+        data_envio DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (campanha_id) REFERENCES email_campanhas(id),
+        FOREIGN KEY (cliente_id) REFERENCES documents(id)
+    )`, (err) => {
+        if (err) {
+            console.error('❌ Erro ao criar tabela email_logs:', err.message);
+        } else {
+            console.log('✅ Tabela email_logs verificada/criada');
         }
     });
 });
@@ -393,7 +433,23 @@ app.delete('/api/usuarios/:id', (req, res) => {
 // ============ ROTAS DE DADOS (CLIENTES, VENDAS, ETC) ============
 app.get('/api/:collection', (req, res) => {
     const collection = req.params.collection;
-    db.all("SELECT id, payload FROM documents WHERE collection = ?", [collection], (err, rows) => {
+
+    // extrair informações do usuário (passadas como headers ou query params)
+    const userId = req.get('X-User-Id') || req.query.user_id;
+    const perfil = req.get('X-User-Perfil') || req.query.perfil;
+
+    // base da query
+    let sql = "SELECT id, payload FROM documents WHERE collection = ?";
+    const params = [collection];
+
+    // para algumas coleções aplicamos filtro de vendedor
+    if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
+        // somente retorna itens cadastrados pelo próprio vendedor
+        sql += " AND json_extract(payload, '$.vendedor_id') = ?";
+        params.push(userId);
+    }
+
+    db.all(sql, params, (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
         // Remonta o objeto exatamente como seu frontend espera
         const data = rows.map(row => ({ id: row.id, ...JSON.parse(row.payload) }));
@@ -404,7 +460,19 @@ app.get('/api/:collection', (req, res) => {
 // ROTA: Adicionar um novo dado
 app.post('/api/:collection', (req, res) => {
     const collection = req.params.collection;
-    const payload = JSON.stringify(req.body);
+
+    // pegar user info para garantir vendedor_id correto
+    const userId = req.get('X-User-Id') || req.body.vendedor_id;
+    const perfil = req.get('X-User-Perfil') || req.body.perfil;
+
+    let payloadBody = { ...req.body };
+
+    if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
+        // força o id do vendedor vindo do header, ignorando o que veio do cliente
+        payloadBody.vendedor_id = parseInt(userId, 10);
+    }
+
+    const payload = JSON.stringify(payloadBody);
     db.run("INSERT INTO documents (collection, payload) VALUES (?, ?)", [collection, payload], function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ id: this.lastID });
@@ -415,7 +483,19 @@ app.post('/api/:collection', (req, res) => {
 app.put('/api/:collection/:id', (req, res) => {
     const collection = req.params.collection;
     const id = req.params.id;
-    const payload = JSON.stringify(req.body);
+
+    // pegar user info para validar edição
+    const userId = req.get('X-User-Id');
+    const perfil = req.get('X-User-Perfil');
+
+    let payloadBody = { ...req.body };
+
+    if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
+        // não permitir que atualizem vendedor_id de outro
+        payloadBody.vendedor_id = parseInt(userId, 10);
+    }
+
+    const payload = JSON.stringify(payloadBody);
     db.run("UPDATE documents SET payload = ? WHERE collection = ? AND id = ?", [payload, collection, id], function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true });
@@ -426,7 +506,20 @@ app.put('/api/:collection/:id', (req, res) => {
 app.delete('/api/:collection/:id', (req, res) => {
     const collection = req.params.collection;
     const id = req.params.id;
-    db.run("DELETE FROM documents WHERE collection = ? AND id = ?", [collection, id], function(err) {
+
+    const userId = req.get('X-User-Id');
+    const perfil = req.get('X-User-Perfil');
+
+    let sql = "DELETE FROM documents WHERE collection = ? AND id = ?";
+    const params = [collection, id];
+
+    if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
+        // garante que só exclui se pertence ao vendedor
+        sql += " AND json_extract(payload,'$.vendedor_id') = ?";
+        params.push(userId);
+    }
+
+    db.run(sql, params, function(err) {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true });
     });
@@ -487,7 +580,211 @@ app.get('/api-cnpj/buscar/:cnpj', async (req, res) => {
     }
 });
 
-// Inicia o servidor
+// ============ CONFIGURAÇÃO DE EMAIL (NODEMAILER) ============
+
+/**
+ * Configurar transporter de email
+ * Você pode usar:
+ * - Gmail: https://myaccount.google.com/apppasswords
+ * - Outlook/Hotmail
+ * - SMTP customizado
+ */
+let emailTransporter = null;
+
+// Função para configurar email
+function configurarEmail() {
+    // IMPORTANTE: Configure com suas credenciais reais!
+    // Para desenvolvimento, você pode usar uma conta Gmail com "Senha de App"
+    
+    emailTransporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: process.env.SMTP_PORT || 587,
+        secure: false,
+        auth: {
+            user: process.env.SMTP_USER || 'seu-email@gmail.com',
+            pass: process.env.SMTP_PASS || 'sua-senha-app-google'
+        }
+    });
+
+    // Verificar conexão
+    emailTransporter.verify((error, success) => {
+        if (error) {
+            console.warn('⚠️  Email não configurado corretamente:', error.message);
+            console.log('ℹ️  Configure as variáveis: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS');
+        } else {
+            console.log('✅ Servidor de email configurado com sucesso');
+        }
+    });
+}
+
+// Configurar email ao iniciar
+configurarEmail();
+
+// ============ ENDPOINTS DE MARKETING ============
+
+/**
+ * POST /api/marketing/enviar-emails
+ * Enviar emails de marketing para clientes
+ */
+app.post('/api/marketing/enviar-emails', (req, res) => {
+    const { assunto, corpo, clientes, usuario_id } = req.body;
+
+    console.log(`📧 Enviando ${clientes.length} emails de marketing...`);
+
+    // Validar entrada
+    if (!assunto || !corpo || !clientes || clientes.length === 0) {
+        return res.json({
+            success: false,
+            error: 'Assunto, corpo e clientes são obrigatórios'
+        });
+    }
+
+    if (!emailTransporter) {
+        return res.json({
+            success: false,
+            error: 'Email não configurado no servidor. Contate o administrador.'
+        });
+    }
+
+    // Registrar campanha no banco
+    db.run(
+        'INSERT INTO email_campanhas (usuario_id, assunto, corpo, total_destinos, status) VALUES (?, ?, ?, ?, ?)',
+        [usuario_id, assunto, corpo, clientes.length, 'enviado'],
+        function(err) {
+            if (err) {
+                console.error('❌ Erro ao registrar campanha:', err.message);
+                return res.json({
+                    success: false,
+                    error: 'Erro ao registrar campanha'
+                });
+            }
+
+            const campanhaId = this.lastID;
+            let enviados = 0;
+            let falhados = 0;
+
+            // Enviar emails
+            clientes.forEach(cliente => {
+                const corpoPersonalizado = corpo.replace(/{{nome}}/g, cliente.nome || 'Cliente');
+
+                const mailOptions = {
+                    from: process.env.SMTP_USER || 'seu-email@gmail.com',
+                    to: cliente.email,
+                    subject: assunto,
+                    text: corpoPersonalizado,
+                    html: `
+                        <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+                            <p>${corpoPersonalizado.replace(/\n/g, '<br>')}</p>
+                            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+                            <p style="color: #999; font-size: 12px;">Este é um email de marketing. Não responda este email.</p>
+                        </div>
+                    `
+                };
+
+                // Enviar email de forma assíncrona
+                emailTransporter.sendMail(mailOptions, (error, info) => {
+                    if (error) {
+                        console.warn(`❌ Erro ao enviar email para ${cliente.email}:`, error.message);
+                        falhados++;
+                        
+                        // Registrar falha no log
+                        db.run(
+                            'INSERT INTO email_logs (campanha_id, cliente_id, email_destinatario, nome_cliente, status, erro_mensagem) VALUES (?, ?, ?, ?, ?, ?)',
+                            [campanhaId, cliente.id || null, cliente.email, cliente.nome, 'erro', error.message]
+                        );
+                    } else {
+                        console.log(`✅ Email enviado para ${cliente.email}`);
+                        enviados++;
+                        
+                        // Registrar sucesso no log
+                        db.run(
+                            'INSERT INTO email_logs (campanha_id, cliente_id, email_destinatario, nome_cliente, status) VALUES (?, ?, ?, ?, ?)',
+                            [campanhaId, cliente.id || null, cliente.email, cliente.nome, 'enviado']
+                        );
+                    }
+                });
+            });
+
+            // Atualizar total de enviados
+            setTimeout(() => {
+                db.run(
+                    'UPDATE email_campanhas SET total_enviados = ? WHERE id = ?',
+                    [enviados, campanhaId]
+                );
+            }, 1000);
+
+            res.json({
+                success: true,
+                enviados: clientes.length,
+                campanha_id: campanhaId,
+                mensagem: `Iniciado envio de ${clientes.length} email(s). Você receberá uma confirmação em breve.`
+            });
+        }
+    );
+});
+
+/**
+ * GET /api/marketing/historico
+ * Obter histórico de campanhas de email
+ */
+app.get('/api/marketing/historico', (req, res) => {
+    db.all(
+        `SELECT * FROM email_campanhas 
+         ORDER BY data_criacao DESC 
+         LIMIT 50`,
+        [],
+        (err, rows) => {
+            if (err) {
+                console.error('❌ Erro ao buscar histórico:', err.message);
+                return res.json({
+                    success: false,
+                    error: 'Erro ao buscar histórico'
+                });
+            }
+
+            res.json({
+                success: true,
+                campanhas: rows || []
+            });
+        }
+    );
+});
+
+/**
+ * GET /api/marketing/campanha/:id
+ * Obter detalhes de uma campanha específica
+ */
+app.get('/api/marketing/campanha/:id', (req, res) => {
+    const { id } = req.params;
+
+    db.get(
+        'SELECT * FROM email_campanhas WHERE id = ?',
+        [id],
+        (err, campanha) => {
+            if (err || !campanha) {
+                return res.json({
+                    success: false,
+                    error: 'Campanha não encontrada'
+                });
+            }
+
+            // Buscar logs dessa campanha
+            db.all(
+                'SELECT * FROM email_logs WHERE campanha_id = ? ORDER BY data_envio DESC',
+                [id],
+                (err, logs) => {
+                    res.json({
+                        success: true,
+                        campanha: campanha,
+                        logs: logs || []
+                    });
+                }
+            );
+        }
+    );
+});
+
+
 const PORT = 3000;
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 CRM Servidor rodando! Acesse: http://localhost:${PORT}`);
