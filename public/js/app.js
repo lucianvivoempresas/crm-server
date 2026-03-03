@@ -585,7 +585,8 @@ async function handleModalSave(e) {
     }
     // Se é novo cliente e não foi definido pelo master, adicionar vendedor_id
     if (!id && data.vendedor_id == null) {
-      data.vendedor_id = obterIdUsuario();
+      const uid = obterIdUsuario();
+      if (uid) data.vendedor_id = parseInt(uid, 10);
     }
   } else if (type === 'venda') {
     const existing = id ? vendas.find(v => Number(v.id) === Number(id)) : null;
@@ -781,7 +782,8 @@ async function runImportClientes() {
       const existing = byDoc.get(doc);
       if (!existing) {
           // Atribui o usuário que está fazendo a importação como vendedor/dono do cliente
-          clientePayload.vendedor_id = obterIdUsuario();
+          const uid = obterIdUsuario();
+          if (uid) clientePayload.vendedor_id = parseInt(uid, 10);
           const newId = await addData('clientes', clientePayload);
         clientePayload.id = newId;
         clientes.push(clientePayload);

@@ -435,8 +435,9 @@ app.get('/api/:collection', (req, res) => {
     const collection = req.params.collection;
 
     // extrair informações do usuário (passadas como headers ou query params)
-    const userId = req.get('X-User-Id') || req.query.user_id;
+    const userIdRaw = req.get('X-User-Id') || req.query.user_id;
     const perfil = req.get('X-User-Perfil') || req.query.perfil;
+    const userId = userIdRaw ? parseInt(userIdRaw, 10) : null;
 
     // base da query
     let sql = "SELECT id, payload FROM documents WHERE collection = ?";
@@ -444,7 +445,7 @@ app.get('/api/:collection', (req, res) => {
 
     // para algumas coleções aplicamos filtro de vendedor
     if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
-        // somente retorna itens cadastrados pelo próprio vendedor
+        // somente retorna itens cadastrados pelo próprio vendedor (inteiro)
         sql += " AND json_extract(payload, '$.vendedor_id') = ?";
         params.push(userId);
     }
@@ -467,6 +468,11 @@ app.post('/api/:collection', (req, res) => {
 
     let payloadBody = { ...req.body };
 
+    // garantir que vendedor_id seja número sempre que fornecido
+    if (payloadBody.vendedor_id != null) {
+        payloadBody.vendedor_id = parseInt(payloadBody.vendedor_id, 10);
+    }
+
     if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
         // força o id do vendedor vindo do header, ignorando o que veio do cliente
         payloadBody.vendedor_id = parseInt(userId, 10);
@@ -485,14 +491,20 @@ app.put('/api/:collection/:id', (req, res) => {
     const id = req.params.id;
 
     // pegar user info para validar edição
-    const userId = req.get('X-User-Id');
+    const userIdRaw = req.get('X-User-Id');
+    const userId = userIdRaw ? parseInt(userIdRaw, 10) : null;
     const perfil = req.get('X-User-Perfil');
 
     let payloadBody = { ...req.body };
 
+    // normalizar vendedor_id caso venha como string
+    if (payloadBody.vendedor_id != null) {
+        payloadBody.vendedor_id = parseInt(payloadBody.vendedor_id, 10);
+    }
+
     if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
         // não permitir que atualizem vendedor_id de outro
-        payloadBody.vendedor_id = parseInt(userId, 10);
+        payloadBody.vendedor_id = userId;
     }
 
     const payload = JSON.stringify(payloadBody);
@@ -507,7 +519,8 @@ app.delete('/api/:collection/:id', (req, res) => {
     const collection = req.params.collection;
     const id = req.params.id;
 
-    const userId = req.get('X-User-Id');
+    const userIdRaw = req.get('X-User-Id');
+    const userId = userIdRaw ? parseInt(userIdRaw, 10) : null;
     const perfil = req.get('X-User-Perfil');
 
     let sql = "DELETE FROM documents WHERE collection = ? AND id = ?";
