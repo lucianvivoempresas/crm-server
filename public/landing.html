@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <title>Economize na conta de luz – Loconecta</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.4/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75' fill='%2316a34a'>⚡</text></svg>">
+</head>
+<body class="flex flex-col min-h-screen text-gray-800">
+
+  <!-- header -->
+  <header class="bg-gradient-to-r from-green-600 to-green-700 text-white shadow-lg">
+    <div class="max-w-6xl mx-auto px-4 py-6 flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <span class="text-3xl">⚡</span>
+        <h1 class="text-2xl font-bold">Loconecta</h1>
+      </div>
+      <a href="/index.html" class="bg-white text-green-600 px-4 py-2 rounded-lg shadow hover:bg-gray-100 transition font-semibold">
+        Acessar CRM
+      </a>
+    </div>
+  </header>
+
+  <!-- hero section -->
+  <section class="flex-1 flex items-center justify-center bg-gradient-to-b from-green-50 to-white py-16">
+    <div class="max-w-3xl text-center px-4 sm:px-8">
+      <h2 class="text-4xl sm:text-5xl font-extrabold mb-6 text-gray-900">
+        Pague menos na conta de luz
+      </h2>
+      <p class="text-lg sm:text-xl mb-8 text-gray-700 leading-relaxed">
+        Com a <strong>energia por assinatura</strong> da Loconecta, você reduz custos, elimina burocracia 
+        e recebe energia limpa diretamente no seu imóvel residencial ou comercial.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="#contato" class="inline-block bg-green-600 text-white px-8 py-4 rounded-lg text-lg font-semibold
+           hover:bg-green-700 transition shadow-lg">
+          Quero economizar agora
+        </a>
+        <a href="#beneficios" class="inline-block bg-white text-green-600 border-2 border-green-600 px-8 py-4 
+           rounded-lg text-lg font-semibold hover:bg-green-50 transition">
+          Saiba mais
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- benefícios -->
+  <section id="beneficios" class="bg-white py-20">
+    <div class="max-w-6xl mx-auto px-4 sm:px-8">
+      <h3 class="text-4xl font-bold text-center mb-16 text-gray-900">Como funciona a energia por assinatura?</h3>
+      <div class="grid gap-10 md:grid-cols-3">
+        <!-- Benefício 1 -->
+        <div class="bg-green-50 p-8 rounded-xl shadow-md hover:shadow-lg transition">
+          <div class="flex justify-center mb-4">
+            <svg class="h-16 w-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m7 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <h4 class="text-xl font-semibold text-center mb-3">Assine fácil</h4>
+          <p class="text-center text-gray-700">Contrate online em minutos, sem sair de casa. Processo 100% digital e seguro.</p>
+        </div>
+        
+        <!-- Benefício 2 -->
+        <div class="bg-green-50 p-8 rounded-xl shadow-md hover:shadow-lg transition">
+          <div class="flex justify-center mb-4">
+            <svg class="h-16 w-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <h4 class="text-xl font-semibold text-center mb-3">Preço fixo e previsível</h4>
+          <p class="text-center text-gray-700">Parcela mensal sem surpresas. Sem flutuações de tarifa ou custos ocultos.</p>
+        </div>
+        
+        <!-- Benefício 3 -->
+        <div class="bg-green-50 p-8 rounded-xl shadow-md hover:shadow-lg transition">
+          <div class="flex justify-center mb-4">
+            <svg class="h-16 w-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+          </div>
+          <h4 class="text-xl font-semibold text-center mb-3">Energia limpa</h4>
+          <p class="text-center text-gray-700">Fonte 100% renovável. Contribua com o meio ambiente sem abrir mão da economia.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- comparação -->
+  <section class="bg-gray-50 py-20">
+    <div class="max-w-4xl mx-auto px-4 sm:px-8">
+      <h3 class="text-4xl font-bold text-center mb-12">Économia real</h3>
+      <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+        <table class="w-full">
+          <thead class="bg-green-600 text-white">
+            <tr>
+              <th class="px-6 py-4 text-left">Aspecto</th>
+              <th class="px-6 py-4 text-center">Tarifa tradicional</th>
+              <th class="px-6 py-4 text-center">Loconecta</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="border-b">
+              <td class="px-6 py-4 font-semibold">Variação de preço</td>
+              <td class="px-6 py-4 text-center">Flutuante</td>
+              <td class="px-6 py-4 text-center text-green-600 font-semibold">Fixo</td>
+            </tr>
+            <tr class="border-b">
+              <td class="px-6 py-4 font-semibold">Burocracia</td>
+              <td class="px-6 py-4 text-center">Alta</td>
+              <td class="px-6 py-4 text-center text-green-600 font-semibold">Mínima</td>
+            </tr>
+            <tr class="border-b">
+              <td class="px-6 py-4 font-semibold">Economia esperada</td>
+              <td class="px-6 py-4 text-center">—</td>
+              <td class="px-6 py-4 text-center text-green-600 font-semibold">Até 40%</td>
+            </tr>
+            <tr>
+              <td class="px-6 py-4 font-semibold">Tipo de energia</td>
+              <td class="px-6 py-4 text-center">Mista</td>
+              <td class="px-6 py-4 text-center text-green-600 font-semibold">100% limpa</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA final -->
+  <section id="contato" class="bg-green-600 text-white py-16">
+    <div class="max-w-2xl mx-auto text-center px-4 sm:px-8">
+      <h3 class="text-4xl font-bold mb-6">Comece a economizar hoje mesmo</h3>
+      <p class="text-lg mb-8">Faça sua cotação gratuita em menos de 5 minutos.</p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="/index.html#novo-cliente" class="inline-block bg-white text-green-600 px-8 py-4 rounded-lg 
+           text-lg font-semibold hover:bg-gray-100 transition">
+          Acessar formulário de contato
+        </a>
+        <a href="mailto:contato@loconecta.com.br" class="inline-block bg-green-700 text-white px-8 py-4 
+           rounded-lg text-lg font-semibold hover:bg-green-800 transition border-2 border-white">
+          Enviar email
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="bg-white py-20">
+    <div class="max-w-2xl mx-auto px-4 sm:px-8">
+      <h3 class="text-3xl font-bold text-center mb-12">Perguntas frequentes</h3>
+      <div class="space-y-6">
+        <details class="bg-gray-50 p-6 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+          <summary class="font-semibold text-lg">Preciso de autorização da concessionária?</summary>
+          <p class="mt-4 text-gray-700">Não, a Loconecta cuida de toda a documentação e é 100% legal.</p>
+        </details>
+        
+        <details class="bg-gray-50 p-6 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+          <summary class="font-semibold text-lg">Quanto posso economizar?</summary>
+          <p class="mt-4 text-gray-700">A economia varia de 20% a 40% dependendo do seu perfil de consumo. Fazemos uma análise gratuita.</p>
+        </details>
+        
+        <details class="bg-gray-50 p-6 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+          <summary class="font-semibold text-lg">Qual é o prazo de contrato?</summary>
+          <p class="mt-4 text-gray-700">Oferecemos planos flexíveis de 12 a 60 meses. Você escolhe o que melhor se encaixa.</p>
+        </details>
+        
+        <details class="bg-gray-50 p-6 rounded-lg cursor-pointer hover:bg-gray-100 transition">
+          <summary class="font-semibold text-lg">Atende residencial e comercial?</summary>
+          <p class="mt-4 text-gray-700">Sim! Oferecemos soluções personalizadas para ambos os segmentos.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- rodapé -->
+  <footer class="bg-gray-900 text-white py-12 mt-auto">
+    <div class="max-w-6xl mx-auto px-4 sm:px-8">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+        <div>
+          <h4 class="font-semibold mb-4">Sobre</h4>
+          <p class="text-gray-400">Loconecta: energia limpa, acessível e previsível para quem quer economizar.</p>
+        </div>
+        <div>
+          <h4 class="font-semibold mb-4">Contato</h4>
+          <p class="text-gray-400">📧 contato@loconecta.com.br</p>
+          <p class="text-gray-400">📱 0800 LOCONECTA</p>
+        </div>
+        <div>
+          <h4 class="font-semibold mb-4">Links</h4>
+          <ul class="text-gray-400 space-y-1">
+            <li><a href="#" class="hover:text-white transition">Política de Privacidade</a></li>
+            <li><a href="#" class="hover:text-white transition">Termos de Serviço</a></li>
+            <li><a href="/index.html" class="hover:text-white transition">Acessar CRM</a></li>
+          </ul>
+        </div>
+      </div>
+      <hr class="border-gray-800 mb-6">
+      <div class="text-center text-gray-400 text-sm">
+        © 2026 Loconecta. Todos os direitos reservados. | Energia limpa para um futuro melhor.
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>
