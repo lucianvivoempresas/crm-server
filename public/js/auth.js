@@ -33,14 +33,18 @@ async function login(email, senha) {
         
         console.log('✅ Login bem-sucedido:', result.usuario.nome);
         
-        // Salvar dados do usuário
+        // Salvar dados do usuário apenas na sessão atual do navegador
         usuarioLogado = result.usuario;
-        localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.usuario));
+        sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.usuario));
         
-        // Salvar token (para futuras requisições)
+        // Salvar token (somente sessão atual)
         if (result.token) {
-            localStorage.setItem(AUTH_TOKEN_KEY, result.token);
+            sessionStorage.setItem(AUTH_TOKEN_KEY, result.token);
         }
+
+        // Remover versões antigas persistidas para evitar auto-login permanente
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        localStorage.removeItem(AUTH_TOKEN_KEY);
         
         return true;
     } catch (err) {
@@ -58,6 +62,8 @@ async function logout() {
         
         // Limpar dados locais
         usuarioLogado = null;
+        sessionStorage.removeItem(AUTH_STORAGE_KEY);
+        sessionStorage.removeItem(AUTH_TOKEN_KEY);
         localStorage.removeItem(AUTH_STORAGE_KEY);
         localStorage.removeItem(AUTH_TOKEN_KEY);
         
@@ -81,12 +87,21 @@ async function logout() {
  */
 function recuperarSessao() {
     try {
-        const saved = localStorage.getItem(AUTH_STORAGE_KEY);
+        const saved = sessionStorage.getItem(AUTH_STORAGE_KEY);
         if (saved) {
             usuarioLogado = JSON.parse(saved);
             console.log('🔄 Sessão recuperada para:', usuarioLogado.nome);
             return usuarioLogado;
         }
+
+        // Limpa sessão legada persistida em localStorage (versões antigas)
+        if (localStorage.getItem(AUTH_STORAGE_KEY)) {
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+        }
+        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+        }
+
         return null;
     } catch (err) {
         console.error('Erro ao recuperar sessão:', err);
