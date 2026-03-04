@@ -11,9 +11,10 @@ let usuarioLogado = null;
  * Fazer login do usuário
  * @param {string} email 
  * @param {string} senha 
+ * @param {boolean} lembrarSessao
  * @returns {Promise}
  */
-async function login(email, senha) {
+async function login(email, senha, lembrarSessao = false) {
     try {
         console.log('🔐 Iniciando login para:', email);
         
@@ -33,18 +34,19 @@ async function login(email, senha) {
         
         console.log('✅ Login bem-sucedido:', result.usuario.nome);
         
-        // Salvar dados do usuário apenas na sessão atual do navegador
+        // Salvar dados do usuário na sessão atual ou de forma persistente (lembrar-me)
         usuarioLogado = result.usuario;
-        sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.usuario));
-        
-        // Salvar token (somente sessão atual)
-        if (result.token) {
-            sessionStorage.setItem(AUTH_TOKEN_KEY, result.token);
+        if (lembrarSessao) {
+            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.usuario));
+            if (result.token) localStorage.setItem(AUTH_TOKEN_KEY, result.token);
+            sessionStorage.removeItem(AUTH_STORAGE_KEY);
+            sessionStorage.removeItem(AUTH_TOKEN_KEY);
+        } else {
+            sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.usuario));
+            if (result.token) sessionStorage.setItem(AUTH_TOKEN_KEY, result.token);
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+            localStorage.removeItem(AUTH_TOKEN_KEY);
         }
-
-        // Remover versões antigas persistidas para evitar auto-login permanente
-        localStorage.removeItem(AUTH_STORAGE_KEY);
-        localStorage.removeItem(AUTH_TOKEN_KEY);
         
         return true;
     } catch (err) {
@@ -87,19 +89,18 @@ async function logout() {
  */
 function recuperarSessao() {
     try {
-        const saved = sessionStorage.getItem(AUTH_STORAGE_KEY);
-        if (saved) {
-            usuarioLogado = JSON.parse(saved);
+        const savedSession = sessionStorage.getItem(AUTH_STORAGE_KEY);
+        if (savedSession) {
+            usuarioLogado = JSON.parse(savedSession);
             console.log('🔄 Sessão recuperada para:', usuarioLogado.nome);
             return usuarioLogado;
         }
 
-        // Limpa sessão legada persistida em localStorage (versões antigas)
-        if (localStorage.getItem(AUTH_STORAGE_KEY)) {
-            localStorage.removeItem(AUTH_STORAGE_KEY);
-        }
-        if (localStorage.getItem(AUTH_TOKEN_KEY)) {
-            localStorage.removeItem(AUTH_TOKEN_KEY);
+        const savedLocal = localStorage.getItem(AUTH_STORAGE_KEY);
+        if (savedLocal) {
+            usuarioLogado = JSON.parse(savedLocal);
+            console.log('🔄 Sessão recuperada para:', usuarioLogado.nome);
+            return usuarioLogado;
         }
 
         return null;

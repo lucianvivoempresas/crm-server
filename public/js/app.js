@@ -40,6 +40,7 @@ async function handleLogin(e) {
   
   const email = document.getElementById('login-email').value.trim();
   const senha = document.getElementById('login-senha').value;
+  const rememberMe = document.getElementById('login-remember')?.checked === true;
   const errorEl = document.getElementById('login-error');
   const form = document.getElementById('login-form');
   
@@ -55,7 +56,7 @@ async function handleLogin(e) {
   
   try {
     // Tentar login
-    await login(email, senha);
+    await login(email, senha, rememberMe);
     
     // Login bem-sucedido
     console.log('✅ Login realizado com sucesso!');

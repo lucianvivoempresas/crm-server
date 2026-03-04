@@ -180,7 +180,7 @@
             outline: none;
         }
 
-        #results-area { display: none; margin-top: 30px; animation: fadeIn 0.5s ease; }
+        #results-area { display: none; margin-top: 30px; animation: fadeIn 0.3s ease; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
         footer { background: #020617; padding: 80px 5% 40px; color: white; }
@@ -335,7 +335,8 @@
         function enviarWhatsApp() {
             const valor = document.getElementById('valor-conta').value;
             const msg = `Olá LOConecta! Fiz a simulação no site com uma conta de R$ ${valor} e quero saber o valor do meu desconto!`;
-            window.location.href = `https://wa.me/5573981972386?text=${encodeURIComponent(msg)}`;
+            const url = `https://wa.me/5573981972386?text=${encodeURIComponent(msg)}`;
+            window.open(url, '_blank', 'noopener,noreferrer');
         }
 
         function animateValue(id, start, end, duration) {
