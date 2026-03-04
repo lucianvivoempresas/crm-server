@@ -124,7 +124,7 @@
         async function testarServidorStatus() {
             clearLog('server-status');
             try {
-                const response = await fetch('http://localhost:3000/');
+                const response = await fetch('/');
                 if (response.ok) {
                     log('server-status', '✅ Servidor está rodando', 'success');
                     log('server-status', `Status: ${response.status}`, 'info');
@@ -140,7 +140,7 @@
         async function testarAPI(endpoint, method = 'GET') {
             clearLog('api-usuarios');
             try {
-                const response = await fetch(`http://localhost:3000${endpoint}`, { method });
+                const response = await fetch(`${endpoint}`, { method });
                 if (response.ok) {
                     const data = await response.json();
                     log('api-usuarios', `✅ ${method} ${endpoint}`, 'success');
@@ -165,7 +165,7 @@
                     ativo: 1
                 };
                 
-                const response = await fetch('http://localhost:3000/api/usuarios', {
+                const response = await fetch('/api/usuarios', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(newUser)
@@ -228,7 +228,7 @@
             log('login-result', `🔐 Tentando login: ${email}`, 'info');
             
             try {
-                const response = await fetch('http://localhost:3000/auth/login', {
+                const response = await fetch('/auth/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, senha })
@@ -340,7 +340,7 @@
             sessionStorage.clear();
             log('reset-status', '✅ localStorage e sessionStorage limpos', 'success');
             log('reset-status', '⏳ Recarregando página em 2 segundos...', 'info');
-            setTimeout(() => location.href = 'http://localhost:3000', 2000);
+            setTimeout(() => location.href = '/', 2000);
         }
 
         // Auto-executar testes ao carregar

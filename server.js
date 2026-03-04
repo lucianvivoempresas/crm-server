@@ -823,5 +823,7 @@ app.get('/api/marketing/campanha/:id', (req, res) => {
 
 const PORT = 3000;
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 CRM Servidor rodando! Acesse: http://localhost:${PORT}`);
+    console.log(`🚀 CRM Servidor rodando em http://localhost:${PORT}`);
+    console.log(`📡 Acesse remotamente via: https://loconecta.com.br (com Nginx como proxy)`);
+    console.log(`💡 Certifique-se de que Nginx está configurado apontando para localhost:${PORT}`);
 });
