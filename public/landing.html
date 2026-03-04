@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LOConecta Energy | A Revolução da Energia por Assinatura</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #22c55e;
+            --primary-light: #4ade80;
+            --primary-dark: #16a34a;
+            --secondary: #0f172a;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --bg-light: #f8fafc;
+            --white: #ffffff;
+            --radius: 24px;
+            --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--white);
+            color: var(--text-main);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(20px);
+            padding: 15px 5%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .logo { font-size: 24px; font-weight: 800; color: var(--secondary); text-decoration: none; }
+        .logo span { color: var(--primary); }
+        nav .links { display: flex; gap: 32px; align-items: center; }
+        nav a { text-decoration: none; color: var(--text-main); font-weight: 600; font-size: 15px; }
+
+        .hero {
+            position: relative;
+            min-height: 90vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-image: url('https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&q=80&w=2000');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: white;
+            text-align: center;
+            padding: 0 5%;
+        }
+
+        .hero::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.4) 50%, rgba(15, 23, 42, 0.9) 100%);
+        }
+
+        .hero-content { position: relative; z-index: 2; max-width: 900px; }
+        .hero h1 { font-size: clamp(40px, 7vw, 72px); font-weight: 800; margin-bottom: 20px; line-height: 1.1; }
+        .hero p { font-size: clamp(18px, 2vw, 22px); opacity: 0.9; margin-bottom: 40px; }
+
+        .btn {
+            padding: 18px 36px;
+            border-radius: 50px;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            transition: 0.3s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-primary { background: var(--primary); color: white; box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3); }
+        .btn-primary:hover { transform: translateY(-3px); background: var(--primary-light); }
+
+        .btn-outline {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .btn-outline:hover {
+            background: white;
+            color: var(--secondary);
+        }
+
+        .stats-wrapper { position: relative; margin-top: -60px; z-index: 10; padding: 0 5%; }
+        .stats-container {
+            background: white;
+            padding: 50px 40px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            text-align: center;
+        }
+
+        .stat-card .value-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            color: var(--primary);
+            margin-bottom: 8px;
+            font-weight: 800;
+        }
+
+        .stat-card h4 { font-size: clamp(30px, 5vw, 52px); line-height: 1; }
+        .stat-card .symbol { font-size: clamp(24px, 3vw, 36px); }
+        .stat-card p { font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+
+        .clients-section { padding: 80px 0 60px; overflow: hidden; }
+        .clients-section p { text-align: center; font-size: 14px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 50px; }
+
+        .slider-wrapper { display: flex; width: 100%; position: relative; overflow: hidden; }
+        .logo-slider { display: flex; gap: 80px; animation: slide 25s linear infinite; align-items: center; }
+        .logo-slider img {
+            height: 60px;
+            min-width: 140px;
+            object-fit: contain;
+            transition: 0.3s;
+        }
+
+        @keyframes slide {
+            from { transform: translateX(0); }
+            to { transform: translateX(-50%); }
+        }
+
+        .simulator-section {
+            background: var(--secondary);
+            border-radius: 48px;
+            padding: 100px 5%;
+            margin: 0 5% 100px;
+            color: white;
+        }
+
+        .simulator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+
+        .calc-box {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 50px;
+            border-radius: var(--radius);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .currency-input { position: relative; display: flex; align-items: center; }
+        .currency-input span { position: absolute; left: 24px; font-weight: 700; color: var(--primary); font-size: 20px; }
+        .currency-input input {
+            width: 100%;
+            padding: 20px 24px 20px 65px;
+            background: rgba(255,255,255,0.08);
+            border: 2px solid transparent;
+            border-radius: 16px;
+            color: white;
+            font-size: 22px;
+            font-weight: 700;
+            outline: none;
+        }
+
+        #results-area { display: none; margin-top: 30px; animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        footer { background: #020617; padding: 80px 5% 40px; color: white; }
+        .footer-main { display: grid; grid-template-columns: 2fr 1fr 1.5fr; gap: 60px; margin-bottom: 60px; }
+        .footer-links h4 { margin-bottom: 24px; color: var(--primary); }
+        .footer-links p { opacity: 0.7; margin-bottom: 10px; }
+        .whatsapp-link { color: var(--primary-light) !important; font-weight: 800; font-size: 18px; text-decoration: none; display: flex; align-items: center; gap: 8px; }
+
+        @media (max-width: 900px) {
+            .simulator-grid, .footer-main { grid-template-columns: 1fr; }
+            .stats-container { grid-template-columns: 1fr; }
+            nav .links { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <nav>
+        <a href="#" class="logo">LOConecta <span>Energy</span></a>
+        <div class="links">
+            <a href="#simulador">Simulador</a>
+            <a href="#contato">Contato</a>
+            <a href="/crm" class="btn-primary" style="padding: 10px 20px; border-radius: 50px; font-size: 14px; text-decoration: none; color: white;">Acesso Vendedor</a>
+        </div>
+    </nav>
+
+    <section class="hero">
+        <div class="hero-content">
+            <h1>Energia Solar Inteligente <br>Para Seu Negócio.</h1>
+            <p>Economize até 25% na sua conta de luz todos os meses, sem investimento em placas solares e sem fidelidade.</p>
+            <div class="btn-group" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
+                <a href="#simulador" class="btn btn-primary">Simular Minha Economia</a>
+                <a href="https://wa.me/5573981972386" target="_blank" class="btn btn-outline">Falar com Especialista</a>
+            </div>
+        </div>
+    </section>
+
+    <div class="stats-wrapper">
+        <div class="stats-container">
+            <div class="stat-card">
+                <div class="value-wrapper">
+                    <h4 id="num-clientes">0</h4>
+                </div>
+                <p>Clientes Felizes</p>
+            </div>
+            <div class="stat-card">
+                <div class="value-wrapper">
+                    <span class="symbol">R$</span>
+                    <h4 id="num-economia">0</h4>
+                </div>
+                <p>Economia Total</p>
+            </div>
+            <div class="stat-card">
+                <div class="value-wrapper">
+                    <h4 id="num-usinas">0</h4>
+                </div>
+                <p>Usinas Ativas</p>
+            </div>
+        </div>
+    </div>
+
+    <section class="clients-section">
+        <p>Empresas que confiam na LOConecta</p>
+        <div class="slider-wrapper">
+            <div class="logo-slider">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRgh3J6MloLTvvVovmnFN3v39fXUb4L_6srIw&s" alt="Honda">
+                <img src="https://c5gwmsmjx1.execute-api.us-east-1.amazonaws.com/prod/dados_processo_seletivo/logo_empresa/208842/logo-pet-de-todos.png" alt="AmorSaúde">
+                <img src="https://marcaspelomundo.com.br/wp-content/uploads/2021/02/CDT-0001-0001-AF-MARCA-CARTAO-DE-TODOS-HORIZONTAL-FUNDO-CLARO.png" alt="Cartão de TODOS">
+                <img src="https://media.licdn.com/dms/image/v2/D560BAQF2cnCDVD6fZg/company-logo_200_200/B56ZbUDxxmH0AI-/0/1747314483020/metalrgica_realeza_logo?e=2147483647&v=beta&t=JaOUDuGvD-3-QEbwWbSh41F06Z3RbP3ogcPglXh4Zz4" alt="Metalúrgica Realeza">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQAoDmJSaVFlszbHiHaFA7Zdr07vcjVkUAVsA&s" alt="Barracuda">
+
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRgh3J6MloLTvvVovmnFN3v39fXUb4L_6srIw&s" alt="Honda">
+                <img src="https://c5gwmsmjx1.execute-api.us-east-1.amazonaws.com/prod/dados_processo_seletivo/logo_empresa/208842/logo-pet-de-todos.png" alt="AmorSaúde">
+                <img src="https://marcaspelomundo.com.br/wp-content/uploads/2021/02/CDT-0001-0001-AF-MARCA-CARTAO-DE-TODOS-HORIZONTAL-FUNDO-CLARO.png" alt="Cartão de TODOS">
+                <img src="https://media.licdn.com/dms/image/v2/D560BAQF2cnCDVD6fZg/company-logo_200_200/B56ZbUDxxmH0AI-/0/1747314483020/metalrgica_realeza_logo?e=2147483647&v=beta&t=JaOUDuGvD-3-QEbwWbSh41F06Z3RbP3ogcPglXh4Zz4" alt="Metalúrgica Realeza">
+                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQAoDmJSaVFlszbHiHaFA7Zdr07vcjVkUAVsA&s" alt="Barracuda">
+            </div>
+        </div>
+    </section>
+
+    <section id="simulador" class="simulator-section">
+        <div class="simulator-grid">
+            <div>
+                <h2 style="font-size: 42px; font-weight: 800; margin-bottom: 20px;">Descubra seu potencial de economia</h2>
+                <p style="opacity: 0.7; font-size: 18px;">Calculamos automaticamente o melhor benefício para o seu perfil de consumo energético.</p>
+            </div>
+            <div class="calc-box">
+                <label style="display: block; margin-bottom: 15px; opacity: 0.8;">Qual o valor da sua última conta?</label>
+                <div class="currency-input">
+                    <span>R$</span>
+                    <input type="number" id="valor-conta" placeholder="Ex: 1200" oninput="calcularAoVivo()">
+                </div>
+
+                <div id="results-area">
+                    <div style="background: rgba(34, 197, 94, 0.15); padding: 25px; border-radius: 16px; border: 1px solid rgba(34, 197, 94, 0.3); margin-top: 20px;">
+                        <p id="label-economia" style="font-size: 12px; text-transform: uppercase; margin-bottom: 5px; color: var(--primary-light); font-weight: 700;"></p>
+                        <h3 id="valor-anual" style="font-size: 38px; font-weight: 800;">R$ 0,00</h3>
+                    </div>
+                    <button class="btn btn-primary" style="width: 100%; margin-top: 25px;" onclick="enviarWhatsApp()">
+                        Garantir Meu Desconto
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer id="contato">
+        <div class="footer-main">
+            <div>
+                <div class="logo" style="color: white; margin-bottom: 20px;">LOConecta <span>Energy</span></div>
+                <p style="opacity: 0.6;">Consultoria em redução de custos energéticos. Transformando gastos em economia real.</p>
+            </div>
+            <div class="footer-links">
+                <h4>Empresa</h4>
+                <a href="#" style="display: block; color: white; opacity: 0.6; margin-bottom: 10px; text-decoration: none;">Início</a>
+                <a href="#simulador" style="display: block; color: white; opacity: 0.6; margin-bottom: 10px; text-decoration: none;">Simulador</a>
+            </div>
+            <div class="footer-links">
+                <h4>Contato</h4>
+                <p>Itabuna • Bahia</p>
+                <a href="https://wa.me/5573981972386" class="whatsapp-link" target="_blank">
+                    (73) 98197-2386
+                </a>
+            </div>
+        </div>
+        <div class="footer-bottom" style="text-align: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 40px; opacity: 0.5; font-size: 13px;">
+            &copy; 2024 LOConecta Energy. Todos os direitos reservados.
+        </div>
+    </footer>
+
+    <script>
+        function calcularAoVivo() {
+            const valor = parseFloat(document.getElementById('valor-conta').value);
+            const area = document.getElementById('results-area');
+            const display = document.getElementById('valor-anual');
+            const label = document.getElementById('label-economia');
+
+            if (valor > 0) {
+                area.style.display = 'block';
+
+                let percentual = valor <= 1000 ? 0.18 : 0.25;
+                const economiaMensal = valor * percentual;
+                const economiaAnual = economiaMensal * 12;
+
+                label.innerText = `Economia Anual Estimada (${(percentual * 100).toFixed(0)}%)`;
+                display.innerText = `R$ ${economiaAnual.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            } else {
+                area.style.display = 'none';
+            }
+        }
+
+        function enviarWhatsApp() {
+            const valor = document.getElementById('valor-conta').value;
+            const msg = `Olá LOConecta! Fiz a simulação no site com uma conta de R$ ${valor} e quero saber o valor do meu desconto!`;
+            window.location.href = `https://wa.me/5573981972386?text=${encodeURIComponent(msg)}`;
+        }
+
+        function animateValue(id, start, end, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const current = Math.floor(progress * (end - start) + start);
+                document.getElementById(id).innerText = current.toLocaleString('pt-BR');
+                if (progress < 1) window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        window.onload = () => {
+            animateValue("num-clientes", 0, 420, 2000);
+            animateValue("num-economia", 0, 780000, 2500);
+            animateValue("num-usinas", 0, 18, 1500);
+        };
+    </script>
+</body>
+</html>

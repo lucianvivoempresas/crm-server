@@ -12,7 +12,16 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' })); 
 
 // Serve os arquivos do seu CRM (HTML, CSS, JS) automaticamente
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+
+// Landing page inicial e rota dedicada para o CRM
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+});
+
+app.get('/crm', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
 
 // Inicializa o banco SQLite (criará um arquivo crm_database.sqlite na mesma pasta)
 const db = new sqlite3.Database('./crm_database.sqlite', (err) => {
