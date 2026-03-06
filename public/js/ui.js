@@ -27,6 +27,8 @@ function showModal(type, id=null) {
     } else {
       if (field) field.classList.add('hidden');
     }
+
+    setupClienteEnergiaToggle('cliente');
   }
 
   if (type === 'venda') {
@@ -110,6 +112,17 @@ function showModal(type, id=null) {
         if (type === 'cliente') {
           const sel = document.getElementById('cliente-vendedor_id');
           if (sel && item.vendedor_id) sel.value = item.vendedor_id;
+          const coelbaEl = document.getElementById('cliente-coelba');
+          const placaSolarEl = document.getElementById('cliente-placaSolar');
+          const excedenteSimEl = document.getElementById('cliente-excedente-sim');
+          const excedenteNaoEl = document.getElementById('cliente-excedente-nao');
+
+          if (coelbaEl) coelbaEl.checked = !!item.coelba;
+          if (placaSolarEl) placaSolarEl.checked = !!item.placaSolar;
+          if (excedenteSimEl) excedenteSimEl.checked = item.excedente === 'Sim';
+          if (excedenteNaoEl) excedenteNaoEl.checked = item.excedente === 'Nao';
+
+          setupClienteEnergiaToggle('cliente');
         }
       }
     });
@@ -251,6 +264,26 @@ function showQuickMessage(message, isError=false) {
   quickFormMessage.classList.toggle('text-red-400', isError);
   quickFormMessage.classList.remove('hidden');
   setTimeout(() => { quickFormMessage.classList.add('hidden'); quickFormMessage.textContent = ''; }, 4000);
+}
+
+function setupClienteEnergiaToggle(prefix) {
+  const placaSolarEl = document.getElementById(`${prefix}-placaSolar`);
+  const excedenteWrapper = document.getElementById(`${prefix}-excedente-wrapper`);
+  const excedenteSimEl = document.getElementById(`${prefix}-excedente-sim`);
+  const excedenteNaoEl = document.getElementById(`${prefix}-excedente-nao`);
+  if (!placaSolarEl || !excedenteWrapper) return;
+
+  const updateVisibility = () => {
+    const enabled = placaSolarEl.checked;
+    excedenteWrapper.classList.toggle('hidden', !enabled);
+    if (!enabled) {
+      if (excedenteSimEl) excedenteSimEl.checked = false;
+      if (excedenteNaoEl) excedenteNaoEl.checked = false;
+    }
+  };
+
+  placaSolarEl.addEventListener('change', updateVisibility);
+  updateVisibility();
 }
 
 function resolveClienteIdFromName(name) {

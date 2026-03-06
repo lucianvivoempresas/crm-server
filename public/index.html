@@ -587,6 +587,30 @@
         <input type="tel" id="qf-cliente-telefone" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="Telefone *" required>
         <input type="email" id="qf-cliente-email" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="Email" >
         <input type="date" id="qf-cliente-dataNascimento" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" title="Data de Nascimento">
+        <div class="rounded-lg border border-slate-700 p-3 space-y-2">
+          <p class="text-xs uppercase tracking-wide text-slate-400">Selecione</p>
+          <label class="flex items-center gap-2 text-slate-200 cursor-pointer">
+            <input type="checkbox" id="qf-cliente-coelba" class="w-4 h-4 rounded">
+            <span>Coelba</span>
+          </label>
+          <label class="flex items-center gap-2 text-slate-200 cursor-pointer">
+            <input type="checkbox" id="qf-cliente-placaSolar" class="w-4 h-4 rounded">
+            <span>Placa Solar</span>
+          </label>
+          <div id="qf-cliente-excedente-wrapper" class="hidden pt-2 border-t border-slate-700">
+            <p class="text-xs uppercase tracking-wide text-slate-400 mb-2">Excedente</p>
+            <div class="flex items-center gap-4">
+              <label class="flex items-center gap-2 text-slate-200 cursor-pointer">
+                <input type="radio" name="qf-cliente-excedente" id="qf-cliente-excedente-sim" value="Sim" class="w-4 h-4">
+                <span>Sim</span>
+              </label>
+              <label class="flex items-center gap-2 text-slate-200 cursor-pointer">
+                <input type="radio" name="qf-cliente-excedente" id="qf-cliente-excedente-nao" value="Nao" class="w-4 h-4">
+                <span>Nao</span>
+              </label>
+            </div>
+          </div>
+        </div>
         <!-- Campos de endereço (preenchidos automaticamente pela API do CNPJ) -->
         <input type="hidden" id="qf-cliente-cep">
         <input type="hidden" id="qf-cliente-logradouro">
@@ -779,6 +803,32 @@
       <div><label class="block text-sm text-slate-300 mb-2">UF</label><input type="text" id="cliente-uf" maxlength="2" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
     </div>
     <div><label class="block text-sm text-slate-300 mb-2">Cidade</label><input type="text" id="cliente-cidade" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"></div>
+    <div class="rounded-lg border border-slate-700 p-4 space-y-3">
+      <p class="text-xs uppercase tracking-wide text-slate-400">Selecione</p>
+      <div class="flex flex-wrap gap-6">
+        <label class="flex items-center gap-2 text-slate-200 cursor-pointer">
+          <input type="checkbox" id="cliente-coelba" class="w-4 h-4 rounded">
+          <span>Coelba</span>
+        </label>
+        <label class="flex items-center gap-2 text-slate-200 cursor-pointer">
+          <input type="checkbox" id="cliente-placaSolar" class="w-4 h-4 rounded">
+          <span>Placa Solar</span>
+        </label>
+      </div>
+      <div id="cliente-excedente-wrapper" class="hidden pt-3 border-t border-slate-700">
+        <p class="text-xs uppercase tracking-wide text-slate-400 mb-2">Excedente</p>
+        <div class="flex items-center gap-6">
+          <label class="flex items-center gap-2 text-slate-200 cursor-pointer">
+            <input type="radio" name="cliente-excedente" id="cliente-excedente-sim" value="Sim" class="w-4 h-4">
+            <span>Sim</span>
+          </label>
+          <label class="flex items-center gap-2 text-slate-200 cursor-pointer">
+            <input type="radio" name="cliente-excedente" id="cliente-excedente-nao" value="Nao" class="w-4 h-4">
+            <span>Nao</span>
+          </label>
+        </div>
+      </div>
+    </div>
     <!-- campo de vendedor só aparece para master, preenchido dinamicamente -->
     <div id="cliente-vendedor-field" class="hidden"><label class="block text-sm text-slate-300 mb-2">Vendedor (só master)</label><select id="cliente-vendedor_id" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white"><option value="">(nenhum)</option></select></div>
     <div><label class="block text-sm text-slate-300 mb-2">Meses desde última venda</label><input type="number" id="cliente-mesesDesdeUltimaVenda" min="0" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" placeholder="Ex: 3"></div>

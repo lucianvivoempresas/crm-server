@@ -508,6 +508,7 @@ function setupQuickFormListeners() {
   if (qfCliente) {
     // Configura listener para buscar dados do CNPJ no formulário rápido
     setupCNPJListener('qf-cliente-cpfCnpj', 'quick');
+    setupClienteEnergiaToggle('qf-cliente');
     
     qfCliente.onsubmit = async (e) => {
       e.preventDefault();
@@ -518,6 +519,9 @@ function setupQuickFormListeners() {
         telefone: document.getElementById('qf-cliente-telefone').value, 
         email: document.getElementById('qf-cliente-email').value || '',
         dataNascimento: document.getElementById('qf-cliente-dataNascimento').value || '',
+        coelba: document.getElementById('qf-cliente-coelba')?.checked === true,
+        placaSolar: document.getElementById('qf-cliente-placaSolar')?.checked === true,
+        excedente: document.getElementById('qf-cliente-excedente-sim')?.checked ? 'Sim' : (document.getElementById('qf-cliente-excedente-nao')?.checked ? 'Nao' : ''),
         vendedor_id: obterIdUsuario(),
         endereco: {
           cep: document.getElementById('qf-cliente-cep')?.value || '',
@@ -533,6 +537,7 @@ function setupQuickFormListeners() {
         await addData('clientes', data); 
         showQuickMessage('Cliente Salvo!'); 
         e.target.reset(); 
+        document.getElementById('qf-cliente-placaSolar')?.dispatchEvent(new Event('change'));
         await renderAll(); 
       } catch(err) { showQuickMessage('Erro', true); }
     };
@@ -583,6 +588,9 @@ async function handleModalSave(e) {
       email: document.getElementById('cliente-email').value,
       dataNascimento: document.getElementById('cliente-dataNascimento').value,
       contaContrato: document.getElementById('cliente-contaContrato').value,
+      coelba: document.getElementById('cliente-coelba')?.checked === true,
+      placaSolar: document.getElementById('cliente-placaSolar')?.checked === true,
+      excedente: document.getElementById('cliente-excedente-sim')?.checked ? 'Sim' : (document.getElementById('cliente-excedente-nao')?.checked ? 'Nao' : ''),
       endereco: {
         cep: document.getElementById('cliente-cep').value,
         logradouro: document.getElementById('cliente-logradouro').value,
