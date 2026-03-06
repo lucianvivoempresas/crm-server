@@ -35,6 +35,32 @@ function showModal(type, id=null) {
     updateDynamicSelects();
     setupVendaFormListeners();
     setupClienteAutocomplete('venda-clienteNome','venda-clienteId','venda-clienteNome-hint');
+
+    const userLogado = obterUsuarioLogado();
+    const vendedorField = document.getElementById('venda-vendedor-field');
+    const vendedorSelect = document.getElementById('venda-vendedor_id');
+    if (userLogado && userLogado.perfil === 'master') {
+      if (vendedorField) vendedorField.classList.remove('hidden');
+      if (vendedorSelect) {
+        popularSelectVendedores(vendedorSelect, false).then(() => {
+          if (vendedorSelect.dataset.pendingValue) {
+            vendedorSelect.value = vendedorSelect.dataset.pendingValue;
+            delete vendedorSelect.dataset.pendingValue;
+          }
+        });
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Selecione um vendedor';
+        vendedorSelect.insertBefore(placeholder, vendedorSelect.firstChild);
+        vendedorSelect.value = '';
+      }
+    } else if (userLogado) {
+      if (vendedorField) vendedorField.classList.add('hidden');
+      if (vendedorSelect) {
+        vendedorSelect.innerHTML = `<option value="${userLogado.id}">${userLogado.nome}</option>`;
+        vendedorSelect.value = String(userLogado.id);
+      }
+    }
   }
 
   if (type === 'usuario') {
@@ -108,6 +134,12 @@ function showModal(type, id=null) {
           if (st) st.dispatchEvent(new Event('change'));
           const val = document.getElementById('venda-valorVenda');
           if (val) val.dispatchEvent(new Event('input'));
+          const vendedorSel = document.getElementById('venda-vendedor_id');
+          if (vendedorSel && item.vendedor_id) {
+            const wanted = String(item.vendedor_id);
+            vendedorSel.value = wanted;
+            if (vendedorSel.value !== wanted) vendedorSel.dataset.pendingValue = wanted;
+          }
         }
         if (type === 'cliente') {
           const sel = document.getElementById('cliente-vendedor_id');

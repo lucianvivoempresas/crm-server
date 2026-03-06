@@ -221,6 +221,9 @@
             <option value="Concluído">Concluído</option>
             <option value="Cancelado">Cancelado</option>
           </select>
+          <select id="filter-vendas-vendedor" class="px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+            <option value="">Todos os Vendedores</option>
+          </select>
           <input type="month" id="filter-vendas-month" class="px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500" />
         </div>
         <div class="flex gap-2">
@@ -240,6 +243,7 @@
                 <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Cliente</th>
                 <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Produto</th>
                 <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Operadora</th>
+                <th id="vendas-col-vendedor" class="px-6 py-4 text-left text-sm font-semibold text-slate-300 hidden">Vendedor</th>
                 <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Valor</th>
                 <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Comissão</th>
                 <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Status</th>
@@ -852,6 +856,12 @@
     <div class="grid grid-cols-2 gap-4">
       <div><label class="block text-sm text-slate-300 mb-2">Tipo de Cliente *</label><select id="venda-tipoCliente" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required><option value="Novo">Novo</option><option value="Base">Base</option></select></div>
       <div><label class="block text-sm text-slate-300 mb-2">Valor Venda *</label><input type="number" step="0.01" id="venda-valorVenda" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required></div>
+    </div>
+    <div id="venda-vendedor-field" class="hidden">
+      <label class="block text-sm text-slate-300 mb-2">Vendedor *</label>
+      <select id="venda-vendedor_id" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white">
+        <option value="">Selecione um vendedor</option>
+      </select>
     </div>
     <div>
       <label class="block text-sm text-slate-300 mb-2">Status *</label>

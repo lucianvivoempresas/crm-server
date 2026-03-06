@@ -159,7 +159,7 @@ function carregarVendedores() {
 function popularSelectVendedores(selectEl, includeEmpty = true) {
   if (!selectEl) return;
   selectEl.innerHTML = includeEmpty ? '<option value="">(nenhum)</option>' : '';
-  carregarVendedores().then(lista => {
+  return carregarVendedores().then(lista => {
     lista.forEach(u => {
       const opt = document.createElement('option');
       opt.value = u.id;
@@ -276,6 +276,21 @@ function setupEventListeners() {
 
   const elFilterStatus = document.getElementById('filter-vendas-status');
   if (elFilterStatus) elFilterStatus.onchange = renderVendasTable;
+
+  const elFilterVendedor = document.getElementById('filter-vendas-vendedor');
+  if (elFilterVendedor) {
+    elFilterVendedor.onchange = renderVendasTable;
+    const user = obterUsuarioLogado();
+    if (user && user.perfil === 'master') {
+      popularSelectVendedores(elFilterVendedor, true);
+      elFilterVendedor.options[0].text = 'Todos os Vendedores';
+      elFilterVendedor.disabled = false;
+    } else if (user) {
+      elFilterVendedor.innerHTML = `<option value="${user.id}">${user.nome}</option>`;
+      elFilterVendedor.value = String(user.id);
+      elFilterVendedor.disabled = true;
+    }
+  }
 
   const elFilterMonth = document.getElementById('filter-vendas-month');
   if (elFilterMonth) elFilterMonth.onchange = renderVendasTable;
@@ -618,6 +633,15 @@ async function handleModalSave(e) {
     }
   } else if (type === 'venda') {
     const existing = id ? vendas.find(v => Number(v.id) === Number(id)) : null;
+    const user = obterUsuarioLogado();
+    const vendedorEl = document.getElementById('venda-vendedor_id');
+    const vendedorSelecionado = vendedorEl && vendedorEl.value ? parseInt(vendedorEl.value, 10) : null;
+
+    if (user && user.perfil === 'master' && !vendedorSelecionado) {
+      showModalError('Selecione o vendedor da venda.');
+      return;
+    }
+
     data = { 
       clienteId: parseInt(document.getElementById('venda-clienteId').value), 
       produto: document.getElementById('venda-produto').value, 
@@ -630,8 +654,10 @@ async function handleModalSave(e) {
       dataRegistro: existing ? existing.dataRegistro : new Date().toISOString().split('T')[0],
       posVendaDismissed: existing ? (existing.posVendaDismissed || []) : []
     };
-    // Se é nova venda, adicionar vendedor_id
-    if (!id) {
+
+    if (vendedorSelecionado) {
+      data.vendedor_id = vendedorSelecionado;
+    } else if (!id) {
       data.vendedor_id = obterIdUsuario();
     } else if (existing) {
       data.vendedor_id = existing.vendedor_id;

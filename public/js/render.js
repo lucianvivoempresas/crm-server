@@ -161,9 +161,16 @@ function renderVendasRecentes() {
 function renderVendasTable() {
   const searchTerm = (document.getElementById('search-vendas')?.value || '').toLowerCase();
   const filterStatus = document.getElementById('filter-vendas-status')?.value;
+  const filterVendedor = document.getElementById('filter-vendas-vendedor')?.value;
   const filterMonth = document.getElementById('filter-vendas-month')?.value;
 
   const user = obterUsuarioLogado();
+  const isMaster = user && user.perfil === 'master';
+
+  const vendedorHeader = document.getElementById('vendas-col-vendedor');
+  if (vendedorHeader) {
+    vendedorHeader.classList.toggle('hidden', !isMaster);
+  }
   
   let filtradas = vendas.filter(v => {
     const c = clientes.find(cl => cl.id === v.clienteId);
@@ -173,6 +180,7 @@ function renderVendasTable() {
     }
     return (!searchTerm || (c?.nome||'').toLowerCase().includes(searchTerm)) &&
            (!filterStatus || v.status === filterStatus) &&
+          (!filterVendedor || String(v.vendedor_id) === String(filterVendedor)) &&
            (!filterMonth || (v.dataConclusao && v.dataConclusao.startsWith(filterMonth)));
   });
 
@@ -184,8 +192,10 @@ function renderVendasTable() {
   
   tbody.innerHTML = filtradas.map(v => {
     const c = clientes.find(cl => cl.id === v.clienteId);
+    const vendedorNome = usuariosList?.find(u => Number(u.id) === Number(v.vendedor_id))?.nome || 'N/A';
+    const vendedorCell = isMaster ? `<td class="px-6 py-4 text-slate-300">${vendedorNome}</td>` : '';
     return `<tr class="hover:bg-slate-700/30">
-      <td class="px-6 py-4 text-white">${c?.nome||'N/A'}</td><td class="px-6 py-4 text-slate-300">${v.produto}</td><td class="px-6 py-4 text-slate-300">${v.operadora}</td>
+      <td class="px-6 py-4 text-white">${c?.nome||'N/A'}</td><td class="px-6 py-4 text-slate-300">${v.produto}</td><td class="px-6 py-4 text-slate-300">${v.operadora}</td>${vendedorCell}
       <td class="px-6 py-4 text-white font-medium">${formatCurrency(v.valorVenda)}</td><td class="px-6 py-4 text-green-400 font-medium">${formatCurrency(calcularComissao(v))}</td>
       <td class="px-6 py-4">${getStatusBadge(v.status)}</td>
       <td class="px-6 py-4"><div class="flex gap-2">
@@ -467,6 +477,21 @@ function updateDynamicSelects() {
 
   const oOptions = '<option value="">Selecione</option>' + [...new Set(comissoes.map(c=>c.operadora))].map(o=>`<option value="${o}">${o}</option>`).join('');
   document.querySelectorAll('select[id$="venda-operadora"]').forEach(s => { const v=s.value; s.innerHTML = oOptions; s.value=v; });
+
+  const filtroVendedor = document.getElementById('filter-vendas-vendedor');
+  const user = obterUsuarioLogado();
+  if (filtroVendedor && user && user.perfil === 'master') {
+    const valorAtual = filtroVendedor.value;
+    popularSelectVendedores(filtroVendedor, true).then(() => {
+      if (filtroVendedor.options[0]) filtroVendedor.options[0].text = 'Todos os Vendedores';
+      filtroVendedor.value = valorAtual;
+      filtroVendedor.disabled = false;
+    });
+  } else if (filtroVendedor && user) {
+    filtroVendedor.innerHTML = `<option value="${user.id}">${user.nome}</option>`;
+    filtroVendedor.value = String(user.id);
+    filtroVendedor.disabled = true;
+  }
 }
 
 function getStatusBadge(status) {
