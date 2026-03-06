@@ -45,22 +45,36 @@ function renderDashboard() {
   let metasPeriodo = metas.filter(m => Number(m.mes) === (range.start.getMonth() + 1) && Number(m.ano) === range.start.getFullYear());
   if (user && user.perfil === 'vendedor') {
     // Vendedor vê apenas suas metas + metas globais (sem vendedor_id)
-    metasPeriodo = metasPeriodo.filter(m => !m.vendedor_id || m.vendedor_id === user.id);
+    metasPeriodo = metasPeriodo.filter(m => !m.vendedor_id || Number(m.vendedor_id) === Number(user.id));
   }
-  // Master vê todas as metas
-  
-  const metaPeriodo = metasPeriodo[0]; // Pega primeira meta do período
+
+  // Prioridade: vendedor -> meta específica dele; master -> meta global
+  let metaPeriodo = null;
+  if (user && user.perfil === 'vendedor') {
+    metaPeriodo = metasPeriodo.find(m => Number(m.vendedor_id) === Number(user.id)) || metasPeriodo.find(m => !m.vendedor_id) || null;
+  } else {
+    metaPeriodo = metasPeriodo.find(m => !m.vendedor_id) || metasPeriodo[0] || null;
+  }
   const container = document.getElementById('metas-progresso-content');
   const emptyEl = document.getElementById('metas-progresso-empty');
 
   if (metaPeriodo && container && emptyEl) {
     emptyEl.classList.add('hidden');
+    let vendasParaMeta = vendasPeriodo;
+    if (metaPeriodo.vendedor_id) {
+      vendasParaMeta = vendasPeriodo.filter(v => Number(v.vendedor_id) === Number(metaPeriodo.vendedor_id));
+    }
+
     const metaVendas = Number(metaPeriodo.valorMeta) || 0;
     const metaComissao = Number(metaPeriodo.comissaoMeta) || 0;
-    const progressoVendas = metaVendas > 0 ? (totalVendasConcluidas / metaVendas) * 100 : 0;
-    const progressoComissao = metaComissao > 0 ? (totalComissoesPeriodo / metaComissao) * 100 : 0;
+    const totalVendasMeta = vendasParaMeta.reduce((acc, v) => acc + (Number(v.valorVenda) || 0), 0);
+    const totalComissoesMeta = vendasParaMeta.reduce((acc, v) => acc + calcularComissao(v), 0);
+    const progressoVendas = metaVendas > 0 ? (totalVendasMeta / metaVendas) * 100 : 0;
+    const progressoComissao = metaComissao > 0 ? (totalComissoesMeta / metaComissao) * 100 : 0;
+    const vendedorMeta = metaPeriodo.vendedor_id ? (usuariosList?.find(u => Number(u.id) === Number(metaPeriodo.vendedor_id))?.nome || `Vendedor #${metaPeriodo.vendedor_id}`) : 'Global';
 
     container.innerHTML = `
+      <div class="md:col-span-2 text-xs text-slate-400">Meta aplicada: ${vendedorMeta}</div>
       <div>
         <div class="flex justify-between mb-2"><span class="text-slate-400">Meta de Vendas (${formatCurrency(metaVendas)})</span><span class="text-white font-bold">${progressoVendas.toFixed(1)}%</span></div>
         <div class="w-full bg-slate-700 rounded-full h-3"><div class="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full" style="width: ${Math.min(progressoVendas,100)}%"></div></div>
@@ -411,7 +425,10 @@ function renderMetasGrid() {
     if (user && user.perfil === 'vendedor') {
       vendasParaMeta = vendasParaMeta.filter(v => v.vendedor_id === user.id);
     }
-    // Master vê todas
+    // Se meta é específica, sempre filtra para o vendedor daquela meta
+    if (meta.vendedor_id) {
+      vendasParaMeta = vendasParaMeta.filter(v => Number(v.vendedor_id) === Number(meta.vendedor_id));
+    }
     
     const vendasMeta = vendasParaMeta;
     const totalVendas = vendasMeta.reduce((acc,v) => acc + (Number(v.valorVenda)||0),0);
@@ -421,12 +438,16 @@ function renderMetasGrid() {
     const progressoVendas = metaVendas > 0 ? (totalVendas / metaVendas) * 100 : 0;
     const progressoComissoes = metaComissao > 0 ? (totalComissoes / metaComissao) * 100 : 0;
 
+    const perfilMeta = meta.vendedor_id
+      ? (usuariosList?.find(u => Number(u.id) === Number(meta.vendedor_id))?.nome || `Vendedor #${meta.vendedor_id}`)
+      : 'Global';
+
     return `
       <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700 hover:border-blue-500/50 transition-all">
         <div class="flex justify-between items-start mb-4">
           <div>
             <h3 class="text-lg font-bold text-white">${String(meta.mes).padStart(2,'0')}/${meta.ano}</h3>
-            <p class="text-sm text-slate-400">Meta Mensal</p>
+            <p class="text-sm text-slate-400">Meta Mensal • ${perfilMeta}</p>
           </div>
           <div class="flex gap-2">
             <button class="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors btn-edit" data-id="${meta.id}" data-type="meta">

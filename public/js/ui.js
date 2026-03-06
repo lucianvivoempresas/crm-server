@@ -119,6 +119,25 @@ function showModal(type, id=null) {
     }
   }
 
+  if (type === 'meta') {
+    const userLogado = obterUsuarioLogado();
+    const vendedorSelect = document.getElementById('meta-vendedor_id');
+    if (vendedorSelect && userLogado && userLogado.perfil === 'master') {
+      vendedorSelect.innerHTML = '<option value="">Global (Todos)</option>';
+      (usuariosList || []).filter(u => u.perfil === 'vendedor' && u.ativo).forEach(u => {
+        const opt = document.createElement('option');
+        opt.value = u.id;
+        opt.textContent = `${u.nome} (${u.email})`;
+        vendedorSelect.appendChild(opt);
+      });
+      vendedorSelect.disabled = false;
+    } else if (vendedorSelect && userLogado) {
+      vendedorSelect.disabled = true;
+      vendedorSelect.innerHTML = `<option value="${userLogado.id}">${userLogado.nome}</option>`;
+      vendedorSelect.value = String(userLogado.id);
+    }
+  }
+
   if (id) {
     document.getElementById('btn-modal-save').textContent = 'Atualizar';
     const storeName = (type === 'comissao') ? 'comissoes' : `${type}s`;

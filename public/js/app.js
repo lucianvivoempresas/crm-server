@@ -683,7 +683,21 @@ async function handleModalSave(e) {
     }
     // Se master não selecionou vendedor, deixa sem vendedor_id (global)
   } else if (type === 'meta') {
-    data = { mes: document.getElementById('meta-mes').value, ano: document.getElementById('meta-ano').value, valorMeta: document.getElementById('meta-valorMeta').value, comissaoMeta: document.getElementById('meta-comissaoMeta').value };
+    const user = obterUsuarioLogado();
+    const vendedorIdEl = document.getElementById('meta-vendedor_id');
+    const vendedorIdValue = vendedorIdEl ? vendedorIdEl.value : '';
+    data = {
+      mes: document.getElementById('meta-mes').value,
+      ano: document.getElementById('meta-ano').value,
+      valorMeta: document.getElementById('meta-valorMeta').value,
+      comissaoMeta: document.getElementById('meta-comissaoMeta').value
+    };
+
+    if (user && user.perfil === 'vendedor') {
+      data.vendedor_id = user.id;
+    } else if (vendedorIdValue) {
+      data.vendedor_id = parseInt(vendedorIdValue, 10);
+    }
   }
 
   if (id) { 
