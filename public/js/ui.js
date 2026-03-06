@@ -178,6 +178,19 @@ function showClientProfileModal(id) {
   document.getElementById('client-profile-endereco').textContent = enderecoText || 'N/A';
   document.getElementById('client-profile-contaContrato').textContent = cliente.contaContrato || 'N/A';
 
+  const vendedorNome = usuariosList?.find(u => Number(u.id) === Number(cliente.vendedor_id))?.nome || 'N/A';
+  const mesesValue = Number.isFinite(Number(cliente.mesesDesdeUltimaVenda)) ? String(Number(cliente.mesesDesdeUltimaVenda)) : 'N/A';
+  const fatorParts = [];
+  if (cliente.coelba) fatorParts.push('Coelba');
+  if (cliente.placaSolar) fatorParts.push('Placa Solar');
+  const fatorValue = fatorParts.length ? fatorParts.join(' + ') : 'N/A';
+  const excedenteValue = cliente.excedente === 'Sim' || cliente.excedente === 'Nao' ? cliente.excedente : 'N/A';
+
+  document.getElementById('client-profile-vendedor').textContent = vendedorNome;
+  document.getElementById('client-profile-meses').textContent = mesesValue;
+  document.getElementById('client-profile-fator').textContent = fatorValue;
+  document.getElementById('client-profile-excedente').textContent = excedenteValue;
+
   // Filtrar vendas do cliente por vendedor se não for master
   const user = obterUsuarioLogado();
   let vendasCliente = vendas.filter(v => Number(v.clienteId) === Number(cliente.id));
