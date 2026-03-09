@@ -363,8 +363,43 @@ function setupClienteAutocomplete(inputId, selectId, hintId) {
   const hint = document.getElementById(hintId);
   if (!inp || !sel) return;
 
+  const listId = inp.getAttribute('list');
+  const datalistEl = listId ? document.getElementById(listId) : null;
+
+  const getClientesDisponiveis = () => {
+    const user = obterUsuarioLogado();
+    if (user && user.perfil === 'vendedor') {
+      return (clientes || []).filter(c => Number(c.vendedor_id) === Number(user.id));
+    }
+    return clientes || [];
+  };
+
+  const fillSuggestions = (query) => {
+    if (!datalistEl) return;
+    const q = String(query || '').trim().toLowerCase();
+    const source = getClientesDisponiveis();
+    let filtered;
+    if (!q) {
+      filtered = source.slice(0, 20);
+    } else {
+      const startsWith = [];
+      const contains = [];
+      source.forEach(c => {
+        const nome = String(c.nome || '').toLowerCase();
+        if (!nome.includes(q)) return;
+        if (nome.startsWith(q)) startsWith.push(c);
+        else contains.push(c);
+      });
+      filtered = [...startsWith, ...contains].slice(0, 20);
+    }
+    datalistEl.innerHTML = filtered.map(c => `<option value="${c.nome}"></option>`).join('');
+  };
+
   const sync = () => {
-    const id = resolveClienteIdFromName(inp.value);
+    fillSuggestions(inp.value);
+    const n = String(inp.value || '').trim().toLowerCase();
+    const found = getClientesDisponiveis().find(x => String(x.nome || '').trim().toLowerCase() === n);
+    const id = found ? Number(found.id) : null;
     if (id) {
       sel.value = String(id);
       if (hint) { hint.textContent = 'Cliente encontrado ✔'; hint.className = 'text-xs text-green-400 mt-1'; }
@@ -379,5 +414,6 @@ function setupClienteAutocomplete(inputId, selectId, hintId) {
   };
   inp.addEventListener('input', sync);
   inp.addEventListener('change', sync);
+  inp.addEventListener('focus', () => fillSuggestions(inp.value));
   sync();
 }
