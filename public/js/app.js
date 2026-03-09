@@ -295,6 +295,9 @@ function setupEventListeners() {
   const elFilterMonth = document.getElementById('filter-vendas-month');
   if (elFilterMonth) elFilterMonth.onchange = renderVendasTable;
 
+  const elSearchClientes = document.getElementById('search-clientes');
+  if (elSearchClientes) elSearchClientes.oninput = renderClientesGrid;
+
   // == EXPORTAÇÕES ==
   const elExportDash = document.getElementById('btn-export-vendas-dash');
   if (elExportDash) elExportDash.onclick = () => exportToCSV('vendas');

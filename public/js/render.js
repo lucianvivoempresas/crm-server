@@ -224,6 +224,7 @@ function renderVendasTable() {
 function renderClientesGrid() {
   const container = document.getElementById('clientes-grid-container');
   const emptyEl = document.getElementById('clientes-grid-empty');
+  const searchTerm = (document.getElementById('search-clientes')?.value || '').toLowerCase().trim();
   
   // Filtrar clientes baseado no perfil
   let clientesFiltrados = clientes;
@@ -234,6 +235,10 @@ function renderClientesGrid() {
     clientesFiltrados = clientes.filter(c => c.vendedor_id === user.id);
   }
   // Master vê todos
+
+  if (searchTerm) {
+    clientesFiltrados = clientesFiltrados.filter(c => (c.nome || '').toLowerCase().includes(searchTerm));
+  }
   
   if (!clientesFiltrados.length) { container.innerHTML = ''; emptyEl.classList.remove('hidden'); return; }
   
@@ -492,6 +497,11 @@ function updateDynamicSelects() {
   
   const dl = document.getElementById('lista-clientes-venda');
   if(dl) dl.innerHTML = clientes.map(c => `<option value="${c.nome}"></option>`).join('');
+
+  const dlBuscaClientes = document.getElementById('lista-clientes-busca');
+  if (dlBuscaClientes) {
+    dlBuscaClientes.innerHTML = clientes.map(c => `<option value="${c.nome}"></option>`).join('');
+  }
 
   const pOptions = '<option value="">Selecione</option>' + [...new Set(comissoes.map(c=>c.produto))].map(p=>`<option value="${p}">${p}</option>`).join('');
   document.querySelectorAll('select[id$="venda-produto"]').forEach(s => { const v=s.value; s.innerHTML = pOptions; s.value=v; });
