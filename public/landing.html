@@ -3,359 +3,409 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LOConecta Energy | A Revolução da Energia por Assinatura</title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <title>VoltConnect - Eficiência Energética de Alta Performance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome 6.5.1 - Versão mais estável -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap');
+        
         :root {
-            --primary: #22c55e;
-            --primary-light: #4ade80;
-            --primary-dark: #16a34a;
-            --secondary: #0f172a;
-            --text-main: #1e293b;
-            --text-muted: #64748b;
-            --bg-light: #f8fafc;
-            --white: #ffffff;
-            --radius: 24px;
-            --shadow-lg: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            scroll-behavior: smooth;
+            --primary-gradient: linear-gradient(135deg, #0891b2 0%, #0284c7 100%);
+            --tech-light: #f8fafc;
+            --accent-cyan: #0891b2;
+            --card-white: rgba(255, 255, 255, 0.9);
         }
 
         body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            background-color: var(--white);
-            color: var(--text-main);
-            line-height: 1.6;
-            overflow-x: hidden;
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--tech-light);
+            color: #0f172a;
+            scroll-behavior: smooth;
         }
 
-        nav {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            background: rgba(255, 255, 255, 0.85);
+        .text-gradient {
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .bg-tech-card {
+            background: var(--card-white);
             backdrop-filter: blur(20px);
-            padding: 15px 5%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 1000;
-            border-bottom: 1px solid rgba(0,0,0,0.05);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+            transition: all 0.4s ease;
         }
 
-        .logo { font-size: 24px; font-weight: 800; color: var(--secondary); text-decoration: none; }
-        .logo span { color: var(--primary); }
-        nav .links { display: flex; gap: 32px; align-items: center; }
-        nav a { text-decoration: none; color: var(--text-main); font-weight: 600; font-size: 15px; }
+        .bg-tech-card:hover {
+            border-color: rgba(34, 211, 238, 0.4);
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.15);
+        }
 
-        .hero {
+        .btn-modern {
+            background: var(--primary-gradient);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(2, 132, 199, 0.2);
+        }
+
+        .btn-modern:hover {
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 8px 25px rgba(2, 132, 199, 0.4);
+        }
+
+        .img-container {
+            background: #e2e8f0;
             position: relative;
-            min-height: 90vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-image: url('https://images.unsplash.com/photo-1509391366360-2e959784a276?auto=format&fit=crop&q=80&w=2000');
-            background-size: cover;
-            background-position: center;
-            background-attachment: fixed;
-            color: white;
-            text-align: center;
-            padding: 0 5%;
+            overflow: hidden;
+            border-radius: 40px;
         }
 
-        .hero::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(15, 23, 42, 0.4) 50%, rgba(15, 23, 42, 0.9) 100%);
+        .hero-mask {
+            mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
         }
 
-        .hero-content { position: relative; z-index: 2; max-width: 900px; }
-        .hero h1 { font-size: clamp(40px, 7vw, 72px); font-weight: 800; margin-bottom: 20px; line-height: 1.1; }
-        .hero p { font-size: clamp(18px, 2vw, 22px); opacity: 0.9; margin-bottom: 40px; }
-
-        .btn {
-            padding: 18px 36px;
-            border-radius: 50px;
-            font-weight: 700;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            transition: 0.2s;
-            border: none;
-            cursor: pointer;
+        .counter-glow {
+            text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
         }
 
-        .btn-primary { background: var(--primary); color: white; box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3); }
-        .btn-primary:hover { transform: translateY(-3px); background: var(--primary-light); }
-
-        .btn-outline {
-            background: rgba(255,255,255,0.1);
-            backdrop-filter: blur(10px);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.2);
+        .reveal {
+            animation: reveal 0.8s ease-out forwards;
         }
 
-        .btn-outline:hover {
-            background: white;
-            color: var(--secondary);
+        @keyframes reveal {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
-        .stats-wrapper { position: relative; margin-top: -60px; z-index: 10; padding: 0 5%; }
-        .stats-container {
-            background: white;
-            padding: 50px 40px;
-            border-radius: var(--radius);
-            box-shadow: var(--shadow-lg);
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            text-align: center;
+        .animate-bounce-slow {
+            animation: bounce 3s infinite;
         }
 
-        .stat-card .value-wrapper {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-            color: var(--primary);
-            margin-bottom: 8px;
-            font-weight: 800;
-        }
-
-        .stat-card h4 { font-size: clamp(30px, 5vw, 52px); line-height: 1; }
-        .stat-card .symbol { font-size: clamp(24px, 3vw, 36px); }
-        .stat-card p { font-size: 13px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
-
-        .clients-section { padding: 80px 0 60px; overflow: hidden; }
-        .clients-section p { text-align: center; font-size: 14px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 50px; }
-
-        .slider-wrapper { display: flex; width: 100%; position: relative; overflow: hidden; }
-        .logo-slider { display: flex; gap: 80px; animation: slide 25s linear infinite; align-items: center; }
-        .logo-slider img {
-            height: 60px;
-            min-width: 140px;
-            object-fit: contain;
-            transition: 0.2s;
-        }
-
-        @keyframes slide {
-            from { transform: translateX(0); }
-            to { transform: translateX(-50%); }
-        }
-
-        .simulator-section {
-            background: var(--secondary);
-            border-radius: 48px;
-            padding: 100px 5%;
-            margin: 0 5% 100px;
-            color: white;
-        }
-
-        .simulator-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
-
-        .calc-box {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 50px;
-            border-radius: var(--radius);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .currency-input { position: relative; display: flex; align-items: center; }
-        .currency-input span { position: absolute; left: 24px; font-weight: 700; color: var(--primary); font-size: 20px; }
-        .currency-input input {
-            width: 100%;
-            padding: 20px 24px 20px 65px;
-            background: rgba(255,255,255,0.08);
-            border: 2px solid transparent;
-            border-radius: 16px;
-            color: white;
-            font-size: 22px;
-            font-weight: 700;
-            outline: none;
-        }
-
-        #results-area { display: none; margin-top: 30px; animation: fadeIn 0.3s ease; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        footer { background: #020617; padding: 80px 5% 40px; color: white; }
-        .footer-main { display: grid; grid-template-columns: 2fr 1fr 1.5fr; gap: 60px; margin-bottom: 60px; }
-        .footer-links h4 { margin-bottom: 24px; color: var(--primary); }
-        .footer-links p { opacity: 0.7; margin-bottom: 10px; }
-        .whatsapp-link { color: var(--primary-light) !important; font-weight: 800; font-size: 18px; text-decoration: none; display: flex; align-items: center; gap: 8px; }
-
-        @media (max-width: 900px) {
-            .simulator-grid, .footer-main { grid-template-columns: 1fr; }
-            .stats-container { grid-template-columns: 1fr; }
-            nav .links { display: none; }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(-5%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
+            50% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
         }
     </style>
 </head>
 <body>
 
-    <nav>
-        <a href="#" class="logo">LOConecta <span>Energy</span></a>
-        <div class="links">
-            <a href="#simulador">Simulador</a>
-            <a href="#contato">Contato</a>
-            <a href="/crm" class="btn-primary" style="padding: 10px 20px; border-radius: 50px; font-size: 14px; text-decoration: none; color: white;">Acesso Vendedor</a>
+    <!-- Header / Nav -->
+    <nav class="fixed w-full z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <div class="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                    <i class="fas fa-bolt text-white"></i>
+                </div>
+                <span class="text-2xl font-black tracking-tighter uppercase text-slate-900">Volt<span class="text-cyan-600">Connect</span></span>
+            </div>
+            <div class="hidden md:flex space-x-10 text-xs font-bold uppercase tracking-widest opacity-80">
+                <a href="#problema" class="text-slate-600 hover:text-cyan-600 transition">Diagnóstico</a>
+                <a href="#solucao" class="text-slate-600 hover:text-cyan-600 transition">Soluções</a>
+                <a href="#clientes" class="text-slate-600 hover:text-cyan-600 transition">Clientes</a>
+            </div>
+            <div class="flex items-center gap-3">
+                <a href="#simulador" class="btn-modern px-6 py-3 rounded-xl text-xs font-black tracking-widest text-white">SIMULAR ECONOMIA</a>
+                <a href="https://loconecta.com.br/crm" class="inline-flex bg-slate-100 hover:bg-slate-200 border border-slate-200 px-6 py-3 rounded-xl text-xs font-black tracking-widest text-slate-700 transition">ACESSAR CRM</a>
+            </div>
         </div>
     </nav>
 
-    <section class="hero">
-        <div class="hero-content">
-            <h1>Energia Solar Inteligente <br>Para Seu Negócio.</h1>
-            <p>Economize até 25% na sua conta de luz todos os meses, sem investimento em placas solares e sem fidelidade.</p>
-            <div class="btn-group" style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-                <a href="#simulador" class="btn btn-primary">Simular Minha Economia</a>
-                <a href="https://wa.me/5573981972386" target="_blank" class="btn btn-outline">Falar com Especialista</a>
-            </div>
-        </div>
-    </section>
-
-    <div class="stats-wrapper">
-        <div class="stats-container">
-            <div class="stat-card">
-                <div class="value-wrapper">
-                    <h4 id="num-clientes">0</h4>
+    <!-- 1️⃣ Hero Section -->
+    <header class="relative min-h-screen flex items-center pt-20 overflow-hidden bg-white">
+        <div class="absolute top-0 right-0 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-[120px] -z-10"></div>
+        
+        <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
+            <div class="reveal">
+                <div class="inline-flex items-center space-x-2 bg-cyan-50 border border-cyan-100 px-4 py-2 rounded-full mb-8">
+                    <span class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
+                    <span class="text-[10px] font-bold text-cyan-600 uppercase tracking-[0.2em]">Consultoria de Alta Performance</span>
                 </div>
-                <p>Clientes Felizes</p>
-            </div>
-            <div class="stat-card">
-                <div class="value-wrapper">
-                    <span class="symbol">R$</span>
-                    <h4 id="num-economia">0</h4>
-                </div>
-                <p>Economia Total</p>
-            </div>
-            <div class="stat-card">
-                <div class="value-wrapper">
-                    <h4 id="num-usinas">0</h4>
-                </div>
-                <p>Usinas Ativas</p>
-            </div>
-        </div>
-    </div>
-
-    <section class="clients-section">
-        <p>Empresas que confiam na LOConecta</p>
-        <div class="slider-wrapper">
-            <div class="logo-slider">
-                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRgh3J6MloLTvvVovmnFN3v39fXUb4L_6srIw&s" alt="Honda">
-                <img src="https://c5gwmsmjx1.execute-api.us-east-1.amazonaws.com/prod/dados_processo_seletivo/logo_empresa/208842/logo-pet-de-todos.png" alt="AmorSaúde">
-                <img src="https://marcaspelomundo.com.br/wp-content/uploads/2021/02/CDT-0001-0001-AF-MARCA-CARTAO-DE-TODOS-HORIZONTAL-FUNDO-CLARO.png" alt="Cartão de TODOS">
-                <img src="https://media.licdn.com/dms/image/v2/D560BAQF2cnCDVD6fZg/company-logo_200_200/B56ZbUDxxmH0AI-/0/1747314483020/metalrgica_realeza_logo?e=2147483647&v=beta&t=JaOUDuGvD-3-QEbwWbSh41F06Z3RbP3ogcPglXh4Zz4" alt="Metalúrgica Realeza">
-                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQAoDmJSaVFlszbHiHaFA7Zdr07vcjVkUAVsA&s" alt="Barracuda">
-
-                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRgh3J6MloLTvvVovmnFN3v39fXUb4L_6srIw&s" alt="Honda">
-                <img src="https://c5gwmsmjx1.execute-api.us-east-1.amazonaws.com/prod/dados_processo_seletivo/logo_empresa/208842/logo-pet-de-todos.png" alt="AmorSaúde">
-                <img src="https://marcaspelomundo.com.br/wp-content/uploads/2021/02/CDT-0001-0001-AF-MARCA-CARTAO-DE-TODOS-HORIZONTAL-FUNDO-CLARO.png" alt="Cartão de TODOS">
-                <img src="https://media.licdn.com/dms/image/v2/D560BAQF2cnCDVD6fZg/company-logo_200_200/B56ZbUDxxmH0AI-/0/1747314483020/metalrgica_realeza_logo?e=2147483647&v=beta&t=JaOUDuGvD-3-QEbwWbSh41F06Z3RbP3ogcPglXh4Zz4" alt="Metalúrgica Realeza">
-                <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQAoDmJSaVFlszbHiHaFA7Zdr07vcjVkUAVsA&s" alt="Barracuda">
-            </div>
-        </div>
-    </section>
-
-    <section id="simulador" class="simulator-section">
-        <div class="simulator-grid">
-            <div>
-                <h2 style="font-size: 42px; font-weight: 800; margin-bottom: 20px;">Descubra seu potencial de economia</h2>
-                <p style="opacity: 0.7; font-size: 18px;">Calculamos automaticamente o melhor benefício para o seu perfil de consumo energético.</p>
-            </div>
-            <div class="calc-box">
-                <label style="display: block; margin-bottom: 15px; opacity: 0.8;">Qual o valor da sua última conta?</label>
-                <div class="currency-input">
-                    <span>R$</span>
-                    <input type="number" id="valor-conta" placeholder="Ex: 1200" oninput="calcularAoVivo()">
+                <h1 class="text-6xl lg:text-8xl font-extrabold leading-[1] mb-6 tracking-tighter text-slate-900">
+                    Pague até <span class="text-gradient">30% menos</span> energia.
+                </h1>
+                <p class="text-xl text-slate-500 mb-10 leading-relaxed max-w-lg">
+                    Unimos tecnologia de ponta e análise estratégica para reduzir faturas de energia e telefonia em usinas e grandes empresas.
+                </p>
+                
+                <div class="bg-emerald-50 border border-emerald-100 p-6 rounded-3xl inline-block mb-10 shadow-sm">
+                    <p class="text-[10px] uppercase font-bold text-emerald-600 tracking-widest mb-1 opacity-80">Economia gerada hoje para clientes:</p>
+                    <p class="text-4xl font-black counter-glow text-emerald-600 tracking-tighter">R$ <span id="realtimeCounter">14.250.320,00</span></p>
                 </div>
 
-                <div id="results-area">
-                    <div style="background: rgba(34, 197, 94, 0.15); padding: 25px; border-radius: 16px; border: 1px solid rgba(34, 197, 94, 0.3); margin-top: 20px;">
-                        <p id="label-economia" style="font-size: 12px; text-transform: uppercase; margin-bottom: 5px; color: var(--primary-light); font-weight: 700;"></p>
-                        <h3 id="valor-anual" style="font-size: 38px; font-weight: 800;">R$ 0,00</h3>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <a href="#simulador" class="btn-modern px-10 py-5 rounded-2xl font-black text-lg text-center text-white">
+                        SIMULAR AGORA
+                    </a>
+                    <a href="https://loconecta.com.br/crm" class="bg-slate-100 hover:bg-slate-200 border border-slate-200 px-10 py-5 rounded-2xl font-bold text-lg transition flex items-center justify-center text-slate-800">
+                        <i class="fas fa-right-to-bracket mr-3 text-cyan-600"></i> Acessar CRM
+                    </a>
+                    <button onclick="window.location.href='https://wa.me/5573991528351'" class="bg-slate-100 hover:bg-slate-200 border border-slate-200 px-10 py-5 rounded-2xl font-bold text-lg transition flex items-center justify-center text-slate-800">
+                        <i class="fab fa-whatsapp mr-3 text-emerald-600"></i> Falar com Especialista
+                    </button>
+                </div>
+            </div>
+            
+            <div class="relative group reveal" style="animation-delay: 0.2s;">
+                <div class="img-container border border-slate-100 shadow-xl">
+                    <!-- Imagem 2 Enviada: Brasil de Fato - Usinas e Infraestrutura -->
+                    <img src="https://www.brasildefato.com.br/wp-content/uploads/2024/09/image_processing20240515-3791018-d59owi.webp" alt="Visão Geral de Energia Renovável" class="w-full h-[650px] object-cover transition-transform duration-1000 group-hover:scale-110">
+                    <div class="absolute inset-0 bg-gradient-to-t from-white via-transparent opacity-30"></div>
+                </div>
+                <div class="absolute -bottom-6 -left-6 bg-white p-6 rounded-3xl shadow-2xl border-l-4 border-l-cyan-500 animate-bounce-slow border border-slate-100">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-cyan-100 rounded-xl flex items-center justify-center">
+                            <i class="fas fa-wind text-cyan-600 text-xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs font-bold text-cyan-600 uppercase tracking-tighter">Eficiência Renovável</p>
+                            <p class="text-xl font-black text-slate-900">+38% Geração</p>
+                        </div>
                     </div>
-                    <button class="btn btn-primary" style="width: 100%; margin-top: 25px;" onclick="enviarWhatsApp()">
-                        Garantir Meu Desconto
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 2️⃣ Problemas -->
+    <section id="problema" class="py-32 bg-slate-50 border-y border-slate-100">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-24">
+                <h2 class="text-4xl lg:text-5xl font-black mb-6 italic tracking-tighter uppercase text-slate-900">Drenos Financeiros <span class="text-cyan-600">Invisíveis</span></h2>
+                <p class="text-slate-500 max-w-2xl mx-auto text-lg">Seu financeiro pode estar ignorando cobranças que custam milhares de reais por ano.</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="bg-tech-card p-10 rounded-[40px] group">
+                    <div class="w-16 h-16 bg-red-50 flex items-center justify-center rounded-2xl mb-8 group-hover:bg-red-100 transition">
+                        <i class="fas fa-phone-slash text-red-500 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4 text-slate-900">Contratos Obsoletos</h3>
+                    <p class="text-slate-500 leading-relaxed">Taxas de roaming, linhas inativas e planos de telefonia que não acompanham o mercado.</p>
+                </div>
+                <div class="bg-tech-card p-10 rounded-[40px] group">
+                    <div class="w-16 h-16 bg-cyan-50 flex items-center justify-center rounded-2xl mb-8 group-hover:bg-cyan-100 transition">
+                        <i class="fas fa-bolt text-cyan-600 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4 text-slate-900">Tarifas Acima do Ideal</h3>
+                    <p class="text-slate-500 leading-relaxed">Falta de enquadramento tarifário correto para grandes consumidores e indústrias.</p>
+                </div>
+                <div class="bg-tech-card p-10 rounded-[40px] group">
+                    <div class="w-16 h-16 bg-amber-50 flex items-center justify-center rounded-2xl mb-8 group-hover:bg-amber-100 transition">
+                        <i class="fas fa-eye-slash text-amber-500 text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4 text-slate-900">Visão Limitada</h3>
+                    <p class="text-slate-500 leading-relaxed">Sem dados e análise estratégica, sua empresa aceita o que as concessionárias impõem.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3️⃣ Solução -->
+    <section id="solucao" class="py-32 bg-white relative">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="lg:flex items-center gap-20">
+                <div class="lg:w-1/2 relative mb-16 lg:mb-0">
+                    <div class="img-container border border-slate-100 shadow-2xl">
+                        <!-- Imagem 1 Enviada: Usina Solar no Solo -->
+                        <img src="https://cdn.prod.website-files.com/668c4853c0375980f89ddae3/66f5a58b6fab4b05587fe0d4_img-thumbnail-aprenda-a-realizar-a-instalacao-de-usina-solar-no-solo.png" alt="Instalação de Usina Solar no Solo" class="w-full h-[500px] object-cover">
+                    </div>
+                    <div class="absolute -top-10 -right-10 w-40 h-40 bg-cyan-500/5 blur-3xl -z-10"></div>
+                </div>
+                <div class="lg:w-1/2">
+                    <h2 class="text-4xl lg:text-6xl font-black mb-8 italic tracking-tighter text-slate-900">Nós analisamos e <br><span class="text-gradient">Reduzimos seus custos.</span></h2>
+                    
+                    <div class="space-y-6">
+                        <div class="bg-slate-50 border border-slate-100 p-8 rounded-3xl hover:bg-slate-100 transition-colors">
+                            <div class="flex items-center space-x-6">
+                                <div class="w-12 h-12 bg-white shadow-sm rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-tower-cell text-cyan-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-xl mb-1 text-slate-900">Telefonia Corporativa</h4>
+                                    <p class="text-slate-500">Auditoria completa de faturas e negociação direta com operadoras.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-slate-50 border border-slate-100 p-8 rounded-3xl hover:bg-slate-100 transition-colors">
+                            <div class="flex items-center space-x-6">
+                                <div class="w-12 h-12 bg-white shadow-sm rounded-xl flex items-center justify-center">
+                                    <i class="fas fa-solar-panel text-emerald-600 text-xl"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-xl mb-1 text-slate-900">Engenharia de Energia</h4>
+                                    <p class="text-slate-500">Eficiência máxima para usinas solares e migração para mercado livre.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 4️⃣ Simulador -->
+    <section id="simulador" class="py-32 bg-slate-50 relative overflow-hidden border-y border-slate-100">
+        <div class="max-w-4xl mx-auto px-6 z-10 relative">
+            <div class="bg-white p-8 lg:p-16 rounded-[60px] border border-slate-200 shadow-2xl">
+                <div class="text-center mb-16">
+                    <h2 class="text-4xl lg:text-5xl font-black tracking-tighter uppercase mb-4 text-slate-900">Calculadora <span class="text-cyan-600">Audit IA</span></h2>
+                    <p class="text-slate-500">Veja o impacto imediato no seu fluxo de caixa.</p>
+                </div>
+
+                <form id="simForm" class="space-y-6">
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <input type="text" id="nome" required placeholder="Nome" class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                        <input type="tel" id="whats" required placeholder="WhatsApp" class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                    </div>
+                    <div class="relative">
+                        <label class="text-[10px] font-bold text-cyan-600 uppercase tracking-widest ml-1 mb-2 block">Gasto Mensal Estimado (R$)</label>
+                        <input type="number" id="valor" required placeholder="Ex: 5000" class="w-full bg-white border border-cyan-200 p-8 rounded-3xl text-4xl font-black text-cyan-600 outline-none transition focus:ring-4 focus:ring-cyan-500/10">
+                    </div>
+                    <button type="submit" class="w-full btn-modern py-6 rounded-3xl text-xl font-black text-white uppercase tracking-widest">
+                        CALCULAR ECONOMIA REAL
+                    </button>
+                </form>
+
+                <div id="resultadoSim" class="hidden mt-12 p-10 bg-gradient-to-br from-emerald-600 to-teal-800 rounded-[40px] text-white text-center shadow-2xl">
+                    <p class="text-xs font-bold uppercase tracking-widest mb-4 opacity-80">Potencial de Redução</p>
+                    <h3 id="resValor" class="text-7xl font-black mb-8 tracking-tighter">R$ 0,00</h3>
+                    <p class="text-lg font-light mb-8 italic">"Sua empresa poderia economizar <span id="resPorcentagem" class="font-bold underline decoration-cyan-300"></span> com nossa consultoria."</p>
+                    <button onclick="enviarWhatsLead()" class="w-full bg-white text-emerald-700 py-5 rounded-2xl font-black flex items-center justify-center hover:scale-105 transition">
+                        <i class="fab fa-whatsapp mr-3 text-2xl"></i> RECEBER ANÁLISE COMPLETA
                     </button>
                 </div>
             </div>
         </div>
     </section>
 
-    <footer id="contato">
-        <div class="footer-main">
-            <div>
-                <div class="logo" style="color: white; margin-bottom: 20px;">LOConecta <span>Energy</span></div>
-                <p style="opacity: 0.6;">Consultoria em redução de custos energéticos. Transformando gastos em economia real.</p>
+    <!-- 5️⃣ Clientes e Testemunho -->
+    <section id="clientes" class="py-32 bg-white">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-20">
+                <h2 class="text-4xl font-extrabold mb-4 italic tracking-tight uppercase text-slate-900">Corporações que <span class="text-cyan-600">Confiam</span></h2>
+                <div class="inline-flex items-center space-x-2 bg-cyan-50 px-6 py-2 rounded-full border border-cyan-100">
+                    <i class="fas fa-award text-cyan-600"></i>
+                    <span class="text-cyan-600 font-bold text-xs tracking-widest uppercase">+300 Consultorias de Sucesso</span>
+                </div>
             </div>
-            <div class="footer-links">
-                <h4>Empresa</h4>
-                <a href="#" style="display: block; color: white; opacity: 0.6; margin-bottom: 10px; text-decoration: none;">Início</a>
-                <a href="#simulador" style="display: block; color: white; opacity: 0.6; margin-bottom: 10px; text-decoration: none;">Simulador</a>
+
+            <!-- Grade de Logos -->
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-32">
+                <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
+                    <i class="fas fa-industry text-4xl mb-4 text-slate-300 group-hover:text-cyan-600 transition"></i>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">SteelCorp</p>
+                </div>
+                <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
+                    <i class="fas fa-microchip text-4xl mb-4 text-slate-300 group-hover:text-cyan-600 transition"></i>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">TechHub</p>
+                </div>
+                <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
+                    <i class="fas fa-truck-fast text-4xl mb-4 text-slate-300 group-hover:text-cyan-600 transition"></i>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">LogiGrid</p>
+                </div>
+                <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
+                    <i class="fas fa-building-shield text-4xl mb-4 text-slate-300 group-hover:text-cyan-600 transition"></i>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">SafeStore</p>
+                </div>
+                <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
+                    <i class="fas fa-vial-circle-check text-4xl mb-4 text-slate-300 group-hover:text-cyan-600 transition"></i>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">BioLab</p>
+                </div>
+                <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
+                    <i class="fas fa-plane text-4xl mb-4 text-slate-300 group-hover:text-cyan-600 transition"></i>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">AeroGlobal</p>
+                </div>
             </div>
-            <div class="footer-links">
-                <h4>Contato</h4>
-                <p>Itabuna • Bahia</p>
-                <a href="https://wa.me/5573981972386" class="whatsapp-link" target="_blank">
-                    (73) 98197-2386
-                </a>
+            
+            <!-- Box do Testemunho -->
+            <div class="reveal mt-12 p-1 rounded-[45px] bg-gradient-to-r from-cyan-200 via-blue-200 to-emerald-200">
+                <div class="bg-white rounded-[44px] py-16 px-10 text-center relative overflow-hidden shadow-xl">
+                    <div class="absolute -top-20 -left-20 w-64 h-64 bg-cyan-500/5 blur-[100px] pointer-events-none"></div>
+                    <i class="fas fa-quote-left text-6xl text-cyan-600/10 mb-8 block"></i>
+                    
+                    <p class="text-3xl md:text-4xl font-bold leading-tight max-w-4xl mx-auto italic text-slate-900">
+                        "A consultoria da <span class="text-cyan-600">VoltConnect</span> não é apenas um serviço, é um software humano de lucro. Recuperamos R$ 450k em gastos obsoletos no primeiro ano de parceria."
+                    </p>
+                    
+                    <div class="mt-12 flex flex-col items-center justify-center">
+                        <div class="relative mb-4">
+                            <div class="absolute -inset-1 bg-gradient-to-tr from-cyan-400 to-blue-600 rounded-full blur-sm opacity-30"></div>
+                            <img src="https://i.pravatar.cc/150?u=tech1" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Diretor Financeiro">
+                        </div>
+                        <div class="text-center">
+                            <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Ricardo Almeida</p>
+                            <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">CFO — Realezza Metalurgica</p>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="footer-bottom" style="text-align: center; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 40px; opacity: 0.5; font-size: 13px;">
-            &copy; 2024 LOConecta Energy. Todos os direitos reservados.
+    </section>
+
+    <footer class="py-20 bg-slate-950 text-center">
+        <div class="flex items-center justify-center space-x-2 mb-8">
+            <div class="w-8 h-8 bg-cyan-600 rounded-lg flex items-center justify-center">
+                <i class="fas fa-bolt text-white text-xs"></i>
+            </div>
+            <span class="text-xl font-black uppercase text-white">VOLTCONNECT</span>
         </div>
+        <p class="text-slate-500 text-sm tracking-widest uppercase font-bold">© 2024 Consultoria Estratégica High-Tech</p>
     </footer>
 
     <script>
-        function calcularAoVivo() {
-            const valor = parseFloat(document.getElementById('valor-conta').value);
-            const area = document.getElementById('results-area');
-            const display = document.getElementById('valor-anual');
-            const label = document.getElementById('label-economia');
-
-            if (valor > 0) {
-                area.style.display = 'block';
-
-                let percentual = valor <= 1000 ? 0.18 : 0.25;
-                const economiaMensal = valor * percentual;
-                const economiaAnual = economiaMensal * 12;
-
-                label.innerText = `Economia Anual Estimada (${(percentual * 100).toFixed(0)}%)`;
-                display.innerText = `R$ ${economiaAnual.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-            } else {
-                area.style.display = 'none';
-            }
+        let totalSaved = 10001.00;
+        function updateCounter() {
+            totalSaved += (Math.random() * 12) + 5;
+            document.getElementById('realtimeCounter').innerText = totalSaved.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
+        setInterval(updateCounter, 1200);
 
-        function enviarWhatsApp() {
-            const valor = document.getElementById('valor-conta').value;
-            const msg = `Olá LOConecta! Fiz a simulação no site com uma conta de R$ ${valor} e quero saber o valor do meu desconto!`;
-            const url = `https://wa.me/5573981972386?text=${encodeURIComponent(msg)}`;
-            window.open(url, '_blank', 'noopener,noreferrer');
-        }
+        let leadData = {};
 
-        function animateValue(id, start, end, duration) {
-            let startTimestamp = null;
-            const step = (timestamp) => {
-                if (!startTimestamp) startTimestamp = timestamp;
-                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-                const current = Math.floor(progress * (end - start) + start);
-                document.getElementById(id).innerText = current.toLocaleString('pt-BR');
-                if (progress < 1) window.requestAnimationFrame(step);
+        document.getElementById('simForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const valor = parseFloat(document.getElementById('valor').value);
+            const nome = document.getElementById('nome').value;
+            const whats = document.getElementById('whats').value;
+            
+            let taxa = 0;
+            if (valor <= 1000) taxa = 0.18;
+            else if (valor <= 2000) taxa = 0.20;
+            else taxa = 0.22;
+
+            const economia = valor * taxa;
+            
+            leadData = {
+                nome,
+                whats,
+                original: valor,
+                economia: economia,
+                taxa: (taxa * 100).toFixed(0)
             };
-            window.requestAnimationFrame(step);
-        }
 
-        window.onload = () => {
-            animateValue("num-clientes", 0, 110, 1200);
-            animateValue("num-economia", 0, 780000, 1200);
-            animateValue("num-usinas", 0, 18, 1200);
-        };
+            document.getElementById('resPorcentagem').innerText = leadData.taxa + '%';
+            document.getElementById('resValor').innerText = `R$ ${economia.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            
+            const res = document.getElementById('resultadoSim');
+            res.classList.remove('hidden');
+            setTimeout(() => {
+                res.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        });
+
+        function enviarWhatsLead() {
+            const msg = encodeURIComponent(
+                `⚡ *Relatório Gerado: EnergyFlow*\n\n` +
+                `*Empresa:* ${leadData.nome}\n` +
+                `*WhatsApp:* ${leadData.whats}\n` +
+                `*Gasto Atual:* R$ ${leadData.original}\n` +
+                `*Potencial de Redução:* ${leadData.taxa}% (R$ ${leadData.economia.toFixed(2)}/mês)\n\n` +
+                `_Gostaria de agendar a auditoria gratuita agora._`
+            );
+            window.open(`https://wa.me/5573991528351?text=${msg}`);
+        }
     </script>
 </body>
 </html>
