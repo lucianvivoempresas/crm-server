@@ -83,6 +83,48 @@
             animation: bounce 3s infinite;
         }
 
+        .testimonial-stage {
+            position: relative;
+            min-height: 430px;
+        }
+
+        .testimonial-slide {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transform: translateY(14px);
+            transition: opacity 0.55s ease, transform 0.55s ease;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .testimonial-slide.active {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .testimonial-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 9999px;
+            background: #cbd5e1;
+            transition: all 0.25s ease;
+        }
+
+        .testimonial-dot.active {
+            width: 28px;
+            background: #0891b2;
+        }
+
+        @media (max-width: 768px) {
+            .testimonial-stage {
+                min-height: 500px;
+            }
+        }
+
         @keyframes bounce {
             0%, 100% { transform: translateY(-5%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
             50% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
@@ -294,50 +336,93 @@
             <!-- Grade de Logos -->
             <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-32">
                 <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <i class="fas fa-industry text-4xl mb-4 text-slate-300 group-hover:text-cyan-600 transition"></i>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">SteelCorp</p>
+                    <img loading="lazy" src="https://logo.clearbit.com/cartaodetodos.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=cartaodetodos.com.br&sz=128';" alt="Logo Cartao de Todos" class="h-12 mx-auto mb-4 object-contain">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Cartao de Todos</p>
                 </div>
                 <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <i class="fas fa-microchip text-4xl mb-4 text-slate-300 group-hover:text-cyan-600 transition"></i>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">TechHub</p>
+                    <img loading="lazy" src="https://logo.clearbit.com/amorsaude.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=amorsaude.com.br&sz=128';" alt="Logo Amor Saude" class="h-12 mx-auto mb-4 object-contain">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Amor Saude</p>
                 </div>
                 <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <i class="fas fa-truck-fast text-4xl mb-4 text-slate-300 group-hover:text-cyan-600 transition"></i>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">LogiGrid</p>
+                    <img loading="lazy" src="https://logo.clearbit.com/petdetodos.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=petdetodos.com.br&sz=128';" alt="Logo Pet de Todos" class="h-12 mx-auto mb-4 object-contain">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Pet de Todos</p>
                 </div>
                 <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <i class="fas fa-building-shield text-4xl mb-4 text-slate-300 group-hover:text-cyan-600 transition"></i>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">SafeStore</p>
+                    <img loading="lazy" src="https://www.google.com/s2/favicons?domain=thebarracuda.com.br&sz=128" onerror="this.onerror=null;this.src='https://www.thebarracuda.com.br/favicon.ico';" alt="Logo Barracuda Hotel" class="h-12 mx-auto mb-4 object-contain">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Barracuda Hotel & Villas</p>
                 </div>
                 <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <i class="fas fa-vial-circle-check text-4xl mb-4 text-slate-300 group-hover:text-cyan-600 transition"></i>
+                    <img loading="lazy" src="https://logo.clearbit.com/biolabfarma.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=biolabfarma.com.br&sz=128';" alt="Logo BioLab" class="h-12 mx-auto mb-4 object-contain">
                     <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">BioLab</p>
                 </div>
                 <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <i class="fas fa-plane text-4xl mb-4 text-slate-300 group-hover:text-cyan-600 transition"></i>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">AeroGlobal</p>
+                    <img loading="lazy" src="https://logo.clearbit.com/aeronew.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=aeronew.com.br&sz=128';" alt="Logo AeroNew" class="h-12 mx-auto mb-4 object-contain">
+                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">AeroNew</p>
                 </div>
             </div>
             
-            <!-- Box do Testemunho -->
+            <!-- Carrossel de Testemunhos -->
             <div class="reveal mt-12 p-1 rounded-[45px] bg-gradient-to-r from-cyan-200 via-blue-200 to-emerald-200">
-                <div class="bg-white rounded-[44px] py-16 px-10 text-center relative overflow-hidden shadow-xl">
+                <div class="bg-white rounded-[44px] py-12 px-6 md:px-10 text-center relative overflow-hidden shadow-xl">
                     <div class="absolute -top-20 -left-20 w-64 h-64 bg-cyan-500/5 blur-[100px] pointer-events-none"></div>
-                    <i class="fas fa-quote-left text-6xl text-cyan-600/10 mb-8 block"></i>
-                    
-                    <p class="text-3xl md:text-4xl font-bold leading-tight max-w-4xl mx-auto italic text-slate-900">
-                        "A consultoria da <span class="text-cyan-600">VoltConnect</span> não é apenas um serviço, é um software humano de lucro. Recuperamos R$ 450k em gastos obsoletos no primeiro ano de parceria."
-                    </p>
-                    
-                    <div class="mt-12 flex flex-col items-center justify-center">
-                        <div class="relative mb-4">
-                            <div class="absolute -inset-1 bg-gradient-to-tr from-cyan-400 to-blue-600 rounded-full blur-sm opacity-30"></div>
-                            <img src="https://i.pravatar.cc/150?u=tech1" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Diretor Financeiro">
-                        </div>
-                        <div class="text-center">
-                            <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Ricardo Almeida</p>
-                            <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">CFO — Realezza Metalurgica</p>
-                        </div>
+
+                    <div id="testimonial-stage" class="testimonial-stage">
+                        <article class="testimonial-slide active" data-testimonial-slide>
+                            <i class="fas fa-quote-left text-6xl text-cyan-600/10 mb-8 block"></i>
+                            <p class="text-3xl md:text-4xl font-bold leading-tight max-w-4xl mx-auto italic text-slate-900">
+                                "Entramos para revisar contrato de energia e telefonia. Em seis meses, fechamos o ciclo com previsibilidade no caixa e queda real de custo operacional."
+                            </p>
+                            <div class="mt-12 flex flex-col items-center justify-center">
+                                <div class="relative mb-4">
+                                    <div class="absolute -inset-1 bg-gradient-to-tr from-cyan-400 to-blue-600 rounded-full blur-sm opacity-30"></div>
+                                    <img src="https://i.pravatar.cc/150?u=ricardo-almeida-cfo" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Ricardo Almeida">
+                                </div>
+                                <div class="text-center">
+                                    <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Ricardo Almeida</p>
+                                    <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">CFO - Realezza Metalurgica</p>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="testimonial-slide" data-testimonial-slide>
+                            <i class="fas fa-quote-left text-6xl text-cyan-600/10 mb-8 block"></i>
+                            <p class="text-3xl md:text-4xl font-bold leading-tight max-w-4xl mx-auto italic text-slate-900">
+                                "O ganho para nos nao foi so percentual de economia. Foi controle. Hoje a diretoria consegue projetar gasto energetico com muito mais seguranca."
+                            </p>
+                            <div class="mt-12 flex flex-col items-center justify-center">
+                                <div class="relative mb-4">
+                                    <div class="absolute -inset-1 bg-gradient-to-tr from-cyan-400 to-blue-600 rounded-full blur-sm opacity-30"></div>
+                                    <img src="https://i.pravatar.cc/150?u=carla-menezes-diretora" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Carla Menezes">
+                                </div>
+                                <div class="text-center">
+                                    <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Fernando Costa</p>
+                                    <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">Diretor Administrativo - Atlas Logistica</p>
+                                </div>
+                            </div>
+                        </article>
+
+                        <article class="testimonial-slide" data-testimonial-slide>
+                            <i class="fas fa-quote-left text-6xl text-cyan-600/10 mb-8 block"></i>
+                            <p class="text-3xl md:text-4xl font-bold leading-tight max-w-4xl mx-auto italic text-slate-900">
+                                "A equipe trouxe leitura tecnica e linguagem de negocio. Renegociamos pontos que passavam despercebidos e o resultado apareceu no DRE."
+                            </p>
+                            <div class="mt-12 flex flex-col items-center justify-center">
+                                <div class="relative mb-4">
+                                    <div class="absolute -inset-1 bg-gradient-to-tr from-cyan-400 to-blue-600 rounded-full blur-sm opacity-30"></div>
+                                    <img src="https://i.pravatar.cc/150?u=fernando-costa-controller" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Fernando Costa">
+                                </div>
+                                <div class="text-center">
+                                    <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Carla Almeida</p>
+                                    <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">Controller - Grupo Nortel Frotas</p>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+
+                    <div id="testimonial-dots" class="mt-8 flex items-center justify-center gap-2" aria-label="Navegacao de testemunhos">
+                        <button type="button" class="testimonial-dot active" data-testimonial-dot="0" aria-label="Testemunho 1"></button>
+                        <button type="button" class="testimonial-dot" data-testimonial-dot="1" aria-label="Testemunho 2"></button>
+                        <button type="button" class="testimonial-dot" data-testimonial-dot="2" aria-label="Testemunho 3"></button>
                     </div>
                 </div>
             </div>
@@ -406,6 +491,43 @@
             );
             window.open(`https://wa.me/5573991528351?text=${msg}`);
         }
+
+        (function initTestimonialCarousel() {
+            const stage = document.getElementById('testimonial-stage');
+            const dotsWrap = document.getElementById('testimonial-dots');
+            if (!stage || !dotsWrap) return;
+
+            const slides = Array.from(stage.querySelectorAll('[data-testimonial-slide]'));
+            const dots = Array.from(dotsWrap.querySelectorAll('[data-testimonial-dot]'));
+            if (!slides.length || slides.length !== dots.length) return;
+
+            let idx = 0;
+            let timer = null;
+
+            const show = (nextIdx) => {
+                idx = (nextIdx + slides.length) % slides.length;
+                slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+                dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+            };
+
+            const start = () => {
+                clearInterval(timer);
+                timer = setInterval(() => show(idx + 1), 10000);
+            };
+
+            dots.forEach((dot, i) => {
+                dot.addEventListener('click', () => {
+                    show(i);
+                    start();
+                });
+            });
+
+            stage.addEventListener('mouseenter', () => clearInterval(timer));
+            stage.addEventListener('mouseleave', start);
+
+            show(0);
+            start();
+        })();
     </script>
 </body>
 </html>
