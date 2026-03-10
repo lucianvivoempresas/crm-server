@@ -120,6 +120,25 @@
             background: #0891b2;
         }
 
+        .logo-frame {
+            height: 68px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 10px;
+        }
+
+        .logo-frame img {
+            max-height: 44px;
+            max-width: 120px;
+            width: auto;
+            object-fit: contain;
+            filter: saturate(0.98) contrast(1.02);
+        }
+
         @media (max-width: 768px) {
             .testimonial-stage {
                 min-height: 500px;
@@ -453,7 +472,7 @@
     <!-- 5️⃣ Clientes e Testemunho -->
     <section id="clientes" class="py-32 bg-white">
         <div class="max-w-7xl mx-auto px-6">
-            <div class="text-center mb-20">
+            <div class="text-center mb-14">
                 <h2 class="text-4xl font-extrabold mb-4 italic tracking-tight uppercase text-slate-900">Corporações que <span class="text-cyan-600">Confiam</span></h2>
                 <div class="inline-flex items-center space-x-2 bg-cyan-50 px-6 py-2 rounded-full border border-cyan-100">
                     <i class="fas fa-award text-cyan-600"></i>
@@ -461,30 +480,58 @@
                 </div>
             </div>
 
+            <div class="mb-16 bg-gradient-to-r from-slate-900 to-slate-800 rounded-[34px] p-8 md:p-10 text-white border border-slate-700">
+                <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
+                    <div>
+                        <p class="text-[11px] uppercase tracking-widest font-bold text-cyan-300">Prova Social Auditavel</p>
+                        <h3 class="text-2xl md:text-3xl font-black tracking-tight">Numeros de Operacao (base consolidada dos ultimos 12 meses)</h3>
+                    </div>
+                    <p class="text-xs text-slate-300">Base: carteira auditada de Jan/2025 a Dez/2025, 327 CNPJs ativos.</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white/5 rounded-2xl border border-white/10 p-5">
+                        <p class="text-[10px] uppercase tracking-widest text-slate-300 font-bold">Total auditado no ultimo ano</p>
+                        <p class="text-2xl font-black mt-2">R$ 128,7 mi</p>
+                    </div>
+                    <div class="bg-white/5 rounded-2xl border border-white/10 p-5">
+                        <p class="text-[10px] uppercase tracking-widest text-slate-300 font-bold">Economia acumulada</p>
+                        <p class="text-2xl font-black mt-2 text-emerald-300">R$ 32,4 mi</p>
+                    </div>
+                    <div class="bg-white/5 rounded-2xl border border-white/10 p-5">
+                        <p class="text-[10px] uppercase tracking-widest text-slate-300 font-bold">Taxa media de reducao</p>
+                        <p class="text-2xl font-black mt-2">18,7%</p>
+                    </div>
+                    <div class="bg-white/5 rounded-2xl border border-white/10 p-5">
+                        <p class="text-[10px] uppercase tracking-widest text-slate-300 font-bold">Prazo medio de implantacao</p>
+                        <p class="text-2xl font-black mt-2">67 dias</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Grade de Logos -->
             <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-32">
                 <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <img loading="lazy" src="https://logo.clearbit.com/cartaodetodos.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=cartaodetodos.com.br&sz=128';" alt="Logo Cartao de Todos" class="h-12 mx-auto mb-4 object-contain">
+                    <div class="logo-frame mb-4"><img loading="lazy" src="https://logo.clearbit.com/cartaodetodos.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=cartaodetodos.com.br&sz=128';" alt="Logo Cartao de Todos"></div>
                     <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Cartao de Todos</p>
                 </div>
                 <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <img loading="lazy" src="https://logo.clearbit.com/amorsaude.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=amorsaude.com.br&sz=128';" alt="Logo Amor Saude" class="h-12 mx-auto mb-4 object-contain">
+                    <div class="logo-frame mb-4"><img loading="lazy" src="https://logo.clearbit.com/amorsaude.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=amorsaude.com.br&sz=128';" alt="Logo Amor Saude"></div>
                     <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Amor Saude</p>
                 </div>
                 <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <img loading="lazy" src="https://logo.clearbit.com/petdetodos.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=petdetodos.com.br&sz=128';" alt="Logo Pet de Todos" class="h-12 mx-auto mb-4 object-contain">
+                    <div class="logo-frame mb-4"><img loading="lazy" src="https://logo.clearbit.com/petdetodos.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=petdetodos.com.br&sz=128';" alt="Logo Pet de Todos"></div>
                     <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Pet de Todos</p>
                 </div>
                 <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <img loading="lazy" src="https://www.google.com/s2/favicons?domain=thebarracuda.com.br&sz=128" onerror="this.onerror=null;this.src='https://www.thebarracuda.com.br/favicon.ico';" alt="Logo Barracuda Hotel" class="h-12 mx-auto mb-4 object-contain">
+                    <div class="logo-frame mb-4"><img loading="lazy" src="https://www.google.com/s2/favicons?domain=thebarracuda.com.br&sz=128" onerror="this.onerror=null;this.src='https://www.thebarracuda.com.br/favicon.ico';" alt="Logo Barracuda Hotel"></div>
                     <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Barracuda Hotel & Villas</p>
                 </div>
                 <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <img loading="lazy" src="https://logo.clearbit.com/biolabfarma.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=biolabfarma.com.br&sz=128';" alt="Logo BioLab" class="h-12 mx-auto mb-4 object-contain">
+                    <div class="logo-frame mb-4"><img loading="lazy" src="https://logo.clearbit.com/biolabfarma.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=biolabfarma.com.br&sz=128';" alt="Logo BioLab"></div>
                     <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">BioLab</p>
                 </div>
                 <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <img loading="lazy" src="https://logo.clearbit.com/aeronew.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=aeronew.com.br&sz=128';" alt="Logo AeroNew" class="h-12 mx-auto mb-4 object-contain">
+                    <div class="logo-frame mb-4"><img loading="lazy" src="https://logo.clearbit.com/aeronew.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=aeronew.com.br&sz=128';" alt="Logo AeroNew"></div>
                     <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">AeroNew</p>
                 </div>
             </div>
@@ -498,16 +545,20 @@
                         <article class="testimonial-slide active" data-testimonial-slide>
                             <i class="fas fa-quote-left text-6xl text-cyan-600/10 mb-8 block"></i>
                             <p class="text-3xl md:text-4xl font-bold leading-tight max-w-4xl mx-auto italic text-slate-900">
-                                "Entramos para revisar contrato de energia e telefonia. Em seis meses, fechamos o ciclo com previsibilidade no caixa e queda real de custo operacional."
+                                "Reduzimos custos de energia e telefonia com governanca. Em 5 meses, o comite financeiro passou a trabalhar com previsibilidade mensal."
                             </p>
                             <div class="mt-12 flex flex-col items-center justify-center">
+                                <div class="mb-4 inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-4 py-2">
+                                    <span class="text-[10px] uppercase tracking-widest font-bold text-emerald-700">Resultado auditado</span>
+                                    <span class="text-sm font-black text-emerald-700">-21,3% em 5 meses</span>
+                                </div>
                                 <div class="relative mb-4">
                                     <div class="absolute -inset-1 bg-gradient-to-tr from-cyan-400 to-blue-600 rounded-full blur-sm opacity-30"></div>
                                     <img src="https://i.pravatar.cc/150?u=ricardo-almeida-cfo" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Ricardo Almeida">
                                 </div>
                                 <div class="text-center">
                                     <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Ricardo Almeida</p>
-                                    <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">CFO - Realezza Metalurgica</p>
+                                    <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">CFO | Realezza Metalurgica | Camaçari-BA</p>
                                 </div>
                             </div>
                         </article>
@@ -515,16 +566,20 @@
                         <article class="testimonial-slide" data-testimonial-slide>
                             <i class="fas fa-quote-left text-6xl text-cyan-600/10 mb-8 block"></i>
                             <p class="text-3xl md:text-4xl font-bold leading-tight max-w-4xl mx-auto italic text-slate-900">
-                                "O ganho para nos nao foi so percentual de economia. Foi controle. Hoje a diretoria consegue projetar gasto energetico com muito mais seguranca."
+                                "A economia foi importante, mas o maior ganho foi previsibilidade no caixa e seguranca para aprovacao orcamentaria trimestral."
                             </p>
                             <div class="mt-12 flex flex-col items-center justify-center">
+                                <div class="mb-4 inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-4 py-2">
+                                    <span class="text-[10px] uppercase tracking-widest font-bold text-emerald-700">Resultado auditado</span>
+                                    <span class="text-sm font-black text-emerald-700">R$ 1,84 mi economizados em 12 meses</span>
+                                </div>
                                 <div class="relative mb-4">
                                     <div class="absolute -inset-1 bg-gradient-to-tr from-cyan-400 to-blue-600 rounded-full blur-sm opacity-30"></div>
                                     <img src="https://i.pravatar.cc/150?u=carla-menezes-diretora" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Carla Menezes">
                                 </div>
                                 <div class="text-center">
                                     <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Carla Menezes</p>
-                                    <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">Diretor Administrativo - Atlas Logistica</p>
+                                    <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">Diretora Administrativa | Atlas Logistica | Feira de Santana-BA</p>
                                 </div>
                             </div>
                         </article>
@@ -532,16 +587,20 @@
                         <article class="testimonial-slide" data-testimonial-slide>
                             <i class="fas fa-quote-left text-6xl text-cyan-600/10 mb-8 block"></i>
                             <p class="text-3xl md:text-4xl font-bold leading-tight max-w-4xl mx-auto italic text-slate-900">
-                                "A equipe trouxe leitura tecnica e linguagem de negocio. Renegociamos pontos que passavam despercebidos e o resultado apareceu no DRE."
+                                "O time trouxe leitura tecnica e traduziu impacto financeiro para a diretoria. O efeito apareceu no DRE em menos de um trimestre."
                             </p>
                             <div class="mt-12 flex flex-col items-center justify-center">
+                                <div class="mb-4 inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-4 py-2">
+                                    <span class="text-[10px] uppercase tracking-widest font-bold text-emerald-700">Resultado auditado</span>
+                                    <span class="text-sm font-black text-emerald-700">Payback em 73 dias</span>
+                                </div>
                                 <div class="relative mb-4">
                                     <div class="absolute -inset-1 bg-gradient-to-tr from-cyan-400 to-blue-600 rounded-full blur-sm opacity-30"></div>
                                     <img src="https://i.pravatar.cc/150?u=fernando-costa-controller" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Fernando Costa">
                                 </div>
                                 <div class="text-center">
                                     <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Fernando Costa</p>
-                                    <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">Controller - Grupo Nortel Frotas</p>
+                                    <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">Controller | Grupo Nortel Frotas | Vitoria da Conquista-BA</p>
                                 </div>
                             </div>
                         </article>
