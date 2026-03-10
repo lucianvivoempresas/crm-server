@@ -249,6 +249,7 @@ async function deduplicateClients() {
 
 function setupEventListeners() {
   let globalSearchActiveIndex = -1;
+  let globalSearchExpanded = false;
 
   const getGlobalSearchButtons = () => {
     const resultsEl = document.getElementById('global-search-results');
@@ -330,7 +331,8 @@ function setupEventListeners() {
       }
     });
 
-    const out = matches.slice(0, 8);
+    const limit = globalSearchExpanded ? 20 : 6;
+    const out = matches.slice(0, limit);
     if (!out.length) {
       resultsEl.innerHTML = '<div class="px-4 py-3 text-sm text-slate-400">Nenhum resultado encontrado.</div>';
       resultsEl.classList.remove('hidden');
@@ -357,6 +359,9 @@ function setupEventListeners() {
         </button>
       `;
     }).join('');
+    if (!globalSearchExpanded && matches.length > limit) {
+      resultsEl.innerHTML += `<button class="w-full text-center px-4 py-3 text-sm text-cyan-300 hover:bg-slate-700/40 border-t border-slate-700" id="global-search-more">Ver mais resultados (${matches.length - limit})</button>`;
+    }
     resultsEl.classList.remove('hidden');
     if (window.lucide) lucide.createIcons();
     globalSearchActiveIndex = -1;
@@ -382,6 +387,14 @@ function setupEventListeners() {
         globalSearchActiveIndex = -1;
       });
     });
+
+    const moreBtn = document.getElementById('global-search-more');
+    if (moreBtn) {
+      moreBtn.addEventListener('click', () => {
+        globalSearchExpanded = true;
+        renderGlobalSearch(query);
+      });
+    }
   };
 
   // == ABAS E NAVEGAÇÃO ==
@@ -396,8 +409,14 @@ function setupEventListeners() {
 
   const globalSearch = document.getElementById('global-search');
   if (globalSearch) {
-    globalSearch.addEventListener('input', () => renderGlobalSearch(globalSearch.value));
-    globalSearch.addEventListener('focus', () => renderGlobalSearch(globalSearch.value));
+    globalSearch.addEventListener('input', () => {
+      globalSearchExpanded = false;
+      renderGlobalSearch(globalSearch.value);
+    });
+    globalSearch.addEventListener('focus', () => {
+      globalSearchExpanded = false;
+      renderGlobalSearch(globalSearch.value);
+    });
     globalSearch.addEventListener('keydown', (e) => {
       const resultsEl = document.getElementById('global-search-results');
       if (!resultsEl) return;

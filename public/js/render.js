@@ -35,6 +35,7 @@ function renderDashboard() {
   const totalClientes = clientesUsuario.length;
   const totalVendasConcluidas = vendasPeriodo.reduce((acc, v) => acc + (Number(v.valorVenda) || 0), 0);
   const totalComissoesPeriodo = vendasPeriodo.reduce((acc, v) => acc + calcularComissao(v), 0);
+  const ticketMedioPeriodo = vendasPeriodo.length ? (totalVendasConcluidas / vendasPeriodo.length) : 0;
 
   document.getElementById('metric-totalClientes').textContent = totalClientes;
   document.getElementById('metric-vendasPeriodo').textContent = vendasPeriodo.length;
@@ -92,7 +93,14 @@ function renderDashboard() {
     if (elAbertos) elAbertos.textContent = String(negociosAbertos);
     if (elAtraso) elAtraso.textContent = String(followupsAtraso);
     if (elRecomendacao) {
-      if (metaRestante > 0) elRecomendacao.textContent = `Recomendacao: priorize oportunidades de maior ticket para reduzir ${formatCurrency(metaRestante)} da meta atual.`;
+      if (metaRestante > 0) {
+        const vendasNecessarias = ticketMedioPeriodo > 0 ? Math.ceil(metaRestante / ticketMedioPeriodo) : 0;
+        if (vendasNecessarias > 0) {
+          elRecomendacao.textContent = `Recomendacao: faltam ${vendasNecessarias} vendas de ticket medio ${formatCurrency(ticketMedioPeriodo)} para bater a meta.`;
+        } else {
+          elRecomendacao.textContent = `Recomendacao: faltam ${formatCurrency(metaRestante)} para bater a meta atual.`;
+        }
+      }
       else elRecomendacao.textContent = 'Recomendacao: meta atingida. Foque em qualidade de carteira e renovacoes.';
     }
 
@@ -141,6 +149,74 @@ function renderDashboard() {
         <div class="bg-slate-700/40 rounded-lg px-4 py-3">
           <p class="text-sm text-white font-medium">${r.cliente?.nome || 'Cliente não encontrado'}</p>
           <p class="text-xs text-slate-400">${r.v.produto} • ${r.v.status} • ${r.dias} dias sem avanço</p>
+        </div>
+      `).join('');
+    }
+  }
+
+  // Cockpit por perfil
+  const cockpit = document.getElementById('dashboard-cockpit-content');
+  if (cockpit) {
+    if (user && user.perfil === 'master') {
+      const vendedores = (usuariosList || []).filter(u => u.perfil === 'vendedor' && u.ativo);
+      const conversao = vendedores.map(v => {
+        const vendasV = (vendas || []).filter(x => Number(x.vendedor_id) === Number(v.id));
+        const concluidasV = vendasV.filter(x => x.status === 'Concluído');
+        const taxa = vendasV.length ? (concluidasV.length / vendasV.length) * 100 : 0;
+        return `${v.nome}: ${taxa.toFixed(1)}%`;
+      }).slice(0, 4).join(' • ') || 'Sem dados de conversão por vendedor';
+
+      const funnel = ['Negociando','Aguardando Aceite','Inputado','Concluído'].map(st => `${st}: ${(vendas || []).filter(v => v.status === st).length}`).join(' • ');
+      const diasMes = new Date(range.start.getFullYear(), range.start.getMonth() + 1, 0).getDate();
+      const diasPassados = Math.max(1, new Date().getDate());
+      const forecast = (totalVendasConcluidas / diasPassados) * diasMes;
+
+      cockpit.innerHTML = `
+        <div class="bg-slate-700/40 rounded-lg p-4"><p class="text-xs text-slate-400 mb-1">Conversão por vendedor</p><p class="text-sm text-white">${conversao}</p></div>
+        <div class="bg-slate-700/40 rounded-lg p-4"><p class="text-xs text-slate-400 mb-1">Funil por etapa</p><p class="text-sm text-white">${funnel}</p></div>
+        <div class="bg-slate-700/40 rounded-lg p-4"><p class="text-xs text-slate-400 mb-1">Ticket médio</p><p class="text-sm text-white font-semibold">${formatCurrency(ticketMedioPeriodo)}</p></div>
+        <div class="bg-slate-700/40 rounded-lg p-4"><p class="text-xs text-slate-400 mb-1">Forecast do período</p><p class="text-sm text-white font-semibold">${formatCurrency(forecast)}</p></div>
+      `;
+    } else {
+      const riscos = (vendasUsuario || []).filter(v => !['Concluído','Cancelado'].includes(v.status)).length;
+      cockpit.innerHTML = `
+        <div class="bg-slate-700/40 rounded-lg p-4"><p class="text-xs text-slate-400 mb-1">Meta do mês</p><p class="text-sm text-white">Acompanhe em "Plano de Ação do Dia"</p></div>
+        <div class="bg-slate-700/40 rounded-lg p-4"><p class="text-xs text-slate-400 mb-1">Faltante</p><p class="text-sm text-white">Ver meta restante acima</p></div>
+        <div class="bg-slate-700/40 rounded-lg p-4"><p class="text-xs text-slate-400 mb-1">Próxima melhor ação</p><p class="text-sm text-white">Priorize clientes com follow-up em atraso.</p></div>
+        <div class="bg-slate-700/40 rounded-lg p-4"><p class="text-xs text-slate-400 mb-1">Vendas em risco</p><p class="text-sm text-white font-semibold">${riscos}</p></div>
+      `;
+    }
+  }
+
+  // Alertas automáticos de pós-venda no dashboard
+  const pvList = document.getElementById('dashboard-posvenda-alertas');
+  const pvEmpty = document.getElementById('dashboard-posvenda-alertas-empty');
+  if (pvList && pvEmpty) {
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const alertas = [];
+    (vendasUsuario || []).filter(v => v.status === 'Concluído' && v.dataConclusao).forEach(v => {
+      const d = Math.round(Math.abs(hoje - new Date(v.dataConclusao + 'T00:00:00')) / 86400000);
+      const dis = v.posVendaDismissed || [];
+      let tipo = null;
+      if (d >= 510 && !dis.includes('RENOVACAO')) tipo = 'Renovação';
+      else if (d >= 90 && !dis.includes(90)) tipo = 'D+90';
+      else if (d >= 30 && !dis.includes(30)) tipo = 'D+30';
+      else if (d >= 7 && !dis.includes(7)) tipo = 'D+7';
+      if (tipo) {
+        const c = clientes.find(cl => Number(cl.id) === Number(v.clienteId));
+        alertas.push({ tipo, nome: c?.nome || 'Cliente não encontrado', produto: v.produto });
+      }
+    });
+
+    if (!alertas.length) {
+      pvList.innerHTML = '';
+      pvEmpty.classList.remove('hidden');
+    } else {
+      pvEmpty.classList.add('hidden');
+      pvList.innerHTML = alertas.slice(0, 6).map(a => `
+        <div class="bg-slate-700/40 rounded-lg px-4 py-3">
+          <p class="text-sm text-white">${a.nome}</p>
+          <p class="text-xs text-slate-400">${a.tipo} • ${a.produto}</p>
         </div>
       `).join('');
     }

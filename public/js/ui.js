@@ -36,6 +36,22 @@ function showModal(type, id=null) {
     setupVendaFormListeners();
     setupClienteAutocomplete('venda-clienteNome','venda-clienteId','venda-clienteNome-hint');
 
+    const prefillId = window.__prefillVendaClienteId;
+    const prefillNome = window.__prefillVendaClienteNome;
+    if (prefillId) {
+      const sel = document.getElementById('venda-clienteId');
+      const inp = document.getElementById('venda-clienteNome');
+      if (sel) sel.value = String(prefillId);
+      if (inp) inp.value = prefillNome || '';
+      const hint = document.getElementById('venda-clienteNome-hint');
+      if (hint) {
+        hint.textContent = 'Cliente selecionado ✔';
+        hint.className = 'text-xs text-green-400 mt-1';
+      }
+      window.__prefillVendaClienteId = '';
+      window.__prefillVendaClienteNome = '';
+    }
+
     const userLogado = obterUsuarioLogado();
     const vendedorField = document.getElementById('venda-vendedor-field');
     const vendedorSelect = document.getElementById('venda-vendedor_id');
@@ -270,6 +286,69 @@ function showClientProfileModal(id) {
       ${v.observacao ? `<tr><td colspan="5" class="px-4 py-2 text-xs text-slate-400 bg-slate-800/20 italic border-b border-slate-700/50">Obs: ${v.observacao}</td></tr>` : ''}
     `).join('');
   }
+
+  const timelineEl = document.getElementById('client-profile-timeline');
+  if (timelineEl) {
+    const eventos = [];
+    if (cliente.importedAt) {
+      eventos.push({ data: cliente.importedAt, titulo: 'Cadastro importado', detalhe: 'Cliente inserido via importação.' });
+    }
+    if (cliente.createdAt) {
+      eventos.push({ data: cliente.createdAt, titulo: 'Cadastro inicial', detalhe: 'Cliente criado manualmente.' });
+    }
+    if (cliente.dataNascimento) {
+      eventos.push({ data: cliente.dataNascimento, titulo: 'Contato', detalhe: `Data de nascimento registrada: ${formatDate(cliente.dataNascimento)}.` });
+    }
+    vendasCliente.forEach(v => {
+      eventos.push({
+        data: v.dataConclusao || v.dataRegistro,
+        titulo: `Venda ${v.status || 'registrada'}`,
+        detalhe: `${v.produto} • ${formatCurrency(v.valorVenda)}${v.observacao ? ` • Obs: ${v.observacao}` : ''}`
+      });
+    });
+    if (cliente.mesesDesdeUltimaVenda) {
+      eventos.push({ data: new Date().toISOString().split('T')[0], titulo: 'Pós-venda', detalhe: `${cliente.mesesDesdeUltimaVenda} meses desde a última venda.` });
+    }
+    const ordenados = eventos.filter(e => !!e.data).sort((a,b) => new Date(b.data) - new Date(a.data));
+    timelineEl.innerHTML = ordenados.length
+      ? ordenados.map(e => `
+          <div class="border-l-2 border-slate-600 pl-3 py-1">
+            <p class="text-xs text-slate-400">${formatDate(e.data)}</p>
+            <p class="text-sm text-white font-medium">${e.titulo}</p>
+            <p class="text-xs text-slate-400">${e.detalhe}</p>
+          </div>
+        `).join('')
+      : '<p class="text-xs text-slate-400">Sem eventos para exibir.</p>';
+  }
+
+  const waBtn = document.getElementById('client-profile-action-whatsapp');
+  if (waBtn) {
+    waBtn.onclick = () => {
+      const telRaw = String(cliente.telefone || '').replace(/\D/g, '');
+      const tel = telRaw && !telRaw.startsWith('55') ? `55${telRaw}` : telRaw;
+      if (!tel) return;
+      window.open(`https://wa.me/${tel}`, '_blank', 'noopener,noreferrer');
+    };
+  }
+
+  const emailBtn = document.getElementById('client-profile-action-email');
+  if (emailBtn) {
+    emailBtn.onclick = () => {
+      if (!cliente.email) return;
+      window.location.href = `mailto:${cliente.email}`;
+    };
+  }
+
+  const newSaleBtn = document.getElementById('client-profile-action-new-sale');
+  if (newSaleBtn) {
+    newSaleBtn.onclick = () => {
+      window.__prefillVendaClienteId = String(cliente.id);
+      window.__prefillVendaClienteNome = cliente.nome || '';
+      hideClientProfileModal();
+      showModal('venda');
+    };
+  }
+
   clientProfileModal.classList.remove('hidden');
   if (window.lucide) lucide.createIcons();
 }
