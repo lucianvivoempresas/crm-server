@@ -41,6 +41,16 @@ function renderDashboard() {
   document.getElementById('metric-totalVendas').textContent = formatCurrency(totalVendasConcluidas);
   document.getElementById('metric-totalComissoes').textContent = formatCurrency(totalComissoesPeriodo);
 
+  // Painel de acao operacional
+  const negociosAbertos = (vendasUsuario || []).filter(v => !['Concluído','Cancelado'].includes(v.status)).length;
+  const followupsAtraso = (vendasUsuario || []).filter(v => {
+    if (['Concluído','Cancelado'].includes(v.status)) return false;
+    const ref = v.dataRegistro || v.dataConclusao;
+    if (!ref) return false;
+    const dias = Math.floor((Date.now() - new Date(ref + 'T00:00:00').getTime()) / 86400000);
+    return dias >= 7;
+  }).length;
+
   // Filtrar metas por período e por vendedor
   let metasPeriodo = metas.filter(m => Number(m.mes) === (range.start.getMonth() + 1) && Number(m.ano) === range.start.getFullYear());
   if (user && user.perfil === 'vendedor') {
@@ -72,6 +82,19 @@ function renderDashboard() {
     const progressoVendas = metaVendas > 0 ? (totalVendasMeta / metaVendas) * 100 : 0;
     const progressoComissao = metaComissao > 0 ? (totalComissoesMeta / metaComissao) * 100 : 0;
     const vendedorMeta = metaPeriodo.vendedor_id ? (usuariosList?.find(u => Number(u.id) === Number(metaPeriodo.vendedor_id))?.nome || `Vendedor #${metaPeriodo.vendedor_id}`) : 'Global';
+    const metaRestante = Math.max(metaVendas - totalVendasMeta, 0);
+
+    const elMetaRestante = document.getElementById('action-meta-restante');
+    const elAbertos = document.getElementById('action-negocios-abertos');
+    const elAtraso = document.getElementById('action-followups-atraso');
+    const elRecomendacao = document.getElementById('action-recomendacao');
+    if (elMetaRestante) elMetaRestante.textContent = formatCurrency(metaRestante);
+    if (elAbertos) elAbertos.textContent = String(negociosAbertos);
+    if (elAtraso) elAtraso.textContent = String(followupsAtraso);
+    if (elRecomendacao) {
+      if (metaRestante > 0) elRecomendacao.textContent = `Recomendacao: priorize oportunidades de maior ticket para reduzir ${formatCurrency(metaRestante)} da meta atual.`;
+      else elRecomendacao.textContent = 'Recomendacao: meta atingida. Foque em qualidade de carteira e renovacoes.';
+    }
 
     container.innerHTML = `
       <div class="md:col-span-2 text-xs text-slate-400">Meta aplicada: ${vendedorMeta}</div>
@@ -87,7 +110,42 @@ function renderDashboard() {
   } else if (container && emptyEl) {
     container.innerHTML = '';
     emptyEl.classList.remove('hidden');
+
+    const elMetaRestante = document.getElementById('action-meta-restante');
+    const elAbertos = document.getElementById('action-negocios-abertos');
+    const elAtraso = document.getElementById('action-followups-atraso');
+    const elRecomendacao = document.getElementById('action-recomendacao');
+    if (elMetaRestante) elMetaRestante.textContent = 'N/A';
+    if (elAbertos) elAbertos.textContent = String(negociosAbertos);
+    if (elAtraso) elAtraso.textContent = String(followupsAtraso);
+    if (elRecomendacao) elRecomendacao.textContent = 'Recomendacao: cadastre uma meta do periodo para acompanhar performance.';
   }
+
+  // Alertas de risco
+  const riscoList = document.getElementById('dashboard-risco-list');
+  const riscoEmpty = document.getElementById('dashboard-risco-empty');
+  if (riscoList && riscoEmpty) {
+    const riscos = (vendasUsuario || []).filter(v => !['Concluído','Cancelado'].includes(v.status)).map(v => {
+      const ref = v.dataRegistro || v.dataConclusao;
+      const dias = ref ? Math.floor((Date.now() - new Date(ref + 'T00:00:00').getTime()) / 86400000) : 0;
+      const cliente = clientes.find(c => Number(c.id) === Number(v.clienteId));
+      return { v, cliente, dias };
+    }).filter(r => r.dias >= 10).sort((a,b) => b.dias - a.dias).slice(0, 5);
+
+    if (!riscos.length) {
+      riscoList.innerHTML = '';
+      riscoEmpty.classList.remove('hidden');
+    } else {
+      riscoEmpty.classList.add('hidden');
+      riscoList.innerHTML = riscos.map(r => `
+        <div class="bg-slate-700/40 rounded-lg px-4 py-3">
+          <p class="text-sm text-white font-medium">${r.cliente?.nome || 'Cliente não encontrado'}</p>
+          <p class="text-xs text-slate-400">${r.v.produto} • ${r.v.status} • ${r.dias} dias sem avanço</p>
+        </div>
+      `).join('');
+    }
+  }
+
   renderDashboardCharts(vendasPeriodo);
   renderVendasRecentes();
   if (window.lucide) lucide.createIcons();

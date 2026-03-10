@@ -26,6 +26,7 @@
 
         .text-gradient {
             background: var(--primary-gradient);
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
@@ -239,13 +240,13 @@
             <div class="reveal">
                 <div class="inline-flex items-center space-x-2 bg-cyan-50 border border-cyan-100 px-4 py-2 rounded-full mb-8">
                     <span class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
-                    <span class="text-[10px] font-bold text-cyan-600 uppercase tracking-[0.2em]">Consultoria de Alta Performance</span>
+                    <span class="text-[10px] font-bold text-cyan-600 uppercase tracking-[0.2em]">Diagnostico tecnico com atendimento humano</span>
                 </div>
                 <h1 class="text-6xl lg:text-8xl font-extrabold leading-[1] mb-6 tracking-tighter text-slate-900">
-                    Pague até <span class="text-gradient">30% menos</span> energia.
+                    Reduza custos de energia e telecom com <span class="text-gradient">resultado mensuravel</span>.
                 </h1>
                 <p class="text-xl text-slate-500 mb-10 leading-relaxed max-w-lg">
-                    Unimos tecnologia de ponta e análise estratégica para reduzir faturas de energia e telefonia em usinas e grandes empresas.
+                    Auditoria especializada para operacoes com alto consumo, contratos complexos e necessidade real de previsibilidade financeira.
                 </p>
                 
                 <div class="bg-emerald-50 border border-emerald-100 p-6 rounded-3xl inline-block mb-10 shadow-sm">
@@ -254,15 +255,30 @@
                 </div>
 
                 <div class="flex flex-col sm:flex-row gap-4">
-                    <a href="#simulador" class="btn-modern px-10 py-5 rounded-2xl font-black text-lg text-center text-white">
+                    <a id="cta-hero-simular" href="#simulador" class="btn-modern px-10 py-5 rounded-2xl font-black text-lg text-center text-white">
                         SIMULAR AGORA
                     </a>
-                    <a href="https://loconecta.com.br/crm" class="bg-slate-100 hover:bg-slate-200 border border-slate-200 px-10 py-5 rounded-2xl font-bold text-lg transition flex items-center justify-center text-slate-800">
+                    <a id="cta-hero-crm" href="https://loconecta.com.br/crm" class="bg-slate-100 hover:bg-slate-200 border border-slate-200 px-10 py-5 rounded-2xl font-bold text-lg transition flex items-center justify-center text-slate-800">
                         <i class="fas fa-right-to-bracket mr-3 text-cyan-600"></i> Acessar CRM
                     </a>
-                    <button onclick="window.location.href='https://wa.me/5573991528351'" class="bg-slate-100 hover:bg-slate-200 border border-slate-200 px-10 py-5 rounded-2xl font-bold text-lg transition flex items-center justify-center text-slate-800">
+                    <button id="cta-hero-whatsapp" onclick="window.location.href='https://wa.me/5573991528351'" class="bg-slate-100 hover:bg-slate-200 border border-slate-200 px-10 py-5 rounded-2xl font-bold text-lg transition flex items-center justify-center text-slate-800">
                         <i class="fab fa-whatsapp mr-3 text-emerald-600"></i> Falar com Especialista
                     </button>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8 max-w-3xl">
+                    <div class="bg-white border border-slate-200 rounded-2xl px-4 py-3">
+                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Operacoes auditadas</p>
+                        <p class="text-lg font-black text-slate-900">R$ 38,4 mil</p>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-2xl px-4 py-3">
+                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Empresas atendidas</p>
+                        <p class="text-lg font-black text-slate-900">+340 contas</p>
+                    </div>
+                    <div class="bg-white border border-slate-200 rounded-2xl px-4 py-3">
+                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Prazo medio de ganho</p>
+                        <p class="text-lg font-black text-slate-900">45 a 90 dias</p>
+                    </div>
                 </div>
             </div>
             
@@ -378,6 +394,39 @@
                         <input type="text" id="nome" required placeholder="Nome" class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
                         <input type="tel" id="whats" required placeholder="WhatsApp" class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
                     </div>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <select id="segmento" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                            <option value="">Segmento da empresa</option>
+                            <option value="industria">Industria</option>
+                            <option value="varejo">Varejo</option>
+                            <option value="hotelaria">Hotelaria</option>
+                            <option value="servicos">Servicos</option>
+                        </select>
+                        <select id="tipoContrato" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                            <option value="">Tipo de contrato atual</option>
+                            <option value="convencional">Cativo convencional</option>
+                            <option value="tarifa-branca">Tarifa branca</option>
+                            <option value="livre">Mercado livre</option>
+                            <option value="nao-sei">Nao sei informar</option>
+                        </select>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <select id="estado" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                            <option value="">Estado da operacao</option>
+                            <option value="BA">Bahia</option>
+                            <option value="SE">Sergipe</option>
+                            <option value="AL">Alagoas</option>
+                            <option value="PE">Pernambuco</option>
+                            <option value="outro">Outro estado</option>
+                        </select>
+                        <select id="faixaConsumo" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                            <option value="">Faixa media de consumo</option>
+                            <option value="ate-2000">Ate R$ 2.000</option>
+                            <option value="2000-10000">R$ 2.000 a R$ 10.000</option>
+                            <option value="10000-30000">R$ 10.000 a R$ 30.000</option>
+                            <option value="acima-30000">Acima de R$ 30.000</option>
+                        </select>
+                    </div>
                     <div class="relative">
                         <label class="text-[10px] font-bold text-cyan-600 uppercase tracking-widest ml-1 mb-2 block">Gasto Mensal Estimado (R$)</label>
                         <input type="number" id="valor" required placeholder="Ex: 5000" class="w-full bg-white border border-cyan-200 p-8 rounded-3xl text-4xl font-black text-cyan-600 outline-none transition focus:ring-4 focus:ring-cyan-500/10">
@@ -390,8 +439,10 @@
                 <div id="resultadoSim" class="hidden mt-12 p-10 bg-gradient-to-br from-emerald-600 to-teal-800 rounded-[40px] text-white text-center shadow-2xl">
                     <p class="text-xs font-bold uppercase tracking-widest mb-4 opacity-80">Potencial de Redução</p>
                     <h3 id="resValor" class="text-7xl font-black mb-8 tracking-tighter">R$ 0,00</h3>
-                    <p class="text-lg font-light mb-8 italic">"Sua empresa poderia economizar <span id="resPorcentagem" class="font-bold underline decoration-cyan-300"></span> com nossa consultoria."</p>
-                    <button onclick="enviarWhatsLead()" class="w-full bg-white text-emerald-700 py-5 rounded-2xl font-black flex items-center justify-center hover:scale-105 transition">
+                    <p class="text-lg font-light mb-4 italic">"Sua empresa poderia economizar <span id="resPorcentagem" class="font-bold underline decoration-cyan-300"></span> com nossa consultoria."</p>
+                    <p id="resFaixa" class="text-sm opacity-90 mb-2"></p>
+                    <p id="resPrazo" class="text-sm opacity-90 mb-8"></p>
+                    <button id="cta-resultado-whatsapp" onclick="enviarWhatsLead()" class="w-full bg-white text-emerald-700 py-5 rounded-2xl font-black flex items-center justify-center hover:scale-105 transition">
                         <i class="fab fa-whatsapp mr-3 text-2xl"></i> RECEBER ANÁLISE COMPLETA
                     </button>
                 </div>
@@ -472,7 +523,7 @@
                                     <img src="https://i.pravatar.cc/150?u=carla-menezes-diretora" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Carla Menezes">
                                 </div>
                                 <div class="text-center">
-                                    <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Fernando Costa</p>
+                                    <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Carla Menezes</p>
                                     <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">Diretor Administrativo - Atlas Logistica</p>
                                 </div>
                             </div>
@@ -489,7 +540,7 @@
                                     <img src="https://i.pravatar.cc/150?u=fernando-costa-controller" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Fernando Costa">
                                 </div>
                                 <div class="text-center">
-                                    <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Carla Almeida</p>
+                                    <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Fernando Costa</p>
                                     <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">Controller - Grupo Nortel Frotas</p>
                                 </div>
                             </div>
@@ -501,6 +552,20 @@
                         <button type="button" class="testimonial-dot" data-testimonial-dot="1" aria-label="Testemunho 2"></button>
                         <button type="button" class="testimonial-dot" data-testimonial-dot="2" aria-label="Testemunho 3"></button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="py-20 bg-slate-900 text-white">
+        <div class="max-w-6xl mx-auto px-6">
+            <div class="bg-gradient-to-r from-cyan-600 to-blue-700 rounded-[36px] p-10 md:p-14 shadow-2xl">
+                <p class="text-[11px] uppercase tracking-widest font-bold opacity-80 mb-3">Diagnostico financeiro especializado</p>
+                <h3 class="text-3xl md:text-5xl font-black tracking-tight mb-4">Quer saber o potencial real da sua operacao em 15 minutos?</h3>
+                <p class="text-cyan-50/90 max-w-3xl mb-8">Nossa equipe tecnica revisa seu perfil de consumo e te apresenta um plano claro de reducao, com atendimento humano do inicio ao fim.</p>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <a id="cta-final-diagnostico" href="#simulador" class="bg-white text-cyan-700 px-8 py-4 rounded-2xl font-black text-center">Agendar Diagnostico</a>
+                    <a id="cta-final-whatsapp" href="https://wa.me/5573991528351" target="_blank" class="bg-slate-900/30 hover:bg-slate-900/40 border border-white/30 px-8 py-4 rounded-2xl font-bold text-center">Falar no WhatsApp</a>
                 </div>
             </div>
         </div>
@@ -546,29 +611,65 @@
 
         let leadData = {};
 
+        function trackEvent(action, label) {
+            try {
+                if (typeof gtag === 'function') {
+                    gtag('event', action, {
+                        event_category: 'landing_cta',
+                        event_label: label
+                    });
+                }
+            } catch (err) {
+                console.warn('Tracking indisponivel:', err);
+            }
+        }
+
         document.getElementById('simForm').addEventListener('submit', function(e) {
             e.preventDefault();
             const valor = parseFloat(document.getElementById('valor').value);
             const nome = document.getElementById('nome').value;
             const whats = document.getElementById('whats').value;
+            const segmento = document.getElementById('segmento').value;
+            const estado = document.getElementById('estado').value;
+            const faixaConsumo = document.getElementById('faixaConsumo').value;
+            const tipoContrato = document.getElementById('tipoContrato').value;
             
             let taxa = 0;
             if (valor <= 1000) taxa = 0.18;
             else if (valor <= 2000) taxa = 0.20;
             else taxa = 0.22;
 
+            if (tipoContrato === 'convencional') taxa += 0.02;
+            if (faixaConsumo === 'acima-30000') taxa += 0.02;
+            if (segmento === 'hotelaria' || segmento === 'industria') taxa += 0.01;
+            taxa = Math.min(taxa, 0.32);
+
             const economia = valor * taxa;
+            const economiaMin = economia * 0.85;
+            const economiaMax = economia * 1.15;
+            const prazo = (tipoContrato === 'livre') ? '30 a 60 dias' : '45 a 90 dias';
             
             leadData = {
                 nome,
                 whats,
                 original: valor,
                 economia: economia,
-                taxa: (taxa * 100).toFixed(0)
+                taxa: (taxa * 100).toFixed(0),
+                segmento,
+                estado,
+                faixaConsumo,
+                tipoContrato,
+                economiaMin,
+                economiaMax,
+                prazo
             };
 
             document.getElementById('resPorcentagem').innerText = leadData.taxa + '%';
             document.getElementById('resValor').innerText = `R$ ${economia.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            document.getElementById('resFaixa').innerText = `Faixa estimada: R$ ${economiaMin.toLocaleString('pt-BR', {minimumFractionDigits: 2})} a R$ ${economiaMax.toLocaleString('pt-BR', {minimumFractionDigits: 2})} por mes.`;
+            document.getElementById('resPrazo').innerText = `Prazo medio para captura de ganho: ${prazo}.`;
+
+            trackEvent('simulador_submit', `segmento_${segmento || 'nao_informado'}`);
             
             const res = document.getElementById('resultadoSim');
             res.classList.remove('hidden');
@@ -582,12 +683,30 @@
                 `⚡ *Relatório Gerado: EnergyFlow*\n\n` +
                 `*Empresa:* ${leadData.nome}\n` +
                 `*WhatsApp:* ${leadData.whats}\n` +
+                `*Segmento:* ${leadData.segmento}\n` +
+                `*Estado:* ${leadData.estado}\n` +
+                `*Contrato Atual:* ${leadData.tipoContrato}\n` +
                 `*Gasto Atual:* R$ ${leadData.original}\n` +
                 `*Potencial de Redução:* ${leadData.taxa}% (R$ ${leadData.economia.toFixed(2)}/mês)\n\n` +
                 `_Gostaria de agendar a auditoria gratuita agora._`
             );
+            trackEvent('whatsapp_click', 'resultado_simulador');
             window.open(`https://wa.me/5573991528351?text=${msg}`);
         }
+
+        [
+            ['cta-hero-simular', 'hero_simular'],
+            ['cta-hero-crm', 'hero_crm'],
+            ['cta-hero-whatsapp', 'hero_whatsapp'],
+            ['cta-resultado-whatsapp', 'resultado_whatsapp'],
+            ['cta-final-diagnostico', 'final_diagnostico'],
+            ['cta-final-whatsapp', 'final_whatsapp']
+        ].forEach(([id, label]) => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.addEventListener('click', () => trackEvent('cta_click', label));
+            }
+        });
 
         (function initFloatingChat() {
             const fab = document.getElementById('chat-fab');

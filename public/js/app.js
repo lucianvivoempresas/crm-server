@@ -248,23 +248,116 @@ async function deduplicateClients() {
 }
 
 function setupEventListeners() {
+  const activateTab = (tabId) => {
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('text-white','border-blue-500','bg-slate-700/50');
+      b.classList.add('text-slate-400','hover:text-white','hover:bg-slate-700/30','border-transparent');
+    });
+    const targetTab = document.getElementById(`tab-${tabId}`);
+    if (targetTab) targetTab.classList.remove('hidden');
+    const targetBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+    if (targetBtn) {
+      targetBtn.classList.add('text-white','border-blue-500','bg-slate-700/50');
+      targetBtn.classList.remove('text-slate-400','hover:text-white','hover:bg-slate-700/30','border-transparent');
+    }
+  };
+
+  const renderGlobalSearch = (query) => {
+    const resultsEl = document.getElementById('global-search-results');
+    if (!resultsEl) return;
+    const q = String(query || '').trim().toLowerCase();
+    if (q.length < 2) {
+      resultsEl.classList.add('hidden');
+      resultsEl.innerHTML = '';
+      return;
+    }
+
+    const matches = [];
+    (clientes || []).forEach(c => {
+      const nome = String(c.nome || '').toLowerCase();
+      const doc = String(c.cpfCnpj || '').toLowerCase();
+      const tel = String(c.telefone || '').toLowerCase();
+      const conta = String(c.contaContrato || '').toLowerCase();
+      if (nome.includes(q) || doc.includes(q) || tel.includes(q) || conta.includes(q)) {
+        matches.push({
+          type: 'cliente',
+          id: c.id,
+          title: c.nome || 'Cliente sem nome',
+          subtitle: `CPF/CNPJ: ${c.cpfCnpj || 'N/A'} • Tel: ${c.telefone || 'N/A'}`
+        });
+      }
+    });
+
+    (vendas || []).forEach(v => {
+      const cliente = clientes.find(c => Number(c.id) === Number(v.clienteId));
+      const base = `${cliente?.nome || ''} ${v.produto || ''} ${v.operadora || ''} ${v.status || ''}`.toLowerCase();
+      if (base.includes(q)) {
+        matches.push({
+          type: 'venda',
+          id: v.id,
+          clienteId: v.clienteId,
+          title: `${cliente?.nome || 'Cliente'} • ${v.produto || 'Venda'}`,
+          subtitle: `${v.operadora || 'N/A'} • ${v.status || 'N/A'} • ${formatCurrency(v.valorVenda)}`
+        });
+      }
+    });
+
+    const out = matches.slice(0, 8);
+    if (!out.length) {
+      resultsEl.innerHTML = '<div class="px-4 py-3 text-sm text-slate-400">Nenhum resultado encontrado.</div>';
+      resultsEl.classList.remove('hidden');
+      return;
+    }
+
+    resultsEl.innerHTML = out.map((r, idx) => `
+      <button class="w-full text-left px-4 py-3 hover:bg-slate-700/50 border-b border-slate-700 last:border-b-0" data-global-result="${idx}">
+        <p class="text-sm text-white font-medium">${r.title}</p>
+        <p class="text-xs text-slate-400">${r.subtitle}</p>
+      </button>
+    `).join('');
+    resultsEl.classList.remove('hidden');
+
+    resultsEl.querySelectorAll('[data-global-result]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const item = out[Number(btn.dataset.globalResult)];
+        if (!item) return;
+        if (item.type === 'cliente') {
+          activateTab('clientes');
+          const input = document.getElementById('search-clientes');
+          if (input) input.value = item.title;
+          renderClientesGrid();
+        } else {
+          activateTab('vendas');
+          const input = document.getElementById('search-vendas');
+          if (input) input.value = item.title.split(' • ')[0] || '';
+          renderVendasTable();
+        }
+        resultsEl.classList.add('hidden');
+      });
+    });
+  };
+
   // == ABAS E NAVEGAÇÃO ==
   const tabsContainer = document.getElementById('tabs-container');
   if (tabsContainer) {
     tabsContainer.onclick = (e) => {
       const btn = e.target.closest('button.tab-btn');
       if (!btn) return;
-      const tabId = btn.dataset.tab;
-      document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-      document.querySelectorAll('.tab-btn').forEach(b => {
-        b.classList.remove('text-white','border-blue-500','bg-slate-700/50');
-        b.classList.add('text-slate-400','hover:text-white','hover:bg-slate-700/30','border-transparent');
-      });
-      const targetTab = document.getElementById(`tab-${tabId}`);
-      if (targetTab) targetTab.classList.remove('hidden');
-      btn.classList.add('text-white','border-blue-500','bg-slate-700/50');
-      btn.classList.remove('text-slate-400','hover:text-white','hover:bg-slate-700/30','border-transparent');
+      activateTab(btn.dataset.tab);
     };
+  }
+
+  const globalSearch = document.getElementById('global-search');
+  if (globalSearch) {
+    globalSearch.addEventListener('input', () => renderGlobalSearch(globalSearch.value));
+    globalSearch.addEventListener('focus', () => renderGlobalSearch(globalSearch.value));
+    document.addEventListener('click', (e) => {
+      const resultsEl = document.getElementById('global-search-results');
+      if (!resultsEl) return;
+      const within = e.target.closest('#global-search, #global-search-results');
+      if (!within) resultsEl.classList.add('hidden');
+    });
   }
 
   // == FILTROS E PESQUISAS ==
