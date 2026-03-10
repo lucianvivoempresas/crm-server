@@ -301,14 +301,14 @@ function setupEventListeners() {
       return;
     }
 
-    const matches = [];
+    const clienteMatches = [];
     (clientes || []).forEach(c => {
       const nome = String(c.nome || '').toLowerCase();
       const doc = String(c.cpfCnpj || '').toLowerCase();
       const tel = String(c.telefone || '').toLowerCase();
       const conta = String(c.contaContrato || '').toLowerCase();
       if (nome.includes(q) || doc.includes(q) || tel.includes(q) || conta.includes(q)) {
-        matches.push({
+        clienteMatches.push({
           type: 'cliente',
           id: c.id,
           title: c.nome || 'Cliente sem nome',
@@ -317,11 +317,12 @@ function setupEventListeners() {
       }
     });
 
+    const vendaMatches = [];
     (vendas || []).forEach(v => {
       const cliente = clientes.find(c => Number(c.id) === Number(v.clienteId));
       const base = `${cliente?.nome || ''} ${v.produto || ''} ${v.operadora || ''} ${v.status || ''}`.toLowerCase();
       if (base.includes(q)) {
-        matches.push({
+        vendaMatches.push({
           type: 'venda',
           id: v.id,
           clienteId: v.clienteId,
@@ -331,8 +332,12 @@ function setupEventListeners() {
       }
     });
 
-    const limit = globalSearchExpanded ? 20 : 6;
-    const out = matches.slice(0, limit);
+    const clienteLimit = globalSearchExpanded ? 12 : 3;
+    const vendaLimit = globalSearchExpanded ? 12 : 3;
+    const outClientes = clienteMatches.slice(0, clienteLimit);
+    const outVendas = vendaMatches.slice(0, vendaLimit);
+    const out = [...outClientes, ...outVendas];
+    const totalMatches = clienteMatches.length + vendaMatches.length;
     if (!out.length) {
       resultsEl.innerHTML = '<div class="px-4 py-3 text-sm text-slate-400">Nenhum resultado encontrado.</div>';
       resultsEl.classList.remove('hidden');
@@ -359,8 +364,8 @@ function setupEventListeners() {
         </button>
       `;
     }).join('');
-    if (!globalSearchExpanded && matches.length > limit) {
-      resultsEl.innerHTML += `<button class="w-full text-center px-4 py-3 text-sm text-cyan-300 hover:bg-slate-700/40 border-t border-slate-700" id="global-search-more">Ver mais resultados (${matches.length - limit})</button>`;
+    if (!globalSearchExpanded && totalMatches > out.length) {
+      resultsEl.innerHTML += `<button type="button" class="w-full text-center px-4 py-3 text-sm text-cyan-300 hover:bg-slate-700/40 border-t border-slate-700" id="global-search-more">Ver mais resultados (${totalMatches - out.length})</button>`;
     }
     resultsEl.classList.remove('hidden');
     if (window.lucide) lucide.createIcons();
@@ -390,7 +395,9 @@ function setupEventListeners() {
 
     const moreBtn = document.getElementById('global-search-more');
     if (moreBtn) {
-      moreBtn.addEventListener('click', () => {
+      moreBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         globalSearchExpanded = true;
         renderGlobalSearch(query);
       });

@@ -445,10 +445,16 @@ function setupClienteAutocomplete(inputId, selectId, hintId) {
   const listId = inp.getAttribute('list');
   const datalistEl = listId ? document.getElementById(listId) : null;
 
-  const getClientesDisponiveis = () => {
+  const getClientesDisponiveis = (query = '') => {
     const user = obterUsuarioLogado();
     if (user && user.perfil === 'vendedor') {
-      return (clientes || []).filter(c => Number(c.vendedor_id) === Number(user.id));
+      const meus = (clientes || []).filter(c => Number(c.vendedor_id) === Number(user.id));
+      const q = String(query || '').trim().toLowerCase();
+      if (!q) return meus;
+      const temNoMeu = meus.some(c => String(c.nome || '').toLowerCase().includes(q));
+      if (temNoMeu) return meus;
+      // Fallback: se não houver correspondência na carteira, sugere no cadastro geral.
+      return clientes || [];
     }
     return clientes || [];
   };
@@ -456,10 +462,10 @@ function setupClienteAutocomplete(inputId, selectId, hintId) {
   const fillSuggestions = (query) => {
     if (!datalistEl) return;
     const q = String(query || '').trim().toLowerCase();
-    const source = getClientesDisponiveis();
+    const source = getClientesDisponiveis(q);
     let filtered;
     if (!q) {
-      filtered = source.slice(0, 20);
+      filtered = source.slice(0, 30);
     } else {
       const startsWith = [];
       const contains = [];
@@ -469,7 +475,7 @@ function setupClienteAutocomplete(inputId, selectId, hintId) {
         if (nome.startsWith(q)) startsWith.push(c);
         else contains.push(c);
       });
-      filtered = [...startsWith, ...contains].slice(0, 20);
+      filtered = [...startsWith, ...contains].slice(0, 30);
     }
     datalistEl.innerHTML = filtered.map(c => `<option value="${c.nome}"></option>`).join('');
   };
@@ -477,7 +483,7 @@ function setupClienteAutocomplete(inputId, selectId, hintId) {
   const sync = () => {
     fillSuggestions(inp.value);
     const n = String(inp.value || '').trim().toLowerCase();
-    const found = getClientesDisponiveis().find(x => String(x.nome || '').trim().toLowerCase() === n);
+    const found = getClientesDisponiveis(inp.value).find(x => String(x.nome || '').trim().toLowerCase() === n);
     const id = found ? Number(found.id) : null;
     if (id) {
       sel.value = String(id);
