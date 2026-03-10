@@ -248,6 +248,32 @@ async function deduplicateClients() {
 }
 
 function setupEventListeners() {
+  let globalSearchActiveIndex = -1;
+
+  const getGlobalSearchButtons = () => {
+    const resultsEl = document.getElementById('global-search-results');
+    if (!resultsEl) return [];
+    return Array.from(resultsEl.querySelectorAll('[data-global-result]'));
+  };
+
+  const paintGlobalSearchActive = () => {
+    const buttons = getGlobalSearchButtons();
+    buttons.forEach((btn, idx) => {
+      btn.classList.toggle('bg-slate-700/50', idx === globalSearchActiveIndex);
+    });
+    if (buttons[globalSearchActiveIndex]) {
+      buttons[globalSearchActiveIndex].scrollIntoView({ block: 'nearest' });
+    }
+  };
+
+  const runGlobalSearchSelection = (index) => {
+    const buttons = getGlobalSearchButtons();
+    if (!buttons.length) return;
+    const idx = Math.max(0, Math.min(index, buttons.length - 1));
+    const btn = buttons[idx];
+    if (btn) btn.click();
+  };
+
   const activateTab = (tabId) => {
     document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
     document.querySelectorAll('.tab-btn').forEach(b => {
@@ -270,6 +296,7 @@ function setupEventListeners() {
     if (q.length < 2) {
       resultsEl.classList.add('hidden');
       resultsEl.innerHTML = '';
+      globalSearchActiveIndex = -1;
       return;
     }
 
@@ -307,16 +334,33 @@ function setupEventListeners() {
     if (!out.length) {
       resultsEl.innerHTML = '<div class="px-4 py-3 text-sm text-slate-400">Nenhum resultado encontrado.</div>';
       resultsEl.classList.remove('hidden');
+      globalSearchActiveIndex = -1;
       return;
     }
 
-    resultsEl.innerHTML = out.map((r, idx) => `
-      <button class="w-full text-left px-4 py-3 hover:bg-slate-700/50 border-b border-slate-700 last:border-b-0" data-global-result="${idx}">
-        <p class="text-sm text-white font-medium">${r.title}</p>
-        <p class="text-xs text-slate-400">${r.subtitle}</p>
-      </button>
-    `).join('');
+    resultsEl.innerHTML = out.map((r, idx) => {
+      const icon = r.type === 'cliente' ? 'users' : 'trending-up';
+      const badge = r.type === 'cliente' ? 'Cliente' : 'Venda';
+      const badgeColor = r.type === 'cliente' ? 'text-cyan-300' : 'text-emerald-300';
+      return `
+        <button class="w-full text-left px-4 py-3 hover:bg-slate-700/50 border-b border-slate-700 last:border-b-0" data-global-result="${idx}">
+          <div class="flex items-start gap-3">
+            <i data-lucide="${icon}" class="w-4 h-4 mt-0.5 text-slate-400"></i>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <p class="text-sm text-white font-medium truncate">${r.title}</p>
+                <span class="text-[10px] uppercase tracking-widest ${badgeColor}">${badge}</span>
+              </div>
+              <p class="text-xs text-slate-400 truncate">${r.subtitle}</p>
+            </div>
+          </div>
+        </button>
+      `;
+    }).join('');
     resultsEl.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+    globalSearchActiveIndex = -1;
+    paintGlobalSearchActive();
 
     resultsEl.querySelectorAll('[data-global-result]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -327,6 +371,7 @@ function setupEventListeners() {
           const input = document.getElementById('search-clientes');
           if (input) input.value = item.title;
           renderClientesGrid();
+          try { showClientProfileModal(item.id); } catch (_) {}
         } else {
           activateTab('vendas');
           const input = document.getElementById('search-vendas');
@@ -334,6 +379,7 @@ function setupEventListeners() {
           renderVendasTable();
         }
         resultsEl.classList.add('hidden');
+        globalSearchActiveIndex = -1;
       });
     });
   };
@@ -352,6 +398,50 @@ function setupEventListeners() {
   if (globalSearch) {
     globalSearch.addEventListener('input', () => renderGlobalSearch(globalSearch.value));
     globalSearch.addEventListener('focus', () => renderGlobalSearch(globalSearch.value));
+    globalSearch.addEventListener('keydown', (e) => {
+      const resultsEl = document.getElementById('global-search-results');
+      if (!resultsEl) return;
+      const isOpen = !resultsEl.classList.contains('hidden');
+      const buttons = getGlobalSearchButtons();
+
+      if (e.key === 'Escape') {
+        resultsEl.classList.add('hidden');
+        globalSearchActiveIndex = -1;
+        return;
+      }
+
+      if (!isOpen || !buttons.length) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        globalSearchActiveIndex = (globalSearchActiveIndex + 1) % buttons.length;
+        paintGlobalSearchActive();
+        return;
+      }
+
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        globalSearchActiveIndex = (globalSearchActiveIndex - 1 + buttons.length) % buttons.length;
+        paintGlobalSearchActive();
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (globalSearchActiveIndex >= 0) {
+          runGlobalSearchSelection(globalSearchActiveIndex);
+        } else {
+          runGlobalSearchSelection(0);
+        }
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      const isCtrlK = (e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 'k';
+      if (!isCtrlK) return;
+      e.preventDefault();
+      globalSearch.focus();
+      globalSearch.select();
+    });
     document.addEventListener('click', (e) => {
       const resultsEl = document.getElementById('global-search-results');
       if (!resultsEl) return;
