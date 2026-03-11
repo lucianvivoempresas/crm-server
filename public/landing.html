@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VoltConnect - Eficiência Energética de Alta Performance</title>
+    <title>VoltConnect - Economia de Energia por Assinatura</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome 6.5.1 - Versão mais estável -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
@@ -11,10 +11,11 @@
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap');
         
         :root {
-            --primary-gradient: linear-gradient(135deg, #0891b2 0%, #0284c7 100%);
+            --primary-gradient: linear-gradient(135deg, #0ea5a4 0%, #2563eb 55%, #0f766e 100%);
             --tech-light: #f8fafc;
             --accent-cyan: #0891b2;
             --card-white: rgba(255, 255, 255, 0.9);
+            --ink-soft: #334155;
         }
 
         body {
@@ -48,7 +49,7 @@
         .btn-modern {
             background: var(--primary-gradient);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 15px rgba(2, 132, 199, 0.2);
+            box-shadow: 0 8px 22px rgba(14, 116, 144, 0.28);
         }
 
         .btn-modern:hover {
@@ -65,6 +66,44 @@
 
         .hero-mask {
             mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
+        }
+
+        .hero-grid {
+            background-image: radial-gradient(circle at 1px 1px, rgba(15, 23, 42, 0.08) 1px, transparent 0);
+            background-size: 22px 22px;
+            opacity: 0.55;
+        }
+
+        .trust-chip {
+            border: 1px solid #dbeafe;
+            background: #f8fbff;
+            color: var(--ink-soft);
+        }
+
+        .headline-safe {
+            line-height: 1.03;
+            padding-right: 0.08em;
+        }
+
+
+        .step-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 34px;
+            height: 34px;
+            border-radius: 9999px;
+            font-size: 12px;
+            font-weight: 800;
+            border: 1px solid #cbd5e1;
+            color: #64748b;
+            background: #f8fafc;
+        }
+
+        .step-chip.active {
+            border-color: #0891b2;
+            color: #ffffff;
+            background: #0891b2;
         }
 
         .counter-glow {
@@ -245,7 +284,7 @@
                 <a href="#faq" class="text-slate-600 hover:text-cyan-600 transition">FAQ</a>
             </div>
             <div class="flex items-center gap-3">
-                <a href="#simulador" class="btn-modern px-6 py-3 rounded-xl text-xs font-black tracking-widest text-white">SIMULAR DESCONTO</a>
+                <a id="cta-nav-simular" href="#simulador" class="btn-modern px-6 py-3 rounded-xl text-xs font-black tracking-widest text-white">SIMULAR DESCONTO</a>
                 <a href="https://loconecta.com.br/crm" class="inline-flex bg-slate-100 hover:bg-slate-200 border border-slate-200 px-6 py-3 rounded-xl text-xs font-black tracking-widest text-slate-700 transition">ACESSAR CRM</a>
             </div>
         </div>
@@ -253,21 +292,22 @@
 
     <!-- 1️⃣ Hero Section -->
     <header class="relative min-h-screen flex items-center pt-20 overflow-hidden bg-white">
+        <div class="absolute inset-0 hero-grid -z-10"></div>
         <div class="absolute top-0 right-0 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-[120px] -z-10"></div>
         
-        <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
+        <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center lg:items-start">
             <div class="reveal">
                 <div class="inline-flex items-center space-x-2 bg-cyan-50 border border-cyan-100 px-4 py-2 rounded-full mb-8">
                     <span class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
-                    <span class="text-[10px] font-bold text-cyan-600 uppercase tracking-[0.2em]">Diagnostico tecnico com atendimento humano</span>
+                    <span class="text-[10px] font-bold text-cyan-600 uppercase tracking-[0.2em]">Energia por assinatura com suporte humano</span>
                 </div>
-                <h1 class="text-6xl lg:text-8xl font-extrabold leading-[1] mb-6 tracking-tighter text-slate-900">
-                    Economize na conta de energia com <span class="text-gradient">adesao simples</span>.
+                <h1 id="hero-headline" class="headline-safe text-6xl lg:text-8xl font-extrabold mb-6 tracking-tighter text-slate-900">
+                    Economize ate 30% na conta de luz <span class="text-gradient">sem investimento</span>.
                 </h1>
-                <p class="text-xl text-slate-500 mb-6 leading-relaxed max-w-2xl">
-                    Sem investimento em equipamentos, sem burocracia e com acompanhamento humano. Se sua conta passa de R$ 200, voce pode ter desconto recorrente.
+                <p id="hero-subheadline" class="text-xl text-slate-500 mb-6 leading-relaxed max-w-2xl">
+                    Pessoa fisica e empresas com conta acima de R$ 200 podem reduzir custos com energia limpa, de forma simples e sem obras.
                 </p>
-                <p class="text-sm font-bold uppercase tracking-wider text-cyan-700 mb-10">Para pessoa fisica e empresa | adesao rapida | sem fidelidade contratual</p>
+                <p class="text-sm font-bold uppercase tracking-wider text-cyan-700 mb-10">Desconto previsivel | ativacao orientada | atendimento especialista</p>
                 
                 <div class="bg-emerald-50 border border-emerald-100 p-6 rounded-3xl inline-block mb-10 shadow-sm">
                     <p class="text-[10px] uppercase font-bold text-emerald-600 tracking-widest mb-1 opacity-80">Economia gerada hoje para clientes:</p>
@@ -286,20 +326,20 @@
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8 max-w-3xl">
                     <div class="bg-white border border-slate-200 rounded-2xl px-4 py-3">
                         <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Operacoes auditadas</p>
-                        <p class="text-lg font-black text-slate-900">R$ 38,4 mil</p>
+                        <p class="text-lg font-black text-slate-900">327 unidades</p>
                     </div>
                     <div class="bg-white border border-slate-200 rounded-2xl px-4 py-3">
                         <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Empresas atendidas</p>
-                        <p class="text-lg font-black text-slate-900">+340 contas</p>
+                        <p class="text-lg font-black text-slate-900">+340 CNPJs</p>
                     </div>
                     <div class="bg-white border border-slate-200 rounded-2xl px-4 py-3">
                         <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Prazo medio de ganho</p>
-                        <p class="text-lg font-black text-slate-900">45 a 90 dias</p>
+                        <p class="text-lg font-black text-slate-900">30 a 90 dias</p>
                     </div>
                 </div>
             </div>
             
-            <div class="relative group reveal" style="animation-delay: 0.2s;">
+            <div class="relative group reveal lg:-mt-6" style="animation-delay: 0.2s;">
                 <div class="img-container border border-slate-100 shadow-xl">
                     <!-- Imagem 2 Enviada: Brasil de Fato - Usinas e Infraestrutura -->
                     <img src="https://www.brasildefato.com.br/wp-content/uploads/2024/09/image_processing20240515-3791018-d59owi.webp" alt="Visão Geral de Energia Renovável" class="w-full h-[650px] object-cover transition-transform duration-1000 group-hover:scale-110">
@@ -320,35 +360,54 @@
         </div>
     </header>
 
+    <section class="py-8 bg-gradient-to-r from-cyan-50 via-white to-blue-50 border-y border-slate-100">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid sm:grid-cols-3 gap-3">
+                <div class="trust-chip rounded-2xl px-5 py-4 flex items-center gap-3">
+                    <i class="fas fa-user-check text-cyan-700"></i>
+                    <p class="text-sm font-semibold">Atendimento humano do inicio ao fim</p>
+                </div>
+                <div class="trust-chip rounded-2xl px-5 py-4 flex items-center gap-3">
+                    <i class="fas fa-house-circle-check text-cyan-700"></i>
+                    <p class="text-sm font-semibold">Sem obra e sem instalacao local</p>
+                </div>
+                <div class="trust-chip rounded-2xl px-5 py-4 flex items-center gap-3">
+                    <i class="fas fa-file-circle-check text-cyan-700"></i>
+                    <p class="text-sm font-semibold">Condicoes claras antes da adesao</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- 2️⃣ Problemas -->
     <section id="problema" class="py-32 bg-slate-50 border-y border-slate-100">
         <div class="max-w-7xl mx-auto px-6">
             <div class="text-center mb-24">
-                <h2 class="text-4xl lg:text-5xl font-black mb-6 italic tracking-tighter uppercase text-slate-900">Drenos Financeiros <span class="text-cyan-600">Invisíveis</span></h2>
-                <p class="text-slate-500 max-w-2xl mx-auto text-lg">Seu financeiro pode estar ignorando cobranças que custam milhares de reais por ano.</p>
+                <h2 class="text-4xl lg:text-5xl font-black mb-6 italic tracking-tighter uppercase text-slate-900">Vantagens da <span class="text-cyan-600">VoltConnect</span></h2>
+                <p class="text-slate-500 max-w-2xl mx-auto text-lg">Implementacao orientada para economia real, com transparencia e comunicacao simples para o cliente.</p>
             </div>
 
             <div class="grid md:grid-cols-3 gap-8">
                 <div class="bg-tech-card p-10 rounded-[40px] group">
-                    <div class="w-16 h-16 bg-red-50 flex items-center justify-center rounded-2xl mb-8 group-hover:bg-red-100 transition">
-                        <i class="fas fa-phone-slash text-red-500 text-2xl"></i>
+                    <div class="w-16 h-16 bg-emerald-50 flex items-center justify-center rounded-2xl mb-8 group-hover:bg-emerald-100 transition">
+                        <i class="fas fa-hand-holding-dollar text-emerald-600 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold mb-4 text-slate-900">Contratos Obsoletos</h3>
-                    <p class="text-slate-500 leading-relaxed">Taxas de roaming, linhas inativas e planos de telefonia que não acompanham o mercado.</p>
+                    <h3 class="text-xl font-bold mb-4 text-slate-900">Sem compra de equipamentos</h3>
+                    <p class="text-slate-500 leading-relaxed">Voce nao precisa investir em placas solares nem realizar instalacoes no local.</p>
                 </div>
                 <div class="bg-tech-card p-10 rounded-[40px] group">
                     <div class="w-16 h-16 bg-cyan-50 flex items-center justify-center rounded-2xl mb-8 group-hover:bg-cyan-100 transition">
-                        <i class="fas fa-bolt text-cyan-600 text-2xl"></i>
+                        <i class="fas fa-file-signature text-cyan-600 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold mb-4 text-slate-900">Tarifas Acima do Ideal</h3>
-                    <p class="text-slate-500 leading-relaxed">Falta de enquadramento tarifário correto para grandes consumidores e indústrias.</p>
+                    <h3 class="text-xl font-bold mb-4 text-slate-900">Adesao sem burocracia</h3>
+                    <p class="text-slate-500 leading-relaxed">Processo simples para ativar sua economia com suporte de ponta a ponta.</p>
                 </div>
                 <div class="bg-tech-card p-10 rounded-[40px] group">
                     <div class="w-16 h-16 bg-amber-50 flex items-center justify-center rounded-2xl mb-8 group-hover:bg-amber-100 transition">
-                        <i class="fas fa-eye-slash text-amber-500 text-2xl"></i>
+                        <i class="fas fa-leaf text-amber-500 text-2xl"></i>
                     </div>
-                    <h3 class="text-xl font-bold mb-4 text-slate-900">Visão Limitada</h3>
-                    <p class="text-slate-500 leading-relaxed">Sem dados e análise estratégica, sua empresa aceita o que as concessionárias impõem.</p>
+                    <h3 class="text-xl font-bold mb-4 text-slate-900">Economia com sustentabilidade</h3>
+                    <p class="text-slate-500 leading-relaxed">Energia proveniente de usinas solares com reducao recorrente na sua conta.</p>
                 </div>
             </div>
         </div>
@@ -366,30 +425,33 @@
                     <div class="absolute -top-10 -right-10 w-40 h-40 bg-cyan-500/5 blur-3xl -z-10"></div>
                 </div>
                 <div class="lg:w-1/2">
-                    <h2 class="text-4xl lg:text-6xl font-black mb-8 italic tracking-tighter text-slate-900">Nós analisamos e <br><span class="text-gradient">Reduzimos seus custos.</span></h2>
+                    <h2 class="text-4xl lg:text-6xl font-black mb-8 italic tracking-tighter text-slate-900">Comece a economizar <br><span class="text-gradient">na sua conta de luz.</span></h2>
                     
                     <div class="space-y-6">
                         <div class="bg-slate-50 border border-slate-100 p-8 rounded-3xl hover:bg-slate-100 transition-colors">
                             <div class="flex items-center space-x-6">
                                 <div class="w-12 h-12 bg-white shadow-sm rounded-xl flex items-center justify-center">
-                                    <i class="fas fa-tower-cell text-cyan-600 text-xl"></i>
+                                    <i class="fas fa-solar-panel text-cyan-600 text-xl"></i>
                                 </div>
                                 <div>
-                                    <h4 class="font-bold text-xl mb-1 text-slate-900">Telefonia Corporativa</h4>
-                                    <p class="text-slate-500">Auditoria completa de faturas e negociação direta com operadoras.</p>
+                                    <h4 class="font-bold text-xl mb-1 text-slate-900">O que e energia solar por assinatura?</h4>
+                                    <p class="text-slate-500">Sua energia vem de usinas solares parceiras, gerando creditos que reduzem o valor da fatura mensal.</p>
                                 </div>
                             </div>
                         </div>
                         <div class="bg-slate-50 border border-slate-100 p-8 rounded-3xl hover:bg-slate-100 transition-colors">
                             <div class="flex items-center space-x-6">
                                 <div class="w-12 h-12 bg-white shadow-sm rounded-xl flex items-center justify-center">
-                                    <i class="fas fa-solar-panel text-emerald-600 text-xl"></i>
+                                    <i class="fas fa-bolt text-emerald-600 text-xl"></i>
                                 </div>
                                 <div>
-                                    <h4 class="font-bold text-xl mb-1 text-slate-900">Engenharia de Energia</h4>
-                                    <p class="text-slate-500">Eficiência máxima em nossas usinas solares e migração para mercado livre. Garantindo o melhor desconto para o cliente.</p>
+                                    <h4 class="font-bold text-xl mb-1 text-slate-900">Como a economia acontece?</h4>
+                                    <p class="text-slate-500">Com a compensacao dos creditos, sua conta mensal fica menor, sem mudanca de concessionaria e sem obra.</p>
                                 </div>
                             </div>
+                        </div>
+                        <div class="pt-2">
+                            <a id="cta-solucao-simular" href="#simulador" class="btn-modern inline-flex px-8 py-4 rounded-2xl font-black text-white">SIMULAR DESCONTO</a>
                         </div>
                     </div>
                 </div>
@@ -403,24 +465,24 @@
             <div class="text-center mb-16">
                 <p class="text-xs font-black uppercase tracking-widest text-cyan-600 mb-3">Processo simples em 3 passos</p>
                 <h2 class="text-4xl lg:text-5xl font-black tracking-tighter text-slate-900 mb-4">Como sua economia acontece</h2>
-                <p class="text-slate-500 text-lg max-w-3xl mx-auto">Modelo direto para reduzir sua conta de energia sem obras, sem troca de concessionaria e com suporte humano.</p>
+                <p class="text-slate-500 text-lg max-w-3xl mx-auto">Do cadastro ate a ativacao dos creditos: tudo de forma leve, rapida e com orientacao especializada.</p>
             </div>
 
             <div class="grid md:grid-cols-3 gap-6 mb-12">
                 <article class="bg-slate-50 border border-slate-200 rounded-3xl p-8">
                     <span class="inline-flex w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 font-black items-center justify-center mb-5">1</span>
-                    <h3 class="text-xl font-black text-slate-900 mb-3">Simulacao do perfil</h3>
-                    <p class="text-slate-500">Voce preenche seus dados de consumo e nossa equipe identifica o potencial real de desconto.</p>
+                    <h3 class="text-xl font-black text-slate-900 mb-3">Cadastro e analise</h3>
+                    <p class="text-slate-500">Voce informa seu consumo e validamos se seu perfil e elegivel para economia imediata.</p>
                 </article>
                 <article class="bg-slate-50 border border-slate-200 rounded-3xl p-8">
                     <span class="inline-flex w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 font-black items-center justify-center mb-5">2</span>
-                    <h3 class="text-xl font-black text-slate-900 mb-3">Ativacao sem investimento</h3>
-                    <p class="text-slate-500">A adesao e feita sem compra de placas e sem burocracia operacional para sua empresa.</p>
+                    <h3 class="text-xl font-black text-slate-900 mb-3">Ativacao da assinatura</h3>
+                    <p class="text-slate-500">Fazemos a configuracao do contrato de forma transparente, sem compra de equipamentos.</p>
                 </article>
                 <article class="bg-slate-50 border border-slate-200 rounded-3xl p-8">
                     <span class="inline-flex w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 font-black items-center justify-center mb-5">3</span>
-                    <h3 class="text-xl font-black text-slate-900 mb-3">Desconto recorrente</h3>
-                    <p class="text-slate-500">A economia aparece de forma previsivel na sua fatura e voce acompanha o resultado mes a mes.</p>
+                    <h3 class="text-xl font-black text-slate-900 mb-3">Economia na fatura</h3>
+                    <p class="text-slate-500">Os creditos de energia passam a reduzir sua conta mensal com previsibilidade de custo.</p>
                 </article>
             </div>
 
@@ -440,50 +502,69 @@
                 </div>
 
                 <form id="simForm" class="space-y-6">
-                    <div class="grid md:grid-cols-2 gap-6">
-                        <input type="text" id="nome" required placeholder="Nome" class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
-                        <input type="tel" id="whats" required placeholder="WhatsApp" class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                    <div class="flex items-center justify-center gap-2 mb-2" aria-label="Etapas do simulador">
+                        <span id="sim-step-chip-1" class="step-chip active">1</span>
+                        <span class="text-slate-300">-</span>
+                        <span id="sim-step-chip-2" class="step-chip">2</span>
                     </div>
-                    <div class="grid md:grid-cols-2 gap-6">
-                        <select id="segmento" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
-                            <option value="">Segmento da empresa</option>
-                            <option value="industria">Industria</option>
-                            <option value="varejo">Varejo</option>
-                            <option value="hotelaria">Hotelaria</option>
-                            <option value="servicos">Servicos</option>
-                        </select>
-                        <select id="tipoContrato" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
-                            <option value="">Tipo de contrato atual</option>
-                            <option value="convencional">Cativo convencional</option>
-                            <option value="tarifa-branca">Tarifa branca</option>
-                            <option value="livre">Mercado livre</option>
-                            <option value="nao-sei">Nao sei informar</option>
-                        </select>
+
+                    <div id="sim-step-1" class="space-y-6">
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <input type="text" id="nome" required placeholder="Nome" class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                            <input type="tel" id="whats" required placeholder="WhatsApp" class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                        </div>
+                        <div class="relative">
+                            <label class="text-[10px] font-bold text-cyan-600 uppercase tracking-widest ml-1 mb-2 block">Gasto Mensal Estimado (R$)</label>
+                            <input type="number" id="valor" required placeholder="Ex: 5000" class="w-full bg-white border border-cyan-200 p-8 rounded-3xl text-4xl font-black text-cyan-600 outline-none transition focus:ring-4 focus:ring-cyan-500/10">
+                        </div>
+                        <button id="sim-next-step" type="button" class="w-full btn-modern py-6 rounded-3xl text-xl font-black text-white uppercase tracking-widest">
+                            CONTINUAR SIMULACAO
+                        </button>
                     </div>
-                    <div class="grid md:grid-cols-2 gap-6">
-                        <select id="estado" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
-                            <option value="">Estado da operacao</option>
-                            <option value="BA">Bahia</option>
-                            <option value="SE">Sergipe</option>
-                            <option value="AL">Alagoas</option>
-                            <option value="PE">Pernambuco</option>
-                            <option value="outro">Outro estado</option>
-                        </select>
-                        <select id="faixaConsumo" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
-                            <option value="">Faixa media de consumo</option>
-                            <option value="ate-2000">Ate R$ 2.000</option>
-                            <option value="2000-10000">R$ 2.000 a R$ 10.000</option>
-                            <option value="10000-30000">R$ 10.000 a R$ 30.000</option>
-                            <option value="acima-30000">Acima de R$ 30.000</option>
-                        </select>
+
+                    <div id="sim-step-2" class="space-y-6 hidden">
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <select id="segmento" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                                <option value="">Segmento da empresa</option>
+                                <option value="industria">Industria</option>
+                                <option value="varejo">Varejo</option>
+                                <option value="hotelaria">Hotelaria</option>
+                                <option value="servicos">Servicos</option>
+                            </select>
+                            <select id="tipoContrato" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                                <option value="">Tipo de contrato atual</option>
+                                <option value="convencional">Cativo convencional</option>
+                                <option value="tarifa-branca">Tarifa branca</option>
+                                <option value="livre">Mercado livre</option>
+                                <option value="nao-sei">Nao sei informar</option>
+                            </select>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <select id="estado" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                                <option value="">Estado da operacao</option>
+                                <option value="BA">Bahia</option>
+                                <option value="SE">Sergipe</option>
+                                <option value="AL">Alagoas</option>
+                                <option value="PE">Pernambuco</option>
+                                <option value="outro">Outro estado</option>
+                            </select>
+                            <select id="faixaConsumo" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
+                                <option value="">Faixa media de consumo</option>
+                                <option value="ate-2000">Ate R$ 2.000</option>
+                                <option value="2000-10000">R$ 2.000 a R$ 10.000</option>
+                                <option value="10000-30000">R$ 10.000 a R$ 30.000</option>
+                                <option value="acima-30000">Acima de R$ 30.000</option>
+                            </select>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <button id="sim-back-step" type="button" class="w-full bg-slate-100 border border-slate-200 py-5 rounded-2xl text-base font-black text-slate-700 uppercase tracking-wide">
+                                Voltar
+                            </button>
+                            <button type="submit" class="w-full btn-modern py-5 rounded-2xl text-base font-black text-white uppercase tracking-wide">
+                                CALCULAR ECONOMIA REAL
+                            </button>
+                        </div>
                     </div>
-                    <div class="relative">
-                        <label class="text-[10px] font-bold text-cyan-600 uppercase tracking-widest ml-1 mb-2 block">Gasto Mensal Estimado (R$)</label>
-                        <input type="number" id="valor" required placeholder="Ex: 5000" class="w-full bg-white border border-cyan-200 p-8 rounded-3xl text-4xl font-black text-cyan-600 outline-none transition focus:ring-4 focus:ring-cyan-500/10">
-                    </div>
-                    <button type="submit" class="w-full btn-modern py-6 rounded-3xl text-xl font-black text-white uppercase tracking-widest">
-                        CALCULAR ECONOMIA REAL
-                    </button>
                 </form>
 
                 <div id="resultadoSim" class="hidden mt-12 p-10 bg-gradient-to-br from-emerald-600 to-teal-800 rounded-[40px] text-white text-center shadow-2xl">
@@ -659,34 +740,42 @@
             <div class="space-y-4">
                 <details class="group bg-white border border-slate-200 rounded-2xl p-6" open>
                     <summary class="cursor-pointer list-none flex items-center justify-between font-bold text-slate-900">
-                        Preciso trocar de concessionaria para contratar?
+                        O que e energia solar por assinatura?
                         <span class="text-cyan-600 transition group-open:rotate-45">+</span>
                     </summary>
-                    <p class="text-slate-500 mt-4 leading-relaxed">Nao. O fornecimento segue na mesma concessionaria. O que muda e a compensacao de creditos para reduzir o valor final da sua fatura.</p>
+                    <p class="text-slate-500 mt-4 leading-relaxed">E um modelo no qual voce utiliza energia gerada em usinas solares parceiras e recebe creditos para reduzir o valor da sua conta de luz.</p>
                 </details>
 
                 <details class="group bg-white border border-slate-200 rounded-2xl p-6">
                     <summary class="cursor-pointer list-none flex items-center justify-between font-bold text-slate-900">
-                        Preciso investir em placas ou instalacao?
+                        Como funciona a economia na conta de luz?
                         <span class="text-cyan-600 transition group-open:rotate-45">+</span>
                     </summary>
-                    <p class="text-slate-500 mt-4 leading-relaxed">Nao. O modelo e por assinatura, com energia de usinas parceiras. Voce nao precisa comprar equipamentos nem fazer obra no local.</p>
+                    <p class="text-slate-500 mt-4 leading-relaxed">A energia gerada vira creditos compensados na sua fatura. Na pratica, voce paga menos no total mensal, mantendo o mesmo fornecimento da concessionaria.</p>
                 </details>
 
                 <details class="group bg-white border border-slate-200 rounded-2xl p-6">
                     <summary class="cursor-pointer list-none flex items-center justify-between font-bold text-slate-900">
-                        Existe fidelidade ou multa para cancelar?
+                        Preciso trocar de concessionaria para aderir?
                         <span class="text-cyan-600 transition group-open:rotate-45">+</span>
                     </summary>
-                    <p class="text-slate-500 mt-4 leading-relaxed">A condicao contratual pode variar por perfil e regiao, mas nossa proposta e trabalhar com regras transparentes, sem surpresa de custo oculto.</p>
+                    <p class="text-slate-500 mt-4 leading-relaxed">Nao. Sua unidade continua vinculada a mesma distribuidora. O processo e feito por compensacao de creditos, sem migracao de concessionaria.</p>
                 </details>
 
                 <details class="group bg-white border border-slate-200 rounded-2xl p-6">
                     <summary class="cursor-pointer list-none flex items-center justify-between font-bold text-slate-900">
-                        Quem pode contratar?
+                        Existe fidelidade ou taxa de cancelamento?
                         <span class="text-cyan-600 transition group-open:rotate-45">+</span>
                     </summary>
-                    <p class="text-slate-500 mt-4 leading-relaxed">Pessoa fisica e empresas com conta de energia acima de R$ 200 ja costumam ter bom potencial de economia. A simulacao confirma a viabilidade.</p>
+                    <p class="text-slate-500 mt-4 leading-relaxed">As condicoes podem variar conforme perfil e regiao. Antes de ativar, voce recebe todas as regras com transparencia para decidir com seguranca.</p>
+                </details>
+
+                <details class="group bg-white border border-slate-200 rounded-2xl p-6">
+                    <summary class="cursor-pointer list-none flex items-center justify-between font-bold text-slate-900">
+                        Quem pode contratar energia por assinatura?
+                        <span class="text-cyan-600 transition group-open:rotate-45">+</span>
+                    </summary>
+                    <p class="text-slate-500 mt-4 leading-relaxed">Pessoa fisica e empresas com consumo minimo na faixa elegivel. Em geral, contas acima de R$ 200 ja possuem potencial de economia.</p>
                 </details>
             </div>
 
@@ -741,6 +830,34 @@
     </footer>
 
     <script>
+        const METRICS_KEY = 'voltconnect_metrics_v1';
+
+        function getMetrics() {
+            try {
+                const raw = localStorage.getItem(METRICS_KEY);
+                if (!raw) return { heroA: 0, heroB: 0, step2: 0, submit: 0 };
+                const parsed = JSON.parse(raw);
+                return {
+                    heroA: Number(parsed.heroA) || 0,
+                    heroB: Number(parsed.heroB) || 0,
+                    step2: Number(parsed.step2) || 0,
+                    submit: Number(parsed.submit) || 0
+                };
+            } catch (err) {
+                return { heroA: 0, heroB: 0, step2: 0, submit: 0 };
+            }
+        }
+
+        function setMetrics(next) {
+            localStorage.setItem(METRICS_KEY, JSON.stringify(next));
+        }
+
+        function bumpMetric(key) {
+            const metrics = getMetrics();
+            metrics[key] = (metrics[key] || 0) + 1;
+            setMetrics(metrics);
+        }
+
         let totalSaved = 10001.00;
         function updateCounter() {
             totalSaved += (Math.random() * 12) + 5;
@@ -749,6 +866,47 @@
         setInterval(updateCounter, 1200);
 
         let leadData = {};
+
+        (function initHeroABTest() {
+            const headlineEl = document.getElementById('hero-headline');
+            const subheadlineEl = document.getElementById('hero-subheadline');
+            const ctaEl = document.getElementById('cta-hero-simular');
+            const navCtaEl = document.getElementById('cta-nav-simular');
+            if (!headlineEl || !subheadlineEl || !ctaEl) return;
+
+            const variants = [
+                {
+                    id: 'A',
+                    headline: 'Economize ate 30% na conta de luz <span class="text-gradient">sem investimento</span>.',
+                    subheadline: 'Pessoa fisica e empresas com conta acima de R$ 200 podem reduzir custos com energia limpa, de forma simples e sem obras.',
+                    cta: 'SIMULAR DESCONTO EM 1 MINUTO'
+                },
+                {
+                    id: 'B',
+                    headline: 'Reduza sua fatura de energia com <span class="text-gradient">adesao rapida</span>.',
+                    subheadline: 'Ativacao orientada, sem burocracia e sem compra de equipamentos para quem busca economia recorrente.',
+                    cta: 'VER MINHA ECONOMIA AGORA'
+                }
+            ];
+
+            const savedVariant = localStorage.getItem('hero_ab_variant');
+            const variant = variants.find(v => v.id === savedVariant) || variants[Math.random() > 0.5 ? 1 : 0];
+            localStorage.setItem('hero_ab_variant', variant.id);
+
+            headlineEl.innerHTML = variant.headline;
+            subheadlineEl.textContent = variant.subheadline;
+            ctaEl.textContent = variant.cta;
+
+            if (navCtaEl) {
+                const navLabel = variant.id === 'A' ? 'SIMULAR DESCONTO' : 'VER ECONOMIA';
+                navCtaEl.textContent = navLabel;
+                navCtaEl.setAttribute('data-variant', variant.id);
+            }
+
+            bumpMetric(variant.id === 'A' ? 'heroA' : 'heroB');
+
+            trackEvent('ab_variant_view', `hero_${variant.id}`);
+        })();
 
         function trackEvent(action, label) {
             try {
@@ -765,6 +923,8 @@
 
         document.getElementById('simForm').addEventListener('submit', function(e) {
             e.preventDefault();
+            const step2 = document.getElementById('sim-step-2');
+            if (step2 && step2.classList.contains('hidden')) return;
             const valor = parseFloat(document.getElementById('valor').value);
             const nome = document.getElementById('nome').value;
             const whats = document.getElementById('whats').value;
@@ -809,6 +969,7 @@
             document.getElementById('resPrazo').innerText = `Prazo medio para captura de ganho: ${prazo}.`;
 
             trackEvent('simulador_submit', `segmento_${segmento || 'nao_informado'}`);
+            bumpMetric('submit');
             
             const res = document.getElementById('resultadoSim');
             res.classList.remove('hidden');
@@ -817,9 +978,103 @@
             }, 100);
         });
 
+        (function initSimuladorSteps() {
+            const nextBtn = document.getElementById('sim-next-step');
+            const backBtn = document.getElementById('sim-back-step');
+            const step1 = document.getElementById('sim-step-1');
+            const step2 = document.getElementById('sim-step-2');
+            const chip1 = document.getElementById('sim-step-chip-1');
+            const chip2 = document.getElementById('sim-step-chip-2');
+            const nome = document.getElementById('nome');
+            const whats = document.getElementById('whats');
+            const valor = document.getElementById('valor');
+
+            if (!nextBtn || !backBtn || !step1 || !step2 || !chip1 || !chip2 || !nome || !whats || !valor) return;
+
+            const showStep = (stepNumber) => {
+                const isStepOne = stepNumber === 1;
+                step1.classList.toggle('hidden', !isStepOne);
+                step2.classList.toggle('hidden', isStepOne);
+                chip1.classList.toggle('active', isStepOne);
+                chip2.classList.toggle('active', !isStepOne);
+            };
+
+            nextBtn.addEventListener('click', () => {
+                const nomeOk = nome.value.trim().length >= 3;
+                const whatsOk = whats.value.trim().length >= 10;
+                const valorNum = parseFloat(valor.value);
+                const valorOk = Number.isFinite(valorNum) && valorNum > 0;
+
+                if (!nomeOk) {
+                    nome.focus();
+                    nome.reportValidity();
+                    return;
+                }
+                if (!whatsOk) {
+                    whats.focus();
+                    whats.setCustomValidity('Informe um WhatsApp valido com DDD.');
+                    whats.reportValidity();
+                    whats.setCustomValidity('');
+                    return;
+                }
+                if (!valorOk) {
+                    valor.focus();
+                    valor.setCustomValidity('Informe um valor mensal valido.');
+                    valor.reportValidity();
+                    valor.setCustomValidity('');
+                    return;
+                }
+
+                showStep(2);
+                trackEvent('simulador_step', 'step_2_opened');
+                bumpMetric('step2');
+            });
+
+            backBtn.addEventListener('click', () => showStep(1));
+
+            // Mascara simples e resiliente para WhatsApp brasileiro com DDD.
+            whats.addEventListener('input', () => {
+                const digits = whats.value.replace(/\D/g, '').slice(0, 11);
+                if (!digits) {
+                    whats.value = '';
+                    return;
+                }
+                if (digits.length <= 2) {
+                    whats.value = `(${digits}`;
+                    return;
+                }
+                if (digits.length <= 6) {
+                    whats.value = `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+                    return;
+                }
+                if (digits.length <= 10) {
+                    whats.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+                    return;
+                }
+                whats.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+            });
+
+            showStep(1);
+        })();
+
+        (function initMobileConversionOrder() {
+            const simulador = document.getElementById('simulador');
+            const clientes = document.getElementById('clientes');
+            if (!simulador || !clientes) return;
+
+            const applyOrder = () => {
+                if (window.innerWidth < 1024 && simulador.compareDocumentPosition(clientes) & Node.DOCUMENT_POSITION_FOLLOWING) {
+                    clientes.parentNode.insertBefore(simulador, clientes);
+                }
+            };
+
+            applyOrder();
+            window.addEventListener('resize', applyOrder);
+        })();
+
         function enviarWhatsLead() {
             const msg = encodeURIComponent(
-                `⚡ *Relatório Gerado: EnergyFlow*\n\n` +
+                `⚡ *Relatório Gerado: VoltConnect IA*\n\n` +
                 `*Empresa:* ${leadData.nome}\n` +
                 `*WhatsApp:* ${leadData.whats}\n` +
                 `*Segmento:* ${leadData.segmento}\n` +
@@ -834,9 +1089,10 @@
         }
 
         [
+            ['cta-nav-simular', 'nav_simular'],
             ['cta-hero-simular', 'hero_simular'],
-            ['cta-hero-crm', 'hero_crm'],
             ['cta-hero-whatsapp', 'hero_whatsapp'],
+            ['cta-solucao-simular', 'solucao_simular'],
             ['cta-como-funciona-simular', 'como_funciona_simular'],
             ['cta-resultado-whatsapp', 'resultado_whatsapp'],
             ['cta-faq-simular', 'faq_simular'],
