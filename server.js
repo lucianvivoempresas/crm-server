@@ -45,6 +45,18 @@ function compararSenha(senha, hash) {
     return hashSenha(senha) === hash;
 }
 
+/**
+ * Faz parse de JSON com segurança para evitar queda do processo.
+ */
+function parsePayloadSeguro(payload, collection, id) {
+    try {
+        return JSON.parse(payload);
+    } catch (err) {
+        console.error(`❌ JSON inválido em ${collection} (id=${id}):`, err.message);
+        return null;
+    }
+}
+
 // ============ CRIAÇÃO DE TABELAS ============
 
 // Cria uma tabela universal (estilo NoSQL) para manter compatibilidade com o seu código anterior
@@ -465,10 +477,20 @@ app.get('/api/:collection', (req, res) => {
 
     db.all(sql, params, (err, rows) => {
         if (err) return res.status(500).json({ error: err.message });
-        // Remonta o objeto exatamente como seu frontend espera
-        const data = rows.map(row => ({ id: row.id, ...JSON.parse(row.payload) }));
+        // Remonta o objeto exatamente como seu frontend espera sem derrubar a API em payload inválido.
+        const data = rows
+            .map(row => {
+                const parsed = parsePayloadSeguro(row.payload, collection, row.id);
+                return parsed ? { id: row.id, ...parsed } : null;
+            })
+            .filter(Boolean);
         res.json(data);
     });
+});
+
+// Healthcheck para PM2/Nginx monitorarem disponibilidade da API
+app.get('/healthz', (req, res) => {
+    res.status(200).json({ ok: true, timestamp: new Date().toISOString() });
 });
 
 // ROTA: Adicionar um novo dado
@@ -830,9 +852,30 @@ app.get('/api/marketing/campanha/:id', (req, res) => {
 });
 
 
-const PORT = 3000;
-app.listen(PORT, '0.0.0.0', () => {
+const PORT = Number(process.env.PORT) || 3000;
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 CRM Servidor rodando em http://localhost:${PORT}`);
     console.log(`📡 Acesse remotamente via: https://loconecta.com.br (com Nginx como proxy)`);
     console.log(`💡 Certifique-se de que Nginx está configurado apontando para localhost:${PORT}`);
 });
+
+process.on('unhandledRejection', (reason) => {
+    console.error('❌ Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('❌ Uncaught Exception:', err);
+    // Encerra para o PM2 reiniciar em estado limpo.
+    setTimeout(() => process.exit(1), 500);
+});
+
+function gracefulShutdown(signal) {
+    console.log(`⚠️ Recebido ${signal}. Encerrando servidor...`);
+    server.close(() => {
+        console.log('✅ Servidor encerrado com sucesso.');
+        process.exit(0);
+    });
+}
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
