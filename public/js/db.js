@@ -27,6 +27,7 @@ async function getAllData(storeName) {
     // envia informações do usuário para que o backend possa aplicar filtros
     const userId = obterIdUsuario();
     const perfil = obterUsuarioLogado()?.perfil;
+    const token = (typeof obterAuthToken === 'function') ? obterAuthToken() : (sessionStorage.getItem('CRM_AUTH_TOKEN') || localStorage.getItem('CRM_AUTH_TOKEN'));
 
     if (perfil === 'vendedor' && !userId) {
       console.warn('getAllData: perfil vendedor sem userId - sessão possivelmente perdida');
@@ -40,6 +41,7 @@ async function getAllData(storeName) {
     }
 
     const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
     if (userId) {
       headers['X-User-Id'] = userId;
       headers['X-User-Perfil'] = perfil;
@@ -62,6 +64,8 @@ async function addData(storeName, data) {
     const userId = obterIdUsuario();
     const perfil = obterUsuarioLogado()?.perfil;
     const headers = { 'Content-Type': 'application/json' };
+    const token = (typeof obterAuthToken === 'function') ? obterAuthToken() : (sessionStorage.getItem('CRM_AUTH_TOKEN') || localStorage.getItem('CRM_AUTH_TOKEN'));
+    if (token) headers.Authorization = `Bearer ${token}`;
     if (userId) {
       headers['X-User-Id'] = userId;
       headers['X-User-Perfil'] = perfil;
@@ -91,6 +95,8 @@ async function updateData(storeName, data) {
     const userId = obterIdUsuario();
     const perfil = obterUsuarioLogado()?.perfil;
     const headers = { 'Content-Type': 'application/json' };
+    const token = (typeof obterAuthToken === 'function') ? obterAuthToken() : (sessionStorage.getItem('CRM_AUTH_TOKEN') || localStorage.getItem('CRM_AUTH_TOKEN'));
+    if (token) headers.Authorization = `Bearer ${token}`;
     if (userId) {
       headers['X-User-Id'] = userId;
       headers['X-User-Perfil'] = perfil;
@@ -113,6 +119,8 @@ async function deleteData(storeName, id) {
     const userId = obterIdUsuario();
     const perfil = obterUsuarioLogado()?.perfil;
     const headers = {};
+    const token = (typeof obterAuthToken === 'function') ? obterAuthToken() : (sessionStorage.getItem('CRM_AUTH_TOKEN') || localStorage.getItem('CRM_AUTH_TOKEN'));
+    if (token) headers.Authorization = `Bearer ${token}`;
     if (userId) {
       headers['X-User-Id'] = userId;
       headers['X-User-Perfil'] = perfil;

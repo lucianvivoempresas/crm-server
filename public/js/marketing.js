@@ -522,7 +522,8 @@ async function enviarEmailsMarketing() {
     const response = await fetch('/api/marketing/enviar-emails', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...(typeof buildAuthHeaders === 'function' ? buildAuthHeaders() : {})
       },
       body: JSON.stringify(payload)
     });
@@ -563,7 +564,9 @@ async function enviarEmailsMarketing() {
  */
 async function carregarHistoricoEmails() {
   try {
-    const response = await fetch('/api/marketing/historico');
+    const response = await fetch('/api/marketing/historico', {
+      headers: (typeof buildAuthHeaders === 'function' ? buildAuthHeaders() : {})
+    });
     const data = await response.json();
 
     if (data.success && data.campanhas) {

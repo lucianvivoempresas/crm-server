@@ -7,9 +7,72 @@ const nodemailer = require('nodemailer');
 
 const app = express();
 
+const IS_PROD = process.env.NODE_ENV === 'production';
+const TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12h
+const TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || (IS_PROD ? '' : 'dev-only-local-secret');
+
+if (IS_PROD && !TOKEN_SECRET) {
+    console.warn('⚠️ AUTH_TOKEN_SECRET não configurado. Defina no ambiente para habilitar autenticação segura.');
+}
+
+const allowedOrigins = (
+    process.env.CORS_ALLOWED_ORIGINS ||
+    [
+        'https://www.voltconect.com.br',
+        'https://voltconect.com.br',
+        'https://www.loconecta.com.br',
+        'https://loconecta.com.br',
+        'http://localhost:3000',
+        'http://127.0.0.1:3000'
+    ].join(',')
+)
+    .split(',')
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+const blockedPublicFiles = new Set([
+    'debug-auth.html',
+    'debug-cnpj.html',
+    'diagnostico.html',
+    'teste-usuarios.html'
+]);
+
+app.disable('x-powered-by');
+
 // Permite requisições de outras origens e aumenta limite de tamanho para a importação de Excel
-app.use(cors());
+app.use(cors({
+    origin(origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+        return callback(new Error('Origem não permitida pelo CORS'));
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Id', 'X-User-Perfil']
+}));
+
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    if (IS_PROD) {
+        res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    }
+    next();
+});
+
 app.use(express.json({ limit: '50mb' })); 
+
+if (IS_PROD) {
+    app.use((req, res, next) => {
+        const filename = path.basename(req.path || '').toLowerCase();
+        if (blockedPublicFiles.has(filename)) {
+            return res.status(404).send('Not Found');
+        }
+        return next();
+    });
+}
 
 // Serve os arquivos do seu CRM (HTML, CSS, JS) automaticamente
 app.use(express.static(path.join(__dirname, 'public'), { index: false }));
@@ -21,6 +84,18 @@ app.get('/', (req, res) => {
 
 app.get('/crm', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+app.get('/politica-de-privacidade', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'politica-de-privacidade.html'));
+});
+
+app.get('/termos-de-uso', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'termos-de-uso.html'));
+});
+
+app.get('/contato', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'contato.html'));
 });
 
 // Inicializa o banco SQLite (criará um arquivo crm_database.sqlite na mesma pasta)
@@ -57,6 +132,88 @@ function parsePayloadSeguro(payload, collection, id) {
     }
 }
 
+function toBase64Url(input) {
+    return Buffer.from(input)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
+}
+
+function fromBase64Url(input) {
+    const normalized = input.replace(/-/g, '+').replace(/_/g, '/');
+    const padLength = (4 - (normalized.length % 4)) % 4;
+    return Buffer.from(normalized + '='.repeat(padLength), 'base64').toString('utf8');
+}
+
+function assinarToken(payloadRaw) {
+    return crypto
+        .createHmac('sha256', TOKEN_SECRET)
+        .update(payloadRaw)
+        .digest('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
+}
+
+function gerarTokenSessao(user) {
+    if (!TOKEN_SECRET) return null;
+    const payloadObj = {
+        userId: user.id,
+        perfil: user.perfil,
+        exp: Date.now() + TOKEN_TTL_MS
+    };
+    const payloadRaw = JSON.stringify(payloadObj);
+    const payload = toBase64Url(payloadRaw);
+    const signature = assinarToken(payloadRaw);
+    return `${payload}.${signature}`;
+}
+
+function validarTokenSessao(token) {
+    if (!TOKEN_SECRET || !token || !token.includes('.')) return null;
+
+    const [payload, signature] = token.split('.');
+    if (!payload || !signature) return null;
+
+    try {
+        const payloadRaw = fromBase64Url(payload);
+        const expectedSignature = assinarToken(payloadRaw);
+        const sigBuffer = Buffer.from(signature);
+        const expectedBuffer = Buffer.from(expectedSignature);
+        if (sigBuffer.length !== expectedBuffer.length) return null;
+        if (!crypto.timingSafeEqual(sigBuffer, expectedBuffer)) return null;
+
+        const parsed = JSON.parse(payloadRaw);
+        if (!parsed.exp || Date.now() > parsed.exp) return null;
+        return parsed;
+    } catch (err) {
+        return null;
+    }
+}
+
+function extractBearerToken(req) {
+    const authorization = req.get('Authorization') || '';
+    if (!authorization.toLowerCase().startsWith('bearer ')) return null;
+    return authorization.slice(7).trim();
+}
+
+function requireAuth(req, res, next) {
+    const token = extractBearerToken(req);
+    const auth = validarTokenSessao(token);
+    if (!auth || !auth.userId) {
+        return res.status(401).json({ success: false, error: 'Não autenticado' });
+    }
+    req.auth = auth;
+    next();
+}
+
+function requireMaster(req, res, next) {
+    if (!req.auth || req.auth.perfil !== 'master') {
+        return res.status(403).json({ success: false, error: 'Acesso restrito ao perfil master' });
+    }
+    next();
+}
+
 // ============ CRIAÇÃO DE TABELAS ============
 
 // Cria uma tabela universal (estilo NoSQL) para manter compatibilidade com o seu código anterior
@@ -84,8 +241,12 @@ db.serialize(() => {
         } else {
             console.log('✅ Tabela usuarios verificada/criada');
             
-            // Criar usuários padrão se não existirem
-            criarUsuariosPadroes();
+            // Em produção, criar usuários padrão só se explicitamente habilitado.
+            if (!IS_PROD || process.env.ALLOW_DEFAULT_USERS === 'true') {
+                criarUsuariosPadroes();
+            } else {
+                console.log('ℹ️ Criação automática de usuários padrão desabilitada em produção.');
+            }
         }
     });
 
@@ -237,6 +398,14 @@ app.post('/auth/login', (req, res) => {
                 [agora, user.id]
             );
             
+            const token = gerarTokenSessao(user);
+            if (!token) {
+                return res.status(500).json({
+                    success: false,
+                    error: 'Servidor sem AUTH_TOKEN_SECRET configurado'
+                });
+            }
+
             // Retornar dados do usuário (sem a senha)
             res.json({
                 success: true,
@@ -246,8 +415,7 @@ app.post('/auth/login', (req, res) => {
                     email: user.email,
                     perfil: user.perfil
                 },
-                // Gerar um token simples (em produção, usar JWT)
-                token: `token_${user.id}_${Date.now()}`
+                token
             });
         }
     );
@@ -257,7 +425,7 @@ app.post('/auth/login', (req, res) => {
  * POST /auth/logout
  * Faz logout do usuário (opcional, apenas para logs)
  */
-app.post('/auth/logout', (req, res) => {
+app.post('/auth/logout', requireAuth, (req, res) => {
     console.log(`👋 Logout realizado`);
     res.json({ success: true });
 });
@@ -266,9 +434,20 @@ app.post('/auth/logout', (req, res) => {
  * GET /auth/me
  * Retorna dados do usuário atual (validando token, se implementado)
  */
-app.get('/auth/me', (req, res) => {
-    // Versão simplificada - em produção, validar o token
-    res.json({ success: false, error: 'Não autenticado' });
+app.get('/auth/me', requireAuth, (req, res) => {
+    db.get(
+        'SELECT id, nome, email, perfil, ativo FROM usuarios WHERE id = ? AND ativo = 1',
+        [req.auth.userId],
+        (err, user) => {
+            if (err) {
+                return res.status(500).json({ success: false, error: 'Erro ao buscar usuário' });
+            }
+            if (!user) {
+                return res.status(401).json({ success: false, error: 'Não autenticado' });
+            }
+            return res.json({ success: true, usuario: user });
+        }
+    );
 });
 
 // ============ ENDPOINTS DE GERENCIAMENTO DE USUÁRIOS ============
@@ -277,7 +456,7 @@ app.get('/auth/me', (req, res) => {
  * GET /api/usuarios
  * Lista todos os usuários (sem senhas)
  */
-app.get('/api/usuarios', (req, res) => {
+app.get('/api/usuarios', requireAuth, requireMaster, (req, res) => {
     db.all(
         'SELECT id, nome, email, perfil, ativo, ultimo_acesso FROM usuarios ORDER BY nome ASC',
         [],
@@ -295,7 +474,7 @@ app.get('/api/usuarios', (req, res) => {
  * POST /api/usuarios
  * Cria um novo usuário
  */
-app.post('/api/usuarios', (req, res) => {
+app.post('/api/usuarios', requireAuth, requireMaster, (req, res) => {
     const { nome, email, senha, perfil = 'vendedor', ativo = 1 } = req.body;
     
     // Validações
@@ -345,7 +524,7 @@ app.post('/api/usuarios', (req, res) => {
  * PUT /api/usuarios/:id
  * Atualiza um usuário
  */
-app.put('/api/usuarios/:id', (req, res) => {
+app.put('/api/usuarios/:id', requireAuth, requireMaster, (req, res) => {
     const id = req.params.id;
     const { nome, email, senha, perfil, ativo } = req.body;
     
@@ -407,7 +586,7 @@ app.put('/api/usuarios/:id', (req, res) => {
  * DELETE /api/usuarios/:id
  * Deleta um usuário
  */
-app.delete('/api/usuarios/:id', (req, res) => {
+app.delete('/api/usuarios/:id', requireAuth, requireMaster, (req, res) => {
     const id = req.params.id;
     
     // Proteção: não permitir deletar o master
@@ -452,16 +631,10 @@ app.delete('/api/usuarios/:id', (req, res) => {
 });
 
 // ============ ROTAS DE DADOS (CLIENTES, VENDAS, ETC) ============
-app.get('/api/:collection', (req, res) => {
+app.get('/api/:collection', requireAuth, (req, res) => {
     const collection = req.params.collection;
-
-    // extrair informações do usuário (passadas como headers ou query params)
-    const userIdRaw = req.get('X-User-Id') || req.query.user_id;
-    const perfil = req.get('X-User-Perfil') || req.query.perfil;
-    const userId = userIdRaw ? parseInt(userIdRaw, 10) : null;
-
-    // DEBUG: log filtering inputs (will be removed once issue is resolved)
-    console.log(`GET /api/${collection} called (userIdRaw='${userIdRaw}', userId=${userId}, perfil='${perfil}')`);
+    const userId = req.auth.userId;
+    const perfil = req.auth.perfil;
 
     // base da query
     let sql = "SELECT id, payload FROM documents WHERE collection = ?";
@@ -472,7 +645,6 @@ app.get('/api/:collection', (req, res) => {
         // somente retorna itens cadastrados pelo próprio vendedor (inteiro)
         sql += " AND json_extract(payload, '$.vendedor_id') = ?";
         params.push(userId);
-        console.log(` -> aplicando filtro vendedor_id=${userId}`);
     }
 
     db.all(sql, params, (err, rows) => {
@@ -494,12 +666,10 @@ app.get('/healthz', (req, res) => {
 });
 
 // ROTA: Adicionar um novo dado
-app.post('/api/:collection', (req, res) => {
+app.post('/api/:collection', requireAuth, (req, res) => {
     const collection = req.params.collection;
-
-    // pegar user info para garantir vendedor_id correto
-    const userId = req.get('X-User-Id') || req.body.vendedor_id;
-    const perfil = req.get('X-User-Perfil') || req.body.perfil;
+    const userId = req.auth.userId;
+    const perfil = req.auth.perfil;
 
     let payloadBody = { ...req.body };
 
@@ -521,14 +691,11 @@ app.post('/api/:collection', (req, res) => {
 });
 
 // ROTA: Atualizar um dado existente
-app.put('/api/:collection/:id', (req, res) => {
+app.put('/api/:collection/:id', requireAuth, (req, res) => {
     const collection = req.params.collection;
     const id = req.params.id;
-
-    // pegar user info para validar edição
-    const userIdRaw = req.get('X-User-Id');
-    const userId = userIdRaw ? parseInt(userIdRaw, 10) : null;
-    const perfil = req.get('X-User-Perfil');
+    const userId = req.auth.userId;
+    const perfil = req.auth.perfil;
 
     let payloadBody = { ...req.body };
 
@@ -550,13 +717,11 @@ app.put('/api/:collection/:id', (req, res) => {
 });
 
 // ROTA: Deletar um dado
-app.delete('/api/:collection/:id', (req, res) => {
+app.delete('/api/:collection/:id', requireAuth, (req, res) => {
     const collection = req.params.collection;
     const id = req.params.id;
-
-    const userIdRaw = req.get('X-User-Id');
-    const userId = userIdRaw ? parseInt(userIdRaw, 10) : null;
-    const perfil = req.get('X-User-Perfil');
+    const userId = req.auth.userId;
+    const perfil = req.auth.perfil;
 
     let sql = "DELETE FROM documents WHERE collection = ? AND id = ?";
     const params = [collection, id];
@@ -574,7 +739,7 @@ app.delete('/api/:collection/:id', (req, res) => {
 });
 
 // ROTA: Buscar dados de CNPJ (contorna CORS)
-app.get('/api-cnpj/buscar/:cnpj', async (req, res) => {
+app.get('/api-cnpj/buscar/:cnpj', requireAuth, async (req, res) => {
     const cnpj = req.params.cnpj.replace(/\D/g, '');
     
     console.log(`🔍 Backend: Buscando CNPJ ${cnpj}`);
@@ -693,8 +858,9 @@ configurarEmail();
  * POST /api/marketing/enviar-emails
  * Enviar emails de marketing para clientes
  */
-app.post('/api/marketing/enviar-emails', (req, res) => {
-    const { assunto, corpo, clientes, usuario_id } = req.body;
+app.post('/api/marketing/enviar-emails', requireAuth, (req, res) => {
+    const { assunto, corpo, clientes } = req.body;
+    const usuario_id = req.auth.userId;
 
     console.log(`📧 Enviando ${clientes.length} emails de marketing...`);
 
@@ -794,7 +960,7 @@ app.post('/api/marketing/enviar-emails', (req, res) => {
  * GET /api/marketing/historico
  * Obter histórico de campanhas de email
  */
-app.get('/api/marketing/historico', (req, res) => {
+app.get('/api/marketing/historico', requireAuth, (req, res) => {
     db.all(
         `SELECT * FROM email_campanhas 
          ORDER BY data_criacao DESC 
@@ -821,7 +987,7 @@ app.get('/api/marketing/historico', (req, res) => {
  * GET /api/marketing/campanha/:id
  * Obter detalhes de uma campanha específica
  */
-app.get('/api/marketing/campanha/:id', (req, res) => {
+app.get('/api/marketing/campanha/:id', requireAuth, (req, res) => {
     const { id } = req.params;
 
     db.get(

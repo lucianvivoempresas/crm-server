@@ -71,7 +71,10 @@ async function logout() {
         
         // Notificar backend (opcional)
         try {
-            await fetch(`${API_URL.replace('/api', '')}/auth/logout`, { method: 'POST' });
+            await fetch(`${API_URL.replace('/api', '')}/auth/logout`, {
+                method: 'POST',
+                headers: buildAuthHeaders()
+            });
         } catch (e) {
             // Não falha se o backend não responder
         }
@@ -155,4 +158,23 @@ function obterIdUsuario() {
 function obterNomeUsuario() {
     const user = obterUsuarioLogado();
     return user ? user.nome : 'Anônimo';
+}
+
+/**
+ * Obter token de autenticação salvo na sessão/localStorage
+ */
+function obterAuthToken() {
+    return sessionStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(AUTH_TOKEN_KEY) || null;
+}
+
+/**
+ * Monta headers padrão para chamadas autenticadas
+ */
+function buildAuthHeaders(extraHeaders = {}) {
+    const token = obterAuthToken();
+    const headers = { ...extraHeaders };
+    if (token) {
+        headers.Authorization = `Bearer ${token}`;
+    }
+    return headers;
 }

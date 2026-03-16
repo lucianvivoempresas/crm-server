@@ -9,7 +9,9 @@ let usuariosList = [];
 async function renderUsuarios() {
     try {
         // Buscar usuários do servidor
-        const response = await fetch(`${API_URL.replace('/api', '')}/api/usuarios`);
+        const token = (typeof obterAuthToken === 'function') ? obterAuthToken() : (sessionStorage.getItem('CRM_AUTH_TOKEN') || localStorage.getItem('CRM_AUTH_TOKEN'));
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const response = await fetch(`${API_URL.replace('/api', '')}/api/usuarios`, { headers });
         if (!response.ok) throw new Error('Erro ao buscar usuários');
         
         usuariosList = await response.json();
@@ -181,7 +183,10 @@ async function handleSalvarUsuario() {
         
         const response = await fetch(url, {
             method,
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                ...(typeof buildAuthHeaders === 'function' ? buildAuthHeaders() : {})
+            },
             body: JSON.stringify(dados)
         });
         
@@ -215,7 +220,10 @@ async function handleDeletarUsuario(usuarioId, nomeUsuario) {
     try {
         const response = await fetch(
             `${API_URL.replace('/api', '')}/api/usuarios/${usuarioId}`,
-            { method: 'DELETE' }
+            {
+                method: 'DELETE',
+                headers: (typeof buildAuthHeaders === 'function' ? buildAuthHeaders() : {})
+            }
         );
         
         const result = await response.json();

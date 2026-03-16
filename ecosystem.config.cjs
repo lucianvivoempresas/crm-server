@@ -16,7 +16,10 @@ module.exports = {
       kill_timeout: 5000,
       env: {
         NODE_ENV: 'production',
-        PORT: 3000
+        PORT: 3000,
+        AUTH_TOKEN_SECRET: 'change-this-to-a-long-random-secret-2026-03-16',
+        CORS_ALLOWED_ORIGINS: 'https://www.voltconect.com.br,https://voltconect.com.br,https://www.loconecta.com.br,https://loconecta.com.br',
+        ALLOW_DEFAULT_USERS: 'false'
       },
       out_file: './logs/pm2-out.log',
       error_file: './logs/pm2-error.log',
