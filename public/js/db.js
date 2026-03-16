@@ -49,11 +49,35 @@ async function getAllData(storeName) {
 
     const res = await fetch(url.toString(), { headers });
     if (!res.ok) throw new Error('Falha ao buscar dados');
-    return await res.json();
+    const raw = await res.json();
+    return normalizeStoreData(storeName, raw);
   } catch (err) {
     console.error(err);
     return [];
   }
+}
+
+function normalizeStoreData(storeName, rows) {
+  if (!Array.isArray(rows)) return [];
+
+  return rows.map(item => {
+    if (!item || typeof item !== 'object') return item;
+
+    const out = { ...item };
+    const legacySeller = out.vendedor_id ?? out.vendedorId ?? out.usuario_id ?? out.userId;
+
+    if (legacySeller !== undefined && legacySeller !== null && legacySeller !== '') {
+      const sellerId = parseInt(legacySeller, 10);
+      if (!Number.isNaN(sellerId)) out.vendedor_id = sellerId;
+    }
+
+    if (storeName === 'vendas' && out.clienteId !== undefined && out.clienteId !== null && out.clienteId !== '') {
+      const clienteId = parseInt(out.clienteId, 10);
+      if (!Number.isNaN(clienteId)) out.clienteId = clienteId;
+    }
+
+    return out;
+  });
 }
 
 async function addData(storeName, data) {

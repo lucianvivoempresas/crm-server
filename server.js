@@ -132,6 +132,110 @@ function parsePayloadSeguro(payload, collection, id) {
     }
 }
 
+/**
+ * Normaliza campos legados de vendedor para um único vendedor_id numérico.
+ */
+function normalizarVendedorId(payloadBody) {
+    if (!payloadBody || typeof payloadBody !== 'object') return payloadBody;
+
+    const candidate = payloadBody.vendedor_id ?? payloadBody.vendedorId ?? payloadBody.usuario_id ?? payloadBody.userId;
+    if (candidate !== undefined && candidate !== null && candidate !== '') {
+        const parsed = parseInt(candidate, 10);
+        if (!Number.isNaN(parsed)) {
+            payloadBody.vendedor_id = parsed;
+        }
+    }
+
+    delete payloadBody.vendedorId;
+    delete payloadBody.usuario_id;
+    delete payloadBody.userId;
+
+    return payloadBody;
+}
+
+const SELLER_ID_SQL_EXPR = "COALESCE(CAST(json_extract(payload, '$.vendedor_id') AS INTEGER), CAST(json_extract(payload, '$.vendedorId') AS INTEGER), CAST(json_extract(payload, '$.usuario_id') AS INTEGER), CAST(json_extract(payload, '$.userId') AS INTEGER))";
+
+function migrarCamposLegadosDocumentos() {
+    db.all(
+        "SELECT id, collection, payload FROM documents WHERE collection IN ('clientes', 'vendas')",
+        [],
+        (err, rows) => {
+            if (err) {
+                console.error('❌ Erro ao buscar dados para migração legada:', err.message);
+                return;
+            }
+
+            if (!rows || rows.length === 0) {
+                console.log('ℹ️ Migração legada: nenhum registro de clientes/vendas encontrado.');
+                return;
+            }
+
+            let atualizados = 0;
+            let ignorados = 0;
+            let falhas = 0;
+            let pendentes = 0;
+
+            const finalizar = () => {
+                console.log(`✅ Migração legada concluída: ${atualizados} atualizado(s), ${ignorados} sem mudança, ${falhas} falha(s).`);
+            };
+
+            rows.forEach(row => {
+                const original = parsePayloadSeguro(row.payload, row.collection, row.id);
+                if (!original) {
+                    ignorados++;
+                    return;
+                }
+
+                const normalizado = normalizarVendedorId({ ...original });
+                let alterado = JSON.stringify(original) !== JSON.stringify(normalizado);
+
+                if (row.collection === 'vendas') {
+                    const clienteLegacy = normalizado.clienteId ?? normalizado.cliente_id;
+                    if (clienteLegacy !== undefined && clienteLegacy !== null && clienteLegacy !== '') {
+                        const parsedCliente = parseInt(clienteLegacy, 10);
+                        if (!Number.isNaN(parsedCliente) && Number(normalizado.clienteId) !== parsedCliente) {
+                            normalizado.clienteId = parsedCliente;
+                            alterado = true;
+                        }
+                    }
+                    if (normalizado.cliente_id !== undefined) {
+                        delete normalizado.cliente_id;
+                        alterado = true;
+                    }
+                }
+
+                if (!alterado) {
+                    ignorados++;
+                    return;
+                }
+
+                pendentes++;
+                db.run(
+                    'UPDATE documents SET payload = ? WHERE id = ? AND collection = ?',
+                    [JSON.stringify(normalizado), row.id, row.collection],
+                    (updateErr) => {
+                        if (updateErr) {
+                            falhas++;
+                            console.error(`❌ Erro ao migrar ${row.collection}#${row.id}:`, updateErr.message);
+                        } else {
+                            atualizados++;
+                        }
+
+                        pendentes--;
+                        if (pendentes === 0) {
+                            finalizar();
+                        }
+                    }
+                );
+            });
+
+            if (pendentes === 0) {
+                finalizar();
+            }
+        }
+    );
+}
+
 function toBase64Url(input) {
     return Buffer.from(input)
         .toString('base64')
@@ -287,6 +391,8 @@ db.serialize(() => {
         } else {
             console.log('✅ Tabela email_logs verificada/criada');
         }
+
+        migrarCamposLegadosDocumentos();
     });
 });
 
@@ -642,8 +748,8 @@ app.get('/api/:collection', requireAuth, (req, res) => {
 
     // para algumas coleções aplicamos filtro de vendedor
     if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
-        // somente retorna itens cadastrados pelo próprio vendedor (inteiro)
-        sql += " AND json_extract(payload, '$.vendedor_id') = ?";
+        // Aceita formato atual e legados de identificação de vendedor.
+        sql += ` AND ${SELLER_ID_SQL_EXPR} = ?`;
         params.push(userId);
     }
 
@@ -671,12 +777,7 @@ app.post('/api/:collection', requireAuth, (req, res) => {
     const userId = req.auth.userId;
     const perfil = req.auth.perfil;
 
-    let payloadBody = { ...req.body };
-
-    // garantir que vendedor_id seja número sempre que fornecido
-    if (payloadBody.vendedor_id != null) {
-        payloadBody.vendedor_id = parseInt(payloadBody.vendedor_id, 10);
-    }
+    let payloadBody = normalizarVendedorId({ ...req.body });
 
     if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
         // força o id do vendedor vindo do header, ignorando o que veio do cliente
@@ -697,12 +798,7 @@ app.put('/api/:collection/:id', requireAuth, (req, res) => {
     const userId = req.auth.userId;
     const perfil = req.auth.perfil;
 
-    let payloadBody = { ...req.body };
-
-    // normalizar vendedor_id caso venha como string
-    if (payloadBody.vendedor_id != null) {
-        payloadBody.vendedor_id = parseInt(payloadBody.vendedor_id, 10);
-    }
+    let payloadBody = normalizarVendedorId({ ...req.body });
 
     if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
         // não permitir que atualizem vendedor_id de outro
@@ -727,8 +823,8 @@ app.delete('/api/:collection/:id', requireAuth, (req, res) => {
     const params = [collection, id];
 
     if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
-        // garante que só exclui se pertence ao vendedor
-        sql += " AND json_extract(payload,'$.vendedor_id') = ?";
+        // Garante que só exclui se pertence ao vendedor, inclusive dados legados.
+        sql += ` AND ${SELLER_ID_SQL_EXPR} = ?`;
         params.push(userId);
     }
 
