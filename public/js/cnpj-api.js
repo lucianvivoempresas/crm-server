@@ -27,7 +27,8 @@ async function fetchCNPJData(cnpj) {
     const url = `${baseUrl}/api-cnpj/buscar/${cleanCnpj}`;
     console.log(`📡 Requisitando: ${url}`);
 
-    const response = await fetch(url);
+    const cnpjHeaders = (typeof buildAuthHeaders === 'function') ? buildAuthHeaders() : {};
+    const response = await fetch(url, { headers: cnpjHeaders });
     
     console.log(`📊 Status da resposta: ${response.status}`);
     
