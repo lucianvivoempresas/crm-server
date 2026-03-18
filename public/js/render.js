@@ -16,21 +16,27 @@ async function renderAll() {
 
 function renderDashboard() {
   const filterEl = document.getElementById('dashboard-period-filter');
+  const filterVendedorEl = document.getElementById('dashboard-vendedor-filter');
   const filterValue = filterEl ? filterEl.value : 'this_month';
   const range = getDateRangeFromFilter(filterValue);
+  const vendedorSelecionado = filterVendedorEl && filterVendedorEl.value ? Number(filterVendedorEl.value) : null;
 
   // Filtrar vendas por vendedor se não for master
   const user = obterUsuarioLogado();
   let vendasUsuario = vendas;
   if (user && user.perfil === 'vendedor') {
-    vendasUsuario = vendas.filter(v => v.vendedor_id === user.id);
+    vendasUsuario = vendas.filter(v => Number(v.vendedor_id) === Number(user.id));
+  } else if (vendedorSelecionado) {
+    vendasUsuario = vendas.filter(v => Number(v.vendedor_id) === vendedorSelecionado);
   }
 
   const vendasPeriodo = filterVendasByDateRange(vendasUsuario, range);
   // Filtrar clientes também por vendedor se não for master
   let clientesUsuario = clientes;
   if (user && user.perfil === 'vendedor') {
-    clientesUsuario = clientes.filter(c => c.vendedor_id === user.id);
+    clientesUsuario = clientes.filter(c => Number(c.vendedor_id) === Number(user.id));
+  } else if (vendedorSelecionado) {
+    clientesUsuario = clientes.filter(c => Number(c.vendedor_id) === vendedorSelecionado);
   }
   const totalClientes = clientesUsuario.length;
   const totalVendasConcluidas = vendasPeriodo.reduce((acc, v) => acc + (Number(v.valorVenda) || 0), 0);
@@ -57,12 +63,16 @@ function renderDashboard() {
   if (user && user.perfil === 'vendedor') {
     // Vendedor vê apenas suas metas + metas globais (sem vendedor_id)
     metasPeriodo = metasPeriodo.filter(m => !m.vendedor_id || Number(m.vendedor_id) === Number(user.id));
+  } else if (vendedorSelecionado) {
+    metasPeriodo = metasPeriodo.filter(m => !m.vendedor_id || Number(m.vendedor_id) === vendedorSelecionado);
   }
 
   // Prioridade: vendedor -> meta específica dele; master -> meta global
   let metaPeriodo = null;
   if (user && user.perfil === 'vendedor') {
     metaPeriodo = metasPeriodo.find(m => Number(m.vendedor_id) === Number(user.id)) || metasPeriodo.find(m => !m.vendedor_id) || null;
+  } else if (vendedorSelecionado) {
+    metaPeriodo = metasPeriodo.find(m => Number(m.vendedor_id) === vendedorSelecionado) || metasPeriodo.find(m => !m.vendedor_id) || null;
   } else {
     metaPeriodo = metasPeriodo.find(m => !m.vendedor_id) || metasPeriodo[0] || null;
   }
@@ -109,6 +119,7 @@ function renderDashboard() {
       <div>
         <div class="flex justify-between mb-2"><span class="text-slate-400">Meta de Vendas (${formatCurrency(metaVendas)})</span><span class="text-white font-bold">${progressoVendas.toFixed(1)}%</span></div>
         <div class="w-full bg-slate-700 rounded-full h-3"><div class="bg-gradient-to-r from-blue-500 to-purple-600 h-3 rounded-full" style="width: ${Math.min(progressoVendas,100)}%"></div></div>
+        <div class="mt-2 text-xs text-slate-400">Valor vendido: <span class="text-white font-medium">${formatCurrency(totalVendasMeta)}</span></div>
       </div>
       <div>
         <div class="flex justify-between mb-2"><span class="text-slate-400">Meta de Comissão (${formatCurrency(metaComissao)})</span><span class="text-white font-bold">${progressoComissao.toFixed(1)}%</span></div>
@@ -237,9 +248,13 @@ function renderDashboardCharts(vendasFiltradas) {
   
   // Filtrar vendas por vendedor se não for master
   const user = obterUsuarioLogado();
+  const filtroVendedorDashboard = document.getElementById('dashboard-vendedor-filter')?.value;
+  const vendedorSelecionado = filtroVendedorDashboard ? Number(filtroVendedorDashboard) : null;
   let vendasAnoFiltradas = vendas.filter(v => v.dataConclusao && v.status === 'Concluído' && new Date(v.dataConclusao).getFullYear() === anoAtual);
   if (user && user.perfil === 'vendedor') {
-    vendasAnoFiltradas = vendasAnoFiltradas.filter(v => v.vendedor_id === user.id);
+    vendasAnoFiltradas = vendasAnoFiltradas.filter(v => Number(v.vendedor_id) === Number(user.id));
+  } else if (vendedorSelecionado) {
+    vendasAnoFiltradas = vendasAnoFiltradas.filter(v => Number(v.vendedor_id) === vendedorSelecionado);
   }
   // Master vê todas
 
@@ -288,9 +303,13 @@ function renderVendasRecentes() {
   
   // Filtrar vendas por vendedor se não for master
   const user = obterUsuarioLogado();
+  const filtroVendedorDashboard = document.getElementById('dashboard-vendedor-filter')?.value;
+  const vendedorSelecionado = filtroVendedorDashboard ? Number(filtroVendedorDashboard) : null;
   let vendasFiltradas = vendas;
   if (user && user.perfil === 'vendedor') {
-    vendasFiltradas = vendas.filter(v => v.vendedor_id === user.id);
+    vendasFiltradas = vendas.filter(v => Number(v.vendedor_id) === Number(user.id));
+  } else if (vendedorSelecionado) {
+    vendasFiltradas = vendas.filter(v => Number(v.vendedor_id) === vendedorSelecionado);
   }
   
   const recentes = [...vendasFiltradas].sort((a,b) => (new Date(b.dataConclusao||b.dataRegistro).getTime() || 0) - (new Date(a.dataConclusao||a.dataRegistro).getTime() || 0)).slice(0,5);

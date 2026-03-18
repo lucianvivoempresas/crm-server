@@ -166,11 +166,15 @@
       <div id="dashboard-saudacao" class="mb-6">
         <!-- Será preenchido por renderizarSaudacao() -->
       </div>
+      <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
         <select id="dashboard-period-filter" class="px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
           <option value="this_month">Analisar Período: Este Mês</option>
           <option value="last_month">Analisar Período: Mês Passado</option>
           <option value="this_quarter">Analisar Período: Este Trimestre</option>
           <option value="last_30_days">Analisar Período: Últimos 30 Dias</option>
+        </select>
+        <select id="dashboard-vendedor-filter" class="px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500">
+          <option value="">Todos os Vendedores</option>
         </select>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

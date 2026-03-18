@@ -480,6 +480,21 @@ function setupEventListeners() {
   const elDashPeriod = document.getElementById('dashboard-period-filter');
   if (elDashPeriod) elDashPeriod.onchange = renderDashboard;
 
+  const elDashVendedor = document.getElementById('dashboard-vendedor-filter');
+  if (elDashVendedor) {
+    elDashVendedor.onchange = renderDashboard;
+    const user = obterUsuarioLogado();
+    if (user && user.perfil === 'master') {
+      popularSelectVendedores(elDashVendedor, true);
+      elDashVendedor.options[0].text = 'Todos os Vendedores';
+      elDashVendedor.disabled = false;
+    } else if (user) {
+      elDashVendedor.innerHTML = `<option value="${user.id}">${user.nome}</option>`;
+      elDashVendedor.value = String(user.id);
+      elDashVendedor.disabled = true;
+    }
+  }
+
   const elSearchVendas = document.getElementById('search-vendas');
   if (elSearchVendas) elSearchVendas.oninput = renderVendasTable;
 
