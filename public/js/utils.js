@@ -14,15 +14,45 @@ function formatDate(dateString) {
   return d.toLocaleDateString('pt-BR');
 }
 
+function parseNumericId(value) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = parseInt(value, 10);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 function calcularComissao(venda) {
   if (!venda) return 0;
+
+  const valor = Number(venda.valorVenda) || 0;
+  const vendaVendedorId = parseNumericId(venda.vendedor_id ?? venda.vendedorId ?? venda.usuario_id ?? venda.userId);
+
+  const regrasAplicaveis = (comissoes || []).filter(c => {
+    return c.produto === venda.produto && c.operadora === venda.operadora && c.tipoCliente === venda.tipoCliente;
+  });
+
+  if (regrasAplicaveis.length) {
+    const regrasOrdenadas = [...regrasAplicaveis].sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+
+    const regraEspecifica = regrasOrdenadas.find(c => {
+      const regraVendedorId = parseNumericId(c.vendedor_id ?? c.vendedorId ?? c.usuario_id ?? c.userId);
+      return vendaVendedorId !== null && regraVendedorId !== null && regraVendedorId === vendaVendedorId;
+    });
+
+    const regraGlobal = regrasOrdenadas.find(c => {
+      const regraVendedorId = parseNumericId(c.vendedor_id ?? c.vendedorId ?? c.usuario_id ?? c.userId);
+      return regraVendedorId === null;
+    });
+
+    const regra = regraEspecifica || regraGlobal;
+    if (regra) return valor * (Number(regra.comissao || 0) / 100);
+  }
+
+  // Fallback legado para Energia B quando nao existir regra cadastrada.
   if (venda.produto === 'Energia B') {
-    const valor = Number(venda.valorVenda) || 0;
     const faixa = faixasEnergiaB.find(f => valor >= f.min && valor <= f.max);
     return faixa ? (valor * faixa.comissao / 100) : 0;
   }
-  const regra = comissoes.find(c => c.produto === venda.produto && c.operadora === venda.operadora && c.tipoCliente === venda.tipoCliente);
-  if (regra) return (Number(venda.valorVenda) || 0) * (Number(regra.comissao || 0) / 100);
+
   return 0;
 }
 

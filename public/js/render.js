@@ -493,7 +493,7 @@ function renderComissoesTable() {
   let comissoesVisíveis = comissoes;
   if (user && user.perfil === 'vendedor') {
     // Vendedor vê: comissões globais (sem vendedor_id) OU com seu ID específico
-    comissoesVisíveis = comissoes.filter(c => !c.vendedor_id || c.vendedor_id === user.id);
+    comissoesVisíveis = comissoes.filter(c => !c.vendedor_id || Number(c.vendedor_id) === Number(user.id));
   }
   // Master vê TODAS as comissoes (globais e específicas por vendedor)
   
@@ -504,7 +504,7 @@ function renderComissoesTable() {
     // Obter nome do vendedor se houver vendedor_id
     let perfilText = 'Global';
     if (c.vendedor_id && usuariosList) {
-      const vendedor = usuariosList.find(u => u.id === c.vendedor_id);
+      const vendedor = usuariosList.find(u => Number(u.id) === Number(c.vendedor_id));
       perfilText = vendedor ? vendedor.nome : `Vendedor #${c.vendedor_id}`;
     }
     return `
@@ -539,7 +539,7 @@ function renderMetasGrid() {
   let metasFiltradas = metas;
   if (user && user.perfil === 'vendedor') {
     // Vendedor vê apenas metas globais (sem vendedor_id) ou suas metas específicas
-    metasFiltradas = metas.filter(m => !m.vendedor_id || m.vendedor_id === user.id);
+    metasFiltradas = metas.filter(m => !m.vendedor_id || Number(m.vendedor_id) === Number(user.id));
   }
   // Master vê todas as metas
   

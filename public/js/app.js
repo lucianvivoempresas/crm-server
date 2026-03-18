@@ -706,13 +706,20 @@ function setupVendaFormListeners() {
       }
     });
 
-    const inputs = ['venda-produto','venda-operadora','venda-tipoCliente','venda-valorVenda'].map(id => document.getElementById(id)).filter(Boolean);
+    const inputs = ['venda-produto','venda-operadora','venda-tipoCliente','venda-valorVenda','venda-vendedor_id'].map(id => document.getElementById(id)).filter(Boolean);
     const updateEstimativa = () => {
+      const vendedorSelecionado = document.getElementById('venda-vendedor_id')?.value;
+      const user = obterUsuarioLogado();
+      const vendedorEstimado = vendedorSelecionado
+        ? parseInt(vendedorSelecionado, 10)
+        : (user && user.perfil === 'vendedor' ? Number(user.id) : null);
+
       const vendaParcial = {
         produto: (document.getElementById('venda-produto')?.value) || '',
         operadora: (document.getElementById('venda-operadora')?.value) || '',
         tipoCliente: (document.getElementById('venda-tipoCliente')?.value) || '',
-        valorVenda: (document.getElementById('venda-valorVenda')?.value) || 0
+        valorVenda: (document.getElementById('venda-valorVenda')?.value) || 0,
+        vendedor_id: Number.isNaN(vendedorEstimado) ? null : vendedorEstimado
       };
       if (vendaParcial.produto && vendaParcial.operadora && vendaParcial.tipoCliente && Number(vendaParcial.valorVenda) > 0) {
         const com = calcularComissao(vendaParcial);
