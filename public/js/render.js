@@ -718,8 +718,17 @@ function updateDynamicSelects() {
 }
 
 function getStatusBadge(status) {
-  const colors = {'Concluído':'bg-green-500/20 text-green-400', 'Cancelado':'bg-red-500/20 text-red-400', 'Negociando':'bg-yellow-500/20 text-yellow-400', 'Aguardando Aceite':'bg-blue-500/20 text-blue-400', 'Inputado':'bg-purple-500/20 text-purple-400', 'Aguardando fatura':'bg-indigo-500/20 text-indigo-300', 'Aguardando Distribuidora':'bg-cyan-500/20 text-cyan-300'};
-  return `<span class="px-3 py-1 rounded-full text-xs font-medium ${colors[status]||'bg-slate-500/20 text-slate-400'}">${status}</span>`;
+  const statusClassMap = {
+    'Concluído': 'crm-status-concluido',
+    'Cancelado': 'crm-status-cancelado',
+    'Negociando': 'crm-status-negociando',
+    'Aguardando Aceite': 'crm-status-aguardando-aceite',
+    'Inputado': 'crm-status-inputado',
+    'Aguardando fatura': 'crm-status-aguardando-fatura',
+    'Aguardando Distribuidora': 'crm-status-aguardando-distribuidora'
+  };
+  const badgeClass = statusClassMap[status] || 'crm-status-default';
+  return `<span class="crm-status-badge ${badgeClass}">${status}</span>`;
 }
 
 function updateImportPreview() {
