@@ -530,6 +530,34 @@ function closeCreateCampanhaModal() {
   if (modal) modal.classList.add('hidden');
 }
 
+function openDeleteCampanhaModal() {
+  const modal = document.getElementById('campanha-delete-modal');
+  if (!modal) return;
+  populateDeleteCampanhaOptions();
+  modal.classList.remove('hidden');
+}
+
+function closeDeleteCampanhaModal() {
+  const modal = document.getElementById('campanha-delete-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function populateDeleteCampanhaOptions() {
+  const select = document.getElementById('campanha-delete-select');
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = '<option value="">Selecione</option>';
+  campanhasCache.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.nome || `Campanha #${c.id}`;
+    select.appendChild(opt);
+  });
+  if (current && campanhasCache.some(c => String(c.id) === String(current))) {
+    select.value = current;
+  }
+}
+
 async function createCampanhaOnly() {
   const user = obterUsuarioLogado();
   if (!user) throw new Error('Sessao expirada.');
@@ -687,16 +715,16 @@ function renderOverdueFilterIndicator() {
   indicator.classList.toggle('hidden', !campanhasOnlyOverdue);
 }
 
-async function deleteCurrentCampaign() {
+async function deleteCurrentCampaign(campanhaIdParam) {
   const user = obterUsuarioLogado();
   if (!user || user.perfil !== 'master') {
     alert('Apenas master pode apagar campanha.');
     return;
   }
 
-  const campanhaId = document.getElementById('campanhas-filter-campanha')?.value;
+  const campanhaId = campanhaIdParam || document.getElementById('campanhas-filter-campanha')?.value;
   if (!campanhaId) {
-    alert('Selecione uma campanha no filtro para apagar.');
+    alert('Selecione uma campanha para apagar.');
     return;
   }
 
@@ -712,6 +740,7 @@ async function deleteCurrentCampaign() {
   await deleteData('campanhas', campanhaId);
 
   if (typeof showQuickMessage === 'function') showQuickMessage('Campanha apagada com sucesso.');
+  closeDeleteCampanhaModal();
   await renderCampanhasTab();
 }
 
@@ -776,6 +805,7 @@ async function importarCampanhaPorArquivo(file) {
 
   if (campanhaNomeInput) campanhaNomeInput.value = '';
   if (campanhaProdutoInput) campanhaProdutoInput.value = '';
+  closeCreateCampanhaModal();
 
   await renderCampanhasTab();
   if (typeof showQuickMessage === 'function') showQuickMessage(`Campanha criada com ${inseridos} lead(s).`);
@@ -785,6 +815,7 @@ async function renderCampanhasTab() {
   await carregarCampanhasData();
   await applyColdLeadAutomation();
   renderCampanhasFilters();
+  populateDeleteCampanhaOptions();
 
   const filtered = getCampanhasFilteredLeads();
   renderCampanhasMetrics(filtered);
@@ -842,15 +873,19 @@ function configureCampanhasByPerfil() {
 function initCampanhasModule() {
   if (campanhasInitialized) return;
 
-  const btnImport = document.getElementById('btn-campanhas-import');
   const btnOpenCreate = document.getElementById('btn-campanhas-open-create');
   const btnCreateClose = document.getElementById('btn-campanha-create-close');
   const btnCreateCancel = document.getElementById('btn-campanha-create-cancel');
   const btnCreateSave = document.getElementById('btn-campanha-create-save');
-  const inputImport = document.getElementById('input-import-campanhas');
+  const btnCreateImport = document.getElementById('btn-campanha-create-import');
+  const inputCreateImport = document.getElementById('input-import-campanhas-create');
   const btnRefresh = document.getElementById('btn-campanhas-refresh');
   const btnExport = document.getElementById('btn-campanhas-export');
   const btnDelete = document.getElementById('btn-campanhas-delete');
+  const btnDeleteClose = document.getElementById('btn-campanha-delete-close');
+  const btnDeleteCancel = document.getElementById('btn-campanha-delete-cancel');
+  const btnDeleteConfirm = document.getElementById('btn-campanha-delete-confirm');
+  const deleteSelect = document.getElementById('campanha-delete-select');
   const btnHeaderAlertOpen = document.getElementById('btn-header-followup-open');
   const btnClearOverdue = document.getElementById('btn-campanhas-overdue-clear');
   const campanhaFilter = document.getElementById('campanhas-filter-campanha');
@@ -880,9 +915,9 @@ function initCampanhasModule() {
     };
   }
 
-  if (btnImport && inputImport) {
-    btnImport.onclick = () => inputImport.click();
-    inputImport.onchange = async (e) => {
+  if (btnCreateImport && inputCreateImport) {
+    btnCreateImport.onclick = () => inputCreateImport.click();
+    inputCreateImport.onchange = async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
       try {
@@ -891,14 +926,27 @@ function initCampanhasModule() {
         console.error(err);
         alert(err.message || 'Erro ao importar campanha.');
       } finally {
-        inputImport.value = '';
+        inputCreateImport.value = '';
       }
     };
   }
 
   if (btnRefresh) btnRefresh.onclick = () => renderCampanhasTab();
   if (btnExport) btnExport.onclick = () => exportCurrentCampaignCsv();
-  if (btnDelete) btnDelete.onclick = () => deleteCurrentCampaign();
+  if (btnDelete) btnDelete.onclick = () => openDeleteCampanhaModal();
+  if (btnDeleteClose) btnDeleteClose.onclick = () => closeDeleteCampanhaModal();
+  if (btnDeleteCancel) btnDeleteCancel.onclick = () => closeDeleteCampanhaModal();
+  if (btnDeleteConfirm) {
+    btnDeleteConfirm.onclick = async () => {
+      try {
+        const campanhaId = deleteSelect?.value || '';
+        await deleteCurrentCampaign(campanhaId);
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Erro ao apagar campanha.');
+      }
+    };
+  }
   if (btnHeaderAlertOpen) {
     btnHeaderAlertOpen.onclick = () => {
       campanhasOnlyOverdue = true;
