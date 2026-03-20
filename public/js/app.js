@@ -153,20 +153,58 @@ function carregarVendedores() {
   return getAllData('usuarios').then(u => (u||[]).filter(x => x.perfil === 'vendedor' && x.ativo)).catch(err => { console.error(err); return []; });
 }
 
+let populateVendedoresSeq = 0;
+
 /**
  * Preenche um <select> com as opções de vendedores
  */
 function popularSelectVendedores(selectEl, includeEmpty = true) {
   if (!selectEl) return;
+  const requestToken = String(++populateVendedoresSeq);
+  selectEl.dataset.populateToken = requestToken;
   selectEl.innerHTML = includeEmpty ? '<option value="">(nenhum)</option>' : '';
+
   return carregarVendedores().then(lista => {
+    // Evita duplicidade quando existem duas populações assíncronas concorrentes.
+    if (selectEl.dataset.populateToken !== requestToken) return;
+
+    const seen = new Set();
     lista.forEach(u => {
+      const key = String(u.id);
+      if (seen.has(key)) return;
+      seen.add(key);
       const opt = document.createElement('option');
       opt.value = u.id;
       opt.textContent = u.nome;
       selectEl.appendChild(opt);
     });
   });
+}
+
+function getThemePreference() {
+  return localStorage.getItem('CRM_THEME') || 'blue';
+}
+
+function applyTheme(theme) {
+  const normalized = theme === 'light' ? 'light' : 'blue';
+  document.body.setAttribute('data-theme', normalized);
+  localStorage.setItem('CRM_THEME', normalized);
+
+  const btn = document.getElementById('btn-theme-toggle');
+  const label = document.getElementById('label-theme-toggle');
+  if (btn) {
+    if (normalized === 'light') {
+      btn.className = 'px-3 py-2 rounded-lg flex items-center gap-2 transition-all bg-slate-700 text-slate-100 hover:bg-slate-600';
+    } else {
+      btn.className = 'px-3 py-2 rounded-lg flex items-center gap-2 transition-all bg-white/10 text-white hover:bg-white/20';
+    }
+  }
+  if (label) label.textContent = normalized === 'light' ? 'UI Azul' : 'UI Branca';
+}
+
+function toggleTheme() {
+  const current = document.body.getAttribute('data-theme') || getThemePreference();
+  applyTheme(current === 'light' ? 'blue' : 'light');
 }
 
 /**
@@ -479,6 +517,12 @@ function setupEventListeners() {
   // == FILTROS E PESQUISAS ==
   const elDashPeriod = document.getElementById('dashboard-period-filter');
   if (elDashPeriod) elDashPeriod.onchange = renderDashboard;
+
+  const btnThemeToggle = document.getElementById('btn-theme-toggle');
+  if (btnThemeToggle) {
+    applyTheme(getThemePreference());
+    btnThemeToggle.onclick = toggleTheme;
+  }
 
   const elDashVendedor = document.getElementById('dashboard-vendedor-filter');
   if (elDashVendedor) {
