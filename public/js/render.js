@@ -718,17 +718,33 @@ function updateDynamicSelects() {
 }
 
 function getStatusBadge(status) {
+  const statusRaw = String(status || '').trim();
+  const statusKey = statusRaw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+  const normalizedLabel = {
+    concluido: 'Concluído',
+    cancelado: 'Cancelado',
+    negociando: 'Negociando',
+    'aguardando aceite': 'Aguardando Aceite',
+    inputado: 'Inputado',
+    'aguardando fatura': 'Aguardando fatura',
+    'aguardando distribuidora': 'Aguardando Distribuidora'
+  }[statusKey] || statusRaw || 'Sem status';
+
   const statusClassMap = {
-    'Concluído': 'crm-status-concluido',
-    'Cancelado': 'crm-status-cancelado',
-    'Negociando': 'crm-status-negociando',
-    'Aguardando Aceite': 'crm-status-aguardando-aceite',
-    'Inputado': 'crm-status-inputado',
-    'Aguardando fatura': 'crm-status-aguardando-fatura',
-    'Aguardando Distribuidora': 'crm-status-aguardando-distribuidora'
+    concluido: 'crm-status-concluido',
+    cancelado: 'crm-status-cancelado',
+    negociando: 'crm-status-negociando',
+    'aguardando aceite': 'crm-status-aguardando-aceite',
+    inputado: 'crm-status-inputado',
+    'aguardando fatura': 'crm-status-aguardando-fatura',
+    'aguardando distribuidora': 'crm-status-aguardando-distribuidora'
   };
-  const badgeClass = statusClassMap[status] || 'crm-status-default';
-  return `<span class="crm-status-badge ${badgeClass}">${status}</span>`;
+  const badgeClass = statusClassMap[statusKey] || 'crm-status-default';
+  return `<span class="crm-status-badge ${badgeClass}">${normalizedLabel}</span>`;
 }
 
 function updateImportPreview() {

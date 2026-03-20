@@ -58,6 +58,23 @@ body[data-theme="light"] td {
   color: #0f172a;
 }
 
+/* Texto de conteúdo no tema branco */
+body[data-theme="light"] .text-white {
+  color: #0f172a !important;
+}
+
+/* Campos do formulário precisam manter contraste no tema branco */
+body[data-theme="light"] input,
+body[data-theme="light"] select,
+body[data-theme="light"] textarea {
+  color: #0f172a !important;
+}
+
+body[data-theme="light"] input::placeholder,
+body[data-theme="light"] textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
 body[data-theme="light"] [class*="placeholder-slate-"]::placeholder {
   color: #64748b !important;
 }
@@ -141,6 +158,40 @@ body[data-theme="light"] #tab-vendas button[id^="btn-"] {
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
 }
 
+/* Reforço de contraste para ações no tema branco */
+body[data-theme="light"] #btn-notificacoes,
+body[data-theme="light"] #btn-theme-toggle {
+  background: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+body[data-theme="light"] #btn-logout {
+  background: #fee2e2 !important;
+  color: #dc2626 !important;
+  border: 1px solid #fca5a5;
+}
+
+body[data-theme="light"] #btn-export-vendas,
+body[data-theme="light"] #btn-export-clientes {
+  background: #059669 !important;
+  color: #ffffff !important;
+  border-color: #047857 !important;
+}
+
+body[data-theme="light"] #btn-import-vendas,
+body[data-theme="light"] #btn-import-clientes-vendas,
+body[data-theme="light"] #btn-import-clientes,
+body[data-theme="light"] #btn-dedupe-clientes {
+  background: #7c3aed !important;
+  color: #ffffff !important;
+  border-color: #6d28d9 !important;
+}
+
+body[data-theme="light"] #btn-dedupe-clientes {
+  background: #dc2626 !important;
+  border-color: #b91c1c !important;
+}
+
 /* Contraste forte para botões da aba Campanhas no tema branco */
 body[data-theme="light"] #btn-campanhas-open-create { background: #7c3aed !important; color: #ffffff !important; border-color: #6d28d9 !important; }
 body[data-theme="light"] #btn-campanhas-refresh { background: #334155 !important; color: #ffffff !important; border-color: #1e293b !important; }
@@ -155,6 +206,14 @@ body[data-theme="light"] #btn-novo-cliente,
 body[data-theme="light"] #btn-open-quick-forms,
 body[data-theme="light"] #btn-campanha-create-save,
 body[data-theme="light"] #btn-campanha-create-import,
-body[data-theme="light"] #btn-campanha-delete-confirm {
+body[data-theme="light"] #btn-campanha-delete-confirm,
+body[data-theme="light"] #btn-campanha-lead-save,
+body[data-theme="light"] #btn-campanha-lead-whatsapp,
+body[data-theme="light"] #btn-campanha-lead-email {
   color: #ffffff !important;
+}
+
+/* Nao sobrescrever texto dos badges de status */
+body[data-theme="light"] .crm-status-badge {
+  color: inherit !important;
 }
