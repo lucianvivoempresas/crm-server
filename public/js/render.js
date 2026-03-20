@@ -10,6 +10,9 @@ async function renderAll() {
     renderPosVenda();
     renderComissoesTable();
     renderMetasGrid();
+    if (typeof renderCampanhasTab === 'function') {
+      await renderCampanhasTab();
+    }
     updateDynamicSelects();
   } catch (err) { console.error(err); }
 }
@@ -42,11 +45,28 @@ function renderDashboard() {
   const totalVendasConcluidas = vendasPeriodo.reduce((acc, v) => acc + (Number(v.valorVenda) || 0), 0);
   const totalComissoesPeriodo = vendasPeriodo.reduce((acc, v) => acc + calcularComissao(v), 0);
   const ticketMedioPeriodo = vendasPeriodo.length ? (totalVendasConcluidas / vendasPeriodo.length) : 0;
+  const oportunidades = (vendasUsuario || []).filter(v => ['Negociando', 'Aguardando Aceite', 'Inputado'].includes(v.status)).length;
+  const concluidas = (vendasUsuario || []).filter(v => v.status === 'Concluído').length;
+  const conversaoRapida = oportunidades > 0 ? (concluidas / (oportunidades + concluidas)) * 100 : 0;
+  const leadsQuentes = (vendasUsuario || []).filter(v => ['Negociando', 'Aguardando Aceite'].includes(v.status)).length;
+  const acoesHoje = (vendasUsuario || []).filter(v => {
+    if (['Concluído', 'Cancelado'].includes(v.status)) return false;
+    const ref = v.dataRegistro || v.dataConclusao;
+    if (!ref) return false;
+    const dias = Math.floor((Date.now() - new Date(ref + 'T00:00:00').getTime()) / 86400000);
+    return dias >= 2;
+  }).length;
 
   document.getElementById('metric-totalClientes').textContent = totalClientes;
   document.getElementById('metric-vendasPeriodo').textContent = vendasPeriodo.length;
   document.getElementById('metric-totalVendas').textContent = formatCurrency(totalVendasConcluidas);
   document.getElementById('metric-totalComissoes').textContent = formatCurrency(totalComissoesPeriodo);
+  const elLeadsQuentes = document.getElementById('metric-leads-quentes');
+  const elAcoesHoje = document.getElementById('metric-acoes-hoje');
+  const elConversao = document.getElementById('metric-conversao-rapida');
+  if (elLeadsQuentes) elLeadsQuentes.textContent = String(leadsQuentes);
+  if (elAcoesHoje) elAcoesHoje.textContent = String(acoesHoje);
+  if (elConversao) elConversao.textContent = `${conversaoRapida.toFixed(1)}%`;
 
   // Painel de acao operacional
   const negociosAbertos = (vendasUsuario || []).filter(v => !['Concluído','Cancelado'].includes(v.status)).length;

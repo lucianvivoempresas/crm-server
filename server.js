@@ -155,6 +155,10 @@ function normalizarVendedorId(payloadBody) {
 
 const SELLER_ID_SQL_EXPR = "COALESCE(CAST(json_extract(payload, '$.vendedor_id') AS INTEGER), CAST(json_extract(payload, '$.vendedorId') AS INTEGER), CAST(json_extract(payload, '$.usuario_id') AS INTEGER), CAST(json_extract(payload, '$.userId') AS INTEGER))";
 
+function isSellerScopedCollection(collection) {
+    return ['clientes', 'vendas', 'campanhas', 'campanha_leads'].includes(collection);
+}
+
 function migrarCamposLegadosDocumentos() {
     db.all(
         "SELECT id, collection, payload FROM documents WHERE collection IN ('clientes', 'vendas')",
@@ -747,7 +751,7 @@ app.get('/api/:collection', requireAuth, (req, res) => {
     const params = [collection];
 
     // para algumas coleções aplicamos filtro de vendedor
-    if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
+    if (isSellerScopedCollection(collection) && userId && perfil !== 'master') {
         // Aceita formato atual e legados de identificação de vendedor.
         sql += ` AND ${SELLER_ID_SQL_EXPR} = ?`;
         params.push(userId);
@@ -779,7 +783,7 @@ app.post('/api/:collection', requireAuth, (req, res) => {
 
     let payloadBody = normalizarVendedorId({ ...req.body });
 
-    if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
+    if (isSellerScopedCollection(collection) && userId && perfil !== 'master') {
         // força o id do vendedor vindo do header, ignorando o que veio do cliente
         payloadBody.vendedor_id = parseInt(userId, 10);
     }
@@ -800,7 +804,7 @@ app.put('/api/:collection/:id', requireAuth, (req, res) => {
 
     let payloadBody = normalizarVendedorId({ ...req.body });
 
-    if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
+    if (isSellerScopedCollection(collection) && userId && perfil !== 'master') {
         // não permitir que atualizem vendedor_id de outro
         payloadBody.vendedor_id = userId;
     }
@@ -822,7 +826,7 @@ app.delete('/api/:collection/:id', requireAuth, (req, res) => {
     let sql = "DELETE FROM documents WHERE collection = ? AND id = ?";
     const params = [collection, id];
 
-    if ((collection === 'clientes' || collection === 'vendas') && userId && perfil !== 'master') {
+    if (isSellerScopedCollection(collection) && userId && perfil !== 'master') {
         // Garante que só exclui se pertence ao vendedor, inclusive dados legados.
         sql += ` AND ${SELLER_ID_SQL_EXPR} = ?`;
         params.push(userId);

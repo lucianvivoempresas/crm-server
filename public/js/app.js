@@ -698,6 +698,9 @@ function setupEventListeners() {
 
   // Inicializa a lógica complementar
   setupQuickFormListeners();
+  if (typeof initCampanhasModule === 'function') {
+    initCampanhasModule();
+  }
 }
 
 function setupVendaFormListeners() {
