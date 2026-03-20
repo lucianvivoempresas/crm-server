@@ -522,6 +522,24 @@ function setupEventListeners() {
   const elSearchClientes = document.getElementById('search-clientes');
   if (elSearchClientes) elSearchClientes.oninput = renderClientesGrid;
 
+  const btnLeadsQuentes = document.getElementById('btn-card-leads-quentes');
+  if (btnLeadsQuentes) {
+    btnLeadsQuentes.onclick = () => {
+      window.__vendasQuickFilter = 'leads_quentes';
+      activateTab('vendas');
+      renderVendasTable();
+    };
+  }
+
+  const btnAcoesHoje = document.getElementById('btn-card-acoes-hoje');
+  if (btnAcoesHoje) {
+    btnAcoesHoje.onclick = () => {
+      window.__vendasQuickFilter = 'acoes_hoje';
+      activateTab('vendas');
+      renderVendasTable();
+    };
+  }
+
   // == EXPORTAÇÕES ==
   const elExportDash = document.getElementById('btn-export-vendas-dash');
   if (elExportDash) elExportDash.onclick = () => exportToCSV('vendas');

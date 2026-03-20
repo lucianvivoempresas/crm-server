@@ -371,6 +371,20 @@ function renderVendasTable() {
            (!filterMonth || (v.dataConclusao && v.dataConclusao.startsWith(filterMonth)));
   });
 
+  const quickFilter = window.__vendasQuickFilter || '';
+  if (quickFilter === 'leads_quentes') {
+    filtradas = filtradas.filter(v => ['Negociando', 'Aguardando Aceite'].includes(v.status));
+  }
+  if (quickFilter === 'acoes_hoje') {
+    filtradas = filtradas.filter(v => {
+      if (['Concluído', 'Cancelado'].includes(v.status)) return false;
+      const ref = v.dataRegistro || v.dataConclusao;
+      if (!ref) return false;
+      const dias = Math.floor((Date.now() - new Date(ref + 'T00:00:00').getTime()) / 86400000);
+      return dias >= 2;
+    });
+  }
+
   const tbody = document.getElementById('vendas-table-body');
   const emptyEl = document.getElementById('vendas-table-empty');
   

@@ -5,6 +5,7 @@ let campanhasCache = [];
 let campanhaLeadsCache = [];
 let campanhasInitialized = false;
 let campanhasOnlyOverdue = false;
+const COLD_AUTOMATION_DAYS = 7;
 
 const CAMPANHAS_STATUS = ['Novo', 'Contato', 'Proposta', 'Fechado', 'Perdido'];
 
@@ -288,6 +289,7 @@ function renderCampanhaReport(leads) {
 
   const today = new Date(getTodayISO() + 'T00:00:00').getTime();
   const classifyHeat = (lead) => {
+    if (lead.temperatura_auto === 'frio') return 'frio';
     if (lead.status_funil === 'Fechado') return 'quente';
     if (lead.status_funil === 'Proposta') return 'quente';
     if (lead.status_funil === 'Contato') {
@@ -325,6 +327,45 @@ function renderCampanhaReport(leads) {
       <p class="mt-2 text-xs text-slate-400">Top objecoes: ${topObjeções}</p>
     </div>
   `;
+}
+
+async function applyColdLeadAutomation() {
+  const todayIso = getTodayISO();
+  const today = new Date(`${todayIso}T00:00:00`).getTime();
+  const updates = [];
+
+  for (const lead of campanhaLeadsCache) {
+    if (!lead || lead.status_funil === 'Fechado' || lead.status_funil === 'Perdido') continue;
+
+    const history = Array.isArray(lead.interaction_history) ? lead.interaction_history : [];
+    const lastInteractionIso = history.length
+      ? history[history.length - 1].data
+      : (lead.atualizado_em || lead.criado_em || '');
+
+    const lastInteractionTime = lastInteractionIso ? new Date(lastInteractionIso).getTime() : today;
+    const daysWithoutInteraction = Math.floor((today - lastInteractionTime) / 86400000);
+    const due = lead.data_proximo_contato ? new Date(`${lead.data_proximo_contato}T00:00:00`).getTime() : null;
+    const overdue = due !== null && due < today;
+
+    const shouldBeCold = daysWithoutInteraction >= COLD_AUTOMATION_DAYS && (overdue || !lead.data_proximo_contato);
+    const nextTemp = shouldBeCold ? 'frio' : '';
+    const currentTemp = lead.temperatura_auto || '';
+
+    if (nextTemp !== currentTemp) {
+      const payload = {
+        ...lead,
+        temperatura_auto: nextTemp,
+        atualizado_em: new Date().toISOString()
+      };
+      updates.push(payload);
+    }
+  }
+
+  for (const payload of updates) {
+    await updateData('campanha_leads', payload);
+    const idx = campanhaLeadsCache.findIndex(l => Number(l.id) === Number(payload.id));
+    if (idx >= 0) campanhaLeadsCache[idx] = payload;
+  }
 }
 
 function renderCampanhasAgenda(leads) {
@@ -477,6 +518,53 @@ function openLeadModal(leadId) {
 function closeLeadModal() {
   const modal = document.getElementById('campanha-lead-modal');
   if (modal) modal.classList.add('hidden');
+}
+
+function openCreateCampanhaModal() {
+  const modal = document.getElementById('campanha-create-modal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeCreateCampanhaModal() {
+  const modal = document.getElementById('campanha-create-modal');
+  if (modal) modal.classList.add('hidden');
+}
+
+async function createCampanhaOnly() {
+  const user = obterUsuarioLogado();
+  if (!user) throw new Error('Sessao expirada.');
+
+  const campanhaNomeInput = document.getElementById('campanha-nome');
+  const campanhaProdutoInput = document.getElementById('campanha-produto');
+  const campanhaVendedorSel = document.getElementById('campanha-vendedor-create');
+
+  const nomeCampanha = (campanhaNomeInput?.value || '').trim();
+  const produtoCampanha = (campanhaProdutoInput?.value || '').trim() || 'Produto nao informado';
+
+  if (!nomeCampanha) throw new Error('Informe o nome da campanha.');
+
+  let vendedorId = parseNumericId(campanhaVendedorSel?.value);
+  if (user.perfil !== 'master') vendedorId = Number(user.id);
+  if (!vendedorId) throw new Error('Selecione um vendedor para criar a campanha.');
+
+  const campanhaId = await addData('campanhas', {
+    nome: nomeCampanha,
+    produto: produtoCampanha,
+    vendedor_id: vendedorId,
+    criado_por: Number(user.id),
+    criado_em: new Date().toISOString(),
+    total_leads: 0
+  });
+
+  if (campanhaNomeInput) campanhaNomeInput.value = '';
+  if (campanhaProdutoInput) campanhaProdutoInput.value = '';
+
+  closeCreateCampanhaModal();
+  await renderCampanhasTab();
+
+  const filterSelect = document.getElementById('campanhas-filter-campanha');
+  if (filterSelect) filterSelect.value = String(campanhaId);
+  if (typeof showQuickMessage === 'function') showQuickMessage('Campanha criada. Agora voce pode importar os leads.');
 }
 
 function suggestNextFollowup(status, currentDate) {
@@ -695,6 +783,7 @@ async function importarCampanhaPorArquivo(file) {
 
 async function renderCampanhasTab() {
   await carregarCampanhasData();
+  await applyColdLeadAutomation();
   renderCampanhasFilters();
 
   const filtered = getCampanhasFilteredLeads();
@@ -754,6 +843,10 @@ function initCampanhasModule() {
   if (campanhasInitialized) return;
 
   const btnImport = document.getElementById('btn-campanhas-import');
+  const btnOpenCreate = document.getElementById('btn-campanhas-open-create');
+  const btnCreateClose = document.getElementById('btn-campanha-create-close');
+  const btnCreateCancel = document.getElementById('btn-campanha-create-cancel');
+  const btnCreateSave = document.getElementById('btn-campanha-create-save');
   const inputImport = document.getElementById('input-import-campanhas');
   const btnRefresh = document.getElementById('btn-campanhas-refresh');
   const btnExport = document.getElementById('btn-campanhas-export');
@@ -773,6 +866,19 @@ function initCampanhasModule() {
 
   setupCampanhasPlaybook();
   configureCampanhasByPerfil();
+
+  if (btnOpenCreate) btnOpenCreate.onclick = openCreateCampanhaModal;
+  if (btnCreateClose) btnCreateClose.onclick = closeCreateCampanhaModal;
+  if (btnCreateCancel) btnCreateCancel.onclick = closeCreateCampanhaModal;
+  if (btnCreateSave) {
+    btnCreateSave.onclick = async () => {
+      try {
+        await createCampanhaOnly();
+      } catch (err) {
+        alert(err.message || 'Erro ao criar campanha.');
+      }
+    };
+  }
 
   if (btnImport && inputImport) {
     btnImport.onclick = () => inputImport.click();
