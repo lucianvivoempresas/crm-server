@@ -32,7 +32,12 @@ body[data-theme="light"] #login-container {
   background: linear-gradient(135deg, #e2e8f0 0%, #e0e7ff 50%, #f1f5f9 100%) !important;
 }
 
-body[data-theme="light"] [class*="bg-slate-"] {
+body[data-theme="light"] .bg-slate-800,
+body[data-theme="light"] .bg-slate-800\/50,
+body[data-theme="light"] .bg-slate-800\/60,
+body[data-theme="light"] .bg-slate-700\/50,
+body[data-theme="light"] .bg-slate-700\/40,
+body[data-theme="light"] .bg-slate-900\/50 {
   background-color: rgba(255, 255, 255, 0.92) !important;
 }
 
@@ -44,8 +49,13 @@ body[data-theme="light"] [class*="text-slate-"] {
   color: #475569 !important;
 }
 
-body[data-theme="light"] [class*="text-white"] {
-  color: #0f172a !important;
+body[data-theme="light"] h1,
+body[data-theme="light"] h2,
+body[data-theme="light"] h3,
+body[data-theme="light"] h4,
+body[data-theme="light"] th,
+body[data-theme="light"] td {
+  color: #0f172a;
 }
 
 body[data-theme="light"] [class*="placeholder-slate-"]::placeholder {
@@ -78,14 +88,14 @@ body[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: #64748b; 
   border: 1px solid transparent;
 }
 
-.crm-status-concluido { background: rgba(34, 197, 94, 0.2); color: #86efac; border-color: rgba(34, 197, 94, 0.35); }
-.crm-status-cancelado { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border-color: rgba(239, 68, 68, 0.35); }
-.crm-status-negociando { background: rgba(245, 158, 11, 0.2); color: #fcd34d; border-color: rgba(245, 158, 11, 0.35); }
-.crm-status-aguardando-aceite { background: rgba(59, 130, 246, 0.2); color: #93c5fd; border-color: rgba(59, 130, 246, 0.35); }
-.crm-status-inputado { background: rgba(168, 85, 247, 0.2); color: #d8b4fe; border-color: rgba(168, 85, 247, 0.35); }
-.crm-status-aguardando-fatura { background: rgba(99, 102, 241, 0.2); color: #c7d2fe; border-color: rgba(99, 102, 241, 0.35); }
-.crm-status-aguardando-distribuidora { background: rgba(6, 182, 212, 0.2); color: #67e8f9; border-color: rgba(6, 182, 212, 0.35); }
-.crm-status-default { background: rgba(100, 116, 139, 0.2); color: #cbd5e1; border-color: rgba(100, 116, 139, 0.35); }
+.crm-status-concluido { background: rgba(34, 197, 94, 0.2) !important; color: #86efac !important; border-color: rgba(34, 197, 94, 0.35) !important; }
+.crm-status-cancelado { background: rgba(239, 68, 68, 0.2) !important; color: #fca5a5 !important; border-color: rgba(239, 68, 68, 0.35) !important; }
+.crm-status-negociando { background: rgba(245, 158, 11, 0.2) !important; color: #fcd34d !important; border-color: rgba(245, 158, 11, 0.35) !important; }
+.crm-status-aguardando-aceite { background: rgba(59, 130, 246, 0.2) !important; color: #93c5fd !important; border-color: rgba(59, 130, 246, 0.35) !important; }
+.crm-status-inputado { background: rgba(168, 85, 247, 0.2) !important; color: #d8b4fe !important; border-color: rgba(168, 85, 247, 0.35) !important; }
+.crm-status-aguardando-fatura { background: rgba(99, 102, 241, 0.2) !important; color: #c7d2fe !important; border-color: rgba(99, 102, 241, 0.35) !important; }
+.crm-status-aguardando-distribuidora { background: rgba(6, 182, 212, 0.2) !important; color: #67e8f9 !important; border-color: rgba(6, 182, 212, 0.35) !important; }
+.crm-status-default { background: rgba(100, 116, 139, 0.2) !important; color: #cbd5e1 !important; border-color: rgba(100, 116, 139, 0.35) !important; }
 
 /* Paleta específica para o tema branco */
 body[data-theme="light"] .crm-status-concluido { background: #dcfce7; color: #166534; border-color: #86efac; }
@@ -129,4 +139,22 @@ body[data-theme="light"] #tab-vendas select {
 
 body[data-theme="light"] #tab-vendas button[id^="btn-"] {
   box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+/* Contraste forte para botões da aba Campanhas no tema branco */
+body[data-theme="light"] #btn-campanhas-open-create { background: #7c3aed !important; color: #ffffff !important; border-color: #6d28d9 !important; }
+body[data-theme="light"] #btn-campanhas-refresh { background: #334155 !important; color: #ffffff !important; border-color: #1e293b !important; }
+body[data-theme="light"] #btn-campanhas-export { background: #059669 !important; color: #ffffff !important; border-color: #047857 !important; }
+body[data-theme="light"] #btn-campanhas-delete { background: #dc2626 !important; color: #ffffff !important; border-color: #b91c1c !important; }
+body[data-theme="light"] #btn-campanhas-reset-filters { background: #1d4ed8 !important; color: #ffffff !important; border-color: #1e40af !important; }
+body[data-theme="light"] #campanhas-copy-script { background: #0891b2 !important; color: #ffffff !important; border-color: #0e7490 !important; }
+
+/* Preserva contraste dos principais botões coloridos no tema branco */
+body[data-theme="light"] #btn-nova-venda,
+body[data-theme="light"] #btn-novo-cliente,
+body[data-theme="light"] #btn-open-quick-forms,
+body[data-theme="light"] #btn-campanha-create-save,
+body[data-theme="light"] #btn-campanha-create-import,
+body[data-theme="light"] #btn-campanha-delete-confirm {
+  color: #ffffff !important;
 }
