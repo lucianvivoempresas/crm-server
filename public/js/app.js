@@ -168,9 +168,11 @@ function popularSelectVendedores(selectEl, includeEmpty = true) {
     // Evita duplicidade quando existem duas populações assíncronas concorrentes.
     if (selectEl.dataset.populateToken !== requestToken) return;
 
+    selectEl.innerHTML = includeEmpty ? '<option value="">(nenhum)</option>' : '';
+
     const seen = new Set();
     lista.forEach(u => {
-      const key = String(u.id);
+      const key = String(u.email || u.id || '').toLowerCase();
       if (seen.has(key)) return;
       seen.add(key);
       const opt = document.createElement('option');
