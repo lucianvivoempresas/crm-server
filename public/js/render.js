@@ -362,7 +362,7 @@ function renderVendasTable() {
   let filtradas = vendas.filter(v => {
     const c = clientes.find(cl => cl.id === v.clienteId);
     // Se é vendedor, filtrar apenas suas vendas
-    if (user && user.perfil === 'vendedor' && v.vendedor_id !== user.id) {
+    if (user && user.perfil === 'vendedor' && Number(v.vendedor_id) !== Number(user.id)) {
       return false;
     }
     return (!searchTerm || (c?.nome||'').toLowerCase().includes(searchTerm)) &&
@@ -383,6 +383,11 @@ function renderVendasTable() {
       const dias = Math.floor((Date.now() - new Date(ref + 'T00:00:00').getTime()) / 86400000);
       return dias >= 2;
     });
+  }
+
+  // O quick filter do dashboard deve ser pontual para evitar travar a listagem.
+  if (quickFilter) {
+    window.__vendasQuickFilter = '';
   }
 
   const tbody = document.getElementById('vendas-table-body');
