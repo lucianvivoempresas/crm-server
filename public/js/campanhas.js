@@ -4,6 +4,7 @@
 let campanhasCache = [];
 let campanhaLeadsCache = [];
 let campanhasInitialized = false;
+let campanhasOnlyOverdue = false;
 
 const CAMPANHAS_STATUS = ['Novo', 'Contato', 'Proposta', 'Fechado', 'Perdido'];
 
@@ -119,10 +120,30 @@ function getDateAfterDaysISO(days) {
   return d.toISOString().split('T')[0];
 }
 
+function csvCell(value) {
+  return `"${String(value ?? '').replace(/"/g, '""')}"`;
+}
+
+function setHeaderFollowupAlert(overdueCount) {
+  const container = document.getElementById('header-followup-alert');
+  const text = document.getElementById('header-followup-alert-text');
+  if (!container || !text) return;
+
+  if (!overdueCount) {
+    container.classList.add('hidden');
+    return;
+  }
+
+  text.textContent = `${overdueCount} follow-up(s) vencido(s) precisam de acao agora.`;
+  container.classList.remove('hidden');
+}
+
 function getCampanhasFilteredLeads() {
   const campanhaFilter = document.getElementById('campanhas-filter-campanha')?.value || '';
   const vendedorFilter = document.getElementById('campanhas-filter-vendedor')?.value || '';
   const statusFilter = document.getElementById('campanhas-filter-status')?.value || '';
+  const overdueMode = document.getElementById('campanhas-filter-overdue-mode')?.value || '';
+  const overdueDays = Math.max(1, Number(document.getElementById('campanhas-filter-overdue-days')?.value || 3));
   const search = (document.getElementById('campanhas-search')?.value || '').trim().toLowerCase();
 
   let filtered = [...campanhaLeadsCache];
@@ -135,6 +156,28 @@ function getCampanhasFilteredLeads() {
     filtered = filtered.filter(l => {
       const blob = `${l.empresa || ''} ${l.telefone || ''} ${l.email || ''} ${l.socio || ''} ${l.produto_ofertado || ''}`.toLowerCase();
       return blob.includes(search);
+    });
+  }
+
+  if (campanhasOnlyOverdue) {
+    const today = getTodayISO();
+    filtered = filtered.filter(l => {
+      if (!l.data_proximo_contato) return false;
+      if (l.status_funil === 'Fechado' || l.status_funil === 'Perdido') return false;
+      return l.data_proximo_contato < today;
+    });
+  }
+
+  if (overdueMode) {
+    const today = new Date(getTodayISO() + 'T00:00:00').getTime();
+    filtered = filtered.filter(l => {
+      if (!l.data_proximo_contato) return false;
+      if (l.status_funil === 'Fechado' || l.status_funil === 'Perdido') return false;
+      const due = new Date(l.data_proximo_contato + 'T00:00:00').getTime();
+      const diff = Math.floor((today - due) / 86400000);
+      if (overdueMode === 'today') return diff === 0;
+      if (overdueMode === 'gt') return diff > overdueDays;
+      return true;
     });
   }
 
@@ -243,6 +286,31 @@ function renderCampanhaReport(leads) {
     .map(([name, count]) => `${name} (${count})`)
     .join(' • ') || 'Sem objecoes mapeadas';
 
+  const today = new Date(getTodayISO() + 'T00:00:00').getTime();
+  const classifyHeat = (lead) => {
+    if (lead.status_funil === 'Fechado') return 'quente';
+    if (lead.status_funil === 'Proposta') return 'quente';
+    if (lead.status_funil === 'Contato') {
+      if (!lead.data_proximo_contato) return 'morno';
+      const due = new Date(lead.data_proximo_contato + 'T00:00:00').getTime();
+      const diff = Math.floor((today - due) / 86400000);
+      return diff <= 1 ? 'quente' : 'morno';
+    }
+    if (lead.status_funil === 'Perdido') return 'frio';
+    if (!lead.data_proximo_contato) return 'morno';
+    const due = new Date(lead.data_proximo_contato + 'T00:00:00').getTime();
+    const diff = Math.floor((today - due) / 86400000);
+    if (diff > 5) return 'frio';
+    if (diff > 1) return 'morno';
+    return 'quente';
+  };
+
+  const heat = { quente: 0, morno: 0, frio: 0 };
+  leads.forEach(l => {
+    const k = classifyHeat(l);
+    heat[k] = (heat[k] || 0) + 1;
+  });
+
   el.innerHTML = `
     <div class="bg-slate-900/40 border border-slate-700 rounded-lg p-3">
       <p>Total: <strong class="text-white">${total}</strong></p>
@@ -251,6 +319,9 @@ function renderCampanhaReport(leads) {
       <p>Perdidos: <strong class="text-red-300">${perdidos}</strong></p>
       <p>Conversao: <strong class="text-cyan-300">${conversao.toFixed(1)}%</strong></p>
       <p>Taxa de perda: <strong class="text-red-300">${perda.toFixed(1)}%</strong></p>
+      <p class="mt-2">Leads quentes: <strong class="text-emerald-300">${heat.quente}</strong></p>
+      <p>Leads mornos: <strong class="text-amber-300">${heat.morno}</strong></p>
+      <p>Leads frios: <strong class="text-slate-300">${heat.frio}</strong></p>
       <p class="mt-2 text-xs text-slate-400">Top objecoes: ${topObjeções}</p>
     </div>
   `;
@@ -298,6 +369,42 @@ function renderCampanhasAgenda(leads) {
   }).join('');
 }
 
+function renderLeadTimeline(lead) {
+  const timeline = document.getElementById('campanha-lead-timeline');
+  if (!timeline) return;
+
+  const history = Array.isArray(lead?.interaction_history) ? [...lead.interaction_history] : [];
+  if (!history.length) {
+    timeline.innerHTML = '<p class="text-xs text-slate-500">Sem interacoes registradas.</p>';
+    return;
+  }
+
+  history.sort((a, b) => new Date(b.data || 0).getTime() - new Date(a.data || 0).getTime());
+  const badgeClassByType = {
+    ligacao: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
+    whatsapp: 'bg-green-500/20 text-green-300 border-green-500/40',
+    proposta: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+    fechamento: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+    outro: 'bg-slate-500/20 text-slate-300 border-slate-500/40'
+  };
+
+  timeline.innerHTML = history.map(item => {
+    const tipo = item.tipo || 'outro';
+    const badgeClass = badgeClassByType[tipo] || badgeClassByType.outro;
+    const tipoLabel = tipo.charAt(0).toUpperCase() + tipo.slice(1);
+    return `
+    <div class="border-l-2 border-slate-600 pl-3 py-1">
+      <div class="flex items-center gap-2 mb-1">
+        <p class="text-xs text-slate-400">${formatDate((item.data || '').split('T')[0] || '')} ${String(item.data || '').split('T')[1]?.slice(0,5) || ''}</p>
+        <span class="px-2 py-0.5 rounded-full text-[10px] border ${badgeClass}">${tipoLabel}</span>
+      </div>
+      <p class="text-xs text-slate-300">Status: ${item.status || 'N/A'}</p>
+      <p class="text-xs text-slate-400">${item.resumo || 'Interacao sem resumo.'}</p>
+    </div>
+  `;
+  }).join('');
+}
+
 async function carregarCampanhasData() {
   try {
     const [campanhas, leads] = await Promise.all([
@@ -340,8 +447,29 @@ function openLeadModal(leadId) {
   document.getElementById('campanha-lead-status').value = lead.status_funil || 'Novo';
   document.getElementById('campanha-lead-data-proxima').value = lead.data_proximo_contato || '';
   document.getElementById('campanha-lead-objecao').value = lead.objecao_principal || '';
+  document.getElementById('campanha-lead-interacao-tipo').value = 'ligacao';
   document.getElementById('campanha-lead-retorno').value = lead.retorno || '';
   document.getElementById('campanha-lead-proxima-acao').value = lead.proxima_acao || '';
+  renderLeadTimeline(lead);
+
+  const waBtn = document.getElementById('btn-campanha-lead-whatsapp');
+  if (waBtn) {
+    waBtn.onclick = () => {
+      const telRaw = String(document.getElementById('campanha-lead-telefone')?.value || '').replace(/\D/g, '');
+      const tel = telRaw && !telRaw.startsWith('55') ? `55${telRaw}` : telRaw;
+      if (!tel) return;
+      window.open(`https://wa.me/${tel}`, '_blank', 'noopener,noreferrer');
+    };
+  }
+
+  const emailBtn = document.getElementById('btn-campanha-lead-email');
+  if (emailBtn) {
+    emailBtn.onclick = () => {
+      const email = String(document.getElementById('campanha-lead-email')?.value || '').trim();
+      if (!email) return;
+      window.location.href = `mailto:${email}`;
+    };
+  }
 
   modal.classList.remove('hidden');
 }
@@ -367,6 +495,24 @@ async function saveLeadFromModal() {
   const status = document.getElementById('campanha-lead-status').value;
   const dataProximaRaw = document.getElementById('campanha-lead-data-proxima').value;
   const dataProxima = suggestNextFollowup(status, dataProximaRaw);
+  const interactionType = document.getElementById('campanha-lead-interacao-tipo').value || 'outro';
+
+  const retorno = document.getElementById('campanha-lead-retorno').value.trim();
+  const proximaAcao = document.getElementById('campanha-lead-proxima-acao').value.trim();
+  const objecao = document.getElementById('campanha-lead-objecao').value.trim();
+  const history = Array.isArray(lead.interaction_history) ? [...lead.interaction_history] : [];
+
+  const resumo = retorno || proximaAcao || objecao || 'Atualizacao do lead';
+  const last = history[history.length - 1];
+  const shouldAppendHistory = !last || last.resumo !== resumo || last.status !== status;
+  if (shouldAppendHistory) {
+    history.push({
+      data: new Date().toISOString(),
+      tipo: interactionType,
+      status,
+      resumo
+    });
+  }
 
   const payload = {
     ...lead,
@@ -378,9 +524,10 @@ async function saveLeadFromModal() {
     produto_ofertado: document.getElementById('campanha-lead-produto').value.trim(),
     status_funil: status,
     data_proximo_contato: dataProxima,
-    objecao_principal: document.getElementById('campanha-lead-objecao').value.trim(),
-    retorno: document.getElementById('campanha-lead-retorno').value.trim(),
-    proxima_acao: document.getElementById('campanha-lead-proxima-acao').value.trim(),
+    objecao_principal: objecao,
+    retorno,
+    proxima_acao: proximaAcao,
+    interaction_history: history,
     atualizado_em: new Date().toISOString()
   };
 
@@ -397,6 +544,59 @@ async function saveLeadFromModal() {
   renderCampanhasAgenda(filtered);
 
   if (typeof showQuickMessage === 'function') showQuickMessage('Lead atualizado com sucesso.');
+}
+
+function exportCurrentCampaignCsv() {
+  const campanhaFilter = document.getElementById('campanhas-filter-campanha')?.value || '';
+  const leads = getCampanhasFilteredLeads();
+  if (!leads.length) {
+    alert('Nenhum lead para exportar nos filtros atuais.');
+    return;
+  }
+
+  const campanha = campanhaFilter ? getCampanhaById(campanhaFilter) : null;
+  const nomeBase = (campanha?.nome || 'campanhas').replace(/[^a-zA-Z0-9_-]+/g, '_');
+
+  const headers = [
+    'Campanha', 'Vendedor', 'Empresa', 'Telefone', 'Email', 'Socio', 'Produto', 'Status',
+    'Objecao', 'Retorno', 'Proxima Acao', 'Data Proximo Contato', 'Ultima Atualizacao'
+  ];
+
+  const csvRows = [headers.map(csvCell).join(',')];
+  leads.forEach(lead => {
+    const campanhaLead = getCampanhaById(lead.campanha_id);
+    const vendedorNome = (typeof usuariosList !== 'undefined' && Array.isArray(usuariosList))
+      ? (usuariosList.find(u => Number(u.id) === Number(lead.vendedor_id))?.nome || `Vendedor #${lead.vendedor_id || 'N/A'}`)
+      : `Vendedor #${lead.vendedor_id || 'N/A'}`;
+    const row = [
+      campanhaLead?.nome || '',
+      vendedorNome,
+      lead.empresa || '',
+      lead.telefone || '',
+      lead.email || '',
+      lead.socio || '',
+      lead.produto_ofertado || '',
+      lead.status_funil || '',
+      lead.objecao_principal || '',
+      lead.retorno || '',
+      lead.proxima_acao || '',
+      lead.data_proximo_contato || '',
+      lead.atualizado_em || lead.criado_em || ''
+    ];
+    csvRows.push(row.map(csvCell).join(','));
+  });
+
+  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${nomeBase}_relatorio.csv`;
+  a.click();
+}
+
+function renderOverdueFilterIndicator() {
+  const indicator = document.getElementById('campanhas-overdue-indicator');
+  if (!indicator) return;
+  indicator.classList.toggle('hidden', !campanhasOnlyOverdue);
 }
 
 async function deleteCurrentCampaign() {
@@ -502,6 +702,14 @@ async function renderCampanhasTab() {
   renderCampanhasTable(filtered);
   renderCampanhaReport(filtered);
   renderCampanhasAgenda(filtered);
+  renderOverdueFilterIndicator();
+
+  const overdueCount = campanhaLeadsCache.filter(l => {
+    if (!l.data_proximo_contato) return false;
+    if (l.status_funil === 'Fechado' || l.status_funil === 'Perdido') return false;
+    return l.data_proximo_contato < getTodayISO();
+  }).length;
+  setHeaderFollowupAlert(overdueCount);
 
   if (window.lucide) lucide.createIcons();
 }
@@ -548,10 +756,16 @@ function initCampanhasModule() {
   const btnImport = document.getElementById('btn-campanhas-import');
   const inputImport = document.getElementById('input-import-campanhas');
   const btnRefresh = document.getElementById('btn-campanhas-refresh');
+  const btnExport = document.getElementById('btn-campanhas-export');
   const btnDelete = document.getElementById('btn-campanhas-delete');
+  const btnHeaderAlertOpen = document.getElementById('btn-header-followup-open');
+  const btnClearOverdue = document.getElementById('btn-campanhas-overdue-clear');
   const campanhaFilter = document.getElementById('campanhas-filter-campanha');
   const vendedorFilter = document.getElementById('campanhas-filter-vendedor');
   const statusFilter = document.getElementById('campanhas-filter-status');
+  const overdueModeFilter = document.getElementById('campanhas-filter-overdue-mode');
+  const overdueDaysFilter = document.getElementById('campanhas-filter-overdue-days');
+  const btnResetFilters = document.getElementById('btn-campanhas-reset-filters');
   const searchInput = document.getElementById('campanhas-search');
   const btnCloseModal = document.getElementById('btn-campanha-lead-close');
   const btnCancelModal = document.getElementById('btn-campanha-lead-cancel');
@@ -577,7 +791,37 @@ function initCampanhasModule() {
   }
 
   if (btnRefresh) btnRefresh.onclick = () => renderCampanhasTab();
+  if (btnExport) btnExport.onclick = () => exportCurrentCampaignCsv();
   if (btnDelete) btnDelete.onclick = () => deleteCurrentCampaign();
+  if (btnHeaderAlertOpen) {
+    btnHeaderAlertOpen.onclick = () => {
+      campanhasOnlyOverdue = true;
+      const tabBtn = document.querySelector('.tab-btn[data-tab="campanhas"]');
+      if (tabBtn) tabBtn.click();
+      renderCampanhasTab();
+    };
+  }
+
+  if (btnClearOverdue) {
+    btnClearOverdue.onclick = () => {
+      campanhasOnlyOverdue = false;
+      renderCampanhasTab();
+    };
+  }
+
+  if (btnResetFilters) {
+    btnResetFilters.onclick = () => {
+      campanhasOnlyOverdue = false;
+      if (campanhaFilter) campanhaFilter.value = '';
+      if (statusFilter) statusFilter.value = '';
+      if (searchInput) searchInput.value = '';
+      if (overdueModeFilter) overdueModeFilter.value = '';
+      if (overdueDaysFilter) overdueDaysFilter.value = '3';
+      const user = obterUsuarioLogado();
+      if (vendedorFilter && (!user || user.perfil === 'master')) vendedorFilter.value = '';
+      renderCampanhasTab();
+    };
+  }
 
   const rerenderFiltered = () => {
     const filtered = getCampanhasFilteredLeads();
@@ -585,11 +829,20 @@ function initCampanhasModule() {
     renderCampanhasTable(filtered);
     renderCampanhaReport(filtered);
     renderCampanhasAgenda(filtered);
+    renderOverdueFilterIndicator();
+    const overdueCount = campanhaLeadsCache.filter(l => {
+      if (!l.data_proximo_contato) return false;
+      if (l.status_funil === 'Fechado' || l.status_funil === 'Perdido') return false;
+      return l.data_proximo_contato < getTodayISO();
+    }).length;
+    setHeaderFollowupAlert(overdueCount);
   };
 
   if (campanhaFilter) campanhaFilter.onchange = rerenderFiltered;
   if (vendedorFilter) vendedorFilter.onchange = rerenderFiltered;
   if (statusFilter) statusFilter.onchange = rerenderFiltered;
+  if (overdueModeFilter) overdueModeFilter.onchange = rerenderFiltered;
+  if (overdueDaysFilter) overdueDaysFilter.oninput = rerenderFiltered;
   if (searchInput) searchInput.oninput = rerenderFiltered;
 
   if (btnCloseModal) btnCloseModal.onclick = closeLeadModal;

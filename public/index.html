@@ -123,6 +123,12 @@
         <input id="global-search" type="text" placeholder="Busca global: cliente, CPF/CNPJ, telefone, conta contrato ou venda..." class="w-full pl-9 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
         <div id="global-search-results" class="hidden mt-2 bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-72 overflow-y-auto"></div>
       </div>
+      <div id="header-followup-alert" class="hidden mt-3 bg-red-500/10 border border-red-500/40 text-red-200 rounded-lg px-4 py-3">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <p id="header-followup-alert-text" class="text-sm">Existem follow-ups vencidos.</p>
+          <button id="btn-header-followup-open" class="px-3 py-1.5 bg-red-500/20 border border-red-500/50 rounded-lg text-sm hover:bg-red-500/30">Abrir Campanhas</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -279,6 +285,9 @@
           <button id="btn-campanhas-refresh" class="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-all flex items-center gap-2">
             <i data-lucide="refresh-cw" class="w-4 h-4"></i>Atualizar
           </button>
+          <button id="btn-campanhas-export" class="px-4 py-2 bg-emerald-500/20 text-emerald-300 rounded-lg border border-emerald-500/40 hover:bg-emerald-500/30 transition-all flex items-center gap-2">
+            <i data-lucide="download" class="w-4 h-4"></i>Exportar CSV
+          </button>
           <button id="btn-campanhas-delete" class="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg border border-red-500/40 hover:bg-red-500/30 transition-all flex items-center gap-2">
             <i data-lucide="trash-2" class="w-4 h-4"></i>Apagar Campanha
           </button>
@@ -343,6 +352,27 @@
                 <option value="Perdido">Perdido</option>
               </select>
             </div>
+          </div>
+          <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label class="block text-sm text-slate-300 mb-2">Faixa de Atraso</label>
+              <select id="campanhas-filter-overdue-mode" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white">
+                <option value="">Todos</option>
+                <option value="today">Vencidos hoje</option>
+                <option value="gt">Vencidos acima de X dias</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm text-slate-300 mb-2">Dias (X)</label>
+              <input id="campanhas-filter-overdue-days" type="number" min="1" value="3" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" />
+            </div>
+            <div class="flex items-end">
+              <button id="btn-campanhas-reset-filters" class="w-full px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600">Resetar Filtros</button>
+            </div>
+          </div>
+          <div id="campanhas-overdue-indicator" class="hidden bg-red-500/10 border border-red-500/40 text-red-200 rounded-lg px-4 py-3 flex items-center justify-between gap-3">
+            <p class="text-sm">Visualizando apenas follow-ups vencidos.</p>
+            <button id="btn-campanhas-overdue-clear" class="px-3 py-1.5 bg-red-500/20 border border-red-500/50 rounded-lg text-sm hover:bg-red-500/30">Limpar Filtro</button>
           </div>
 
           <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 overflow-hidden">
@@ -413,8 +443,28 @@
               <div><label class="block text-sm text-slate-300 mb-2">Proximo Contato</label><input id="campanha-lead-data-proxima" type="date" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" /></div>
             </div>
             <div><label class="block text-sm text-slate-300 mb-2">Objeção Principal</label><input id="campanha-lead-objecao" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="Ex: ta caro" /></div>
+            <div>
+              <label class="block text-sm text-slate-300 mb-2">Tipo de Interacao</label>
+              <select id="campanha-lead-interacao-tipo" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white">
+                <option value="ligacao">Ligacao</option>
+                <option value="whatsapp">WhatsApp</option>
+                <option value="proposta">Proposta</option>
+                <option value="fechamento">Fechamento</option>
+                <option value="outro">Outro</option>
+              </select>
+            </div>
             <div><label class="block text-sm text-slate-300 mb-2">Retorno</label><textarea id="campanha-lead-retorno" rows="3" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="Resumo da conversa"></textarea></div>
             <div><label class="block text-sm text-slate-300 mb-2">Proxima Acao</label><textarea id="campanha-lead-proxima-acao" rows="2" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="Ex: enviar proposta e retornar amanha 14h"></textarea></div>
+            <div>
+              <p class="text-sm text-slate-300 mb-2">Timeline de Interacoes</p>
+              <div id="campanha-lead-timeline" class="bg-slate-900/40 border border-slate-700 rounded-lg p-3 space-y-2 max-h-40 overflow-y-auto">
+                <p class="text-xs text-slate-500">Sem interacoes registradas.</p>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button id="btn-campanha-lead-whatsapp" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Abrir WhatsApp</button>
+              <button id="btn-campanha-lead-email" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Enviar E-mail</button>
+            </div>
             <div class="flex gap-3">
               <button id="btn-campanha-lead-cancel" class="flex-1 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600">Cancelar</button>
               <button id="btn-campanha-lead-save" class="flex-1 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700">Salvar Lead</button>
