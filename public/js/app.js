@@ -571,6 +571,19 @@ function setupEventListeners() {
   const elFilterClientesOferta = document.getElementById('filter-clientes-oferta');
   if (elFilterClientesOferta) elFilterClientesOferta.oninput = renderClientesGrid;
 
+  const btnClearClientesFilters = document.getElementById('btn-clear-clientes-filters');
+  if (btnClearClientesFilters) {
+    btnClearClientesFilters.onclick = () => {
+      const elSearch = document.getElementById('search-clientes');
+      const elOferta = document.getElementById('filter-clientes-oferta');
+      if (elSearch) elSearch.value = '';
+      if (elOferta) elOferta.value = '';
+      window.__clientesGridPage = 1;
+      window.__clientesGridLastSearch = '';
+      renderClientesGrid();
+    };
+  }
+
   const btnLeadsQuentes = document.getElementById('btn-card-leads-quentes');
   if (btnLeadsQuentes) {
     btnLeadsQuentes.onclick = () => {
