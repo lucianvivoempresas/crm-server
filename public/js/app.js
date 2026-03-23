@@ -1199,7 +1199,7 @@ async function runImportClientes() {
 
     let created = 0, updated = 0, duplicated = 0;
 
-    const cleanCellValue = (value) => String(value ?? '').replace(/\u0000/g, '').trim();
+    const cleanCellValue = (value) => repairTextArtifacts(String(value ?? '').replace(/\u0000/g, '')).trim();
     const firstNonEmpty = (row, aliases = []) => {
       for (const key of aliases) {
         if (!Object.prototype.hasOwnProperty.call(row, key)) continue;

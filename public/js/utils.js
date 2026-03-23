@@ -100,6 +100,50 @@ function filterVendasByDateRange(vendasArray, range) {
 function normalizeDoc(v) { return String(v || '').replace(/\D+/g, '').trim(); }
 function normalizePhone(v) { return String(v || '').replace(/\D+/g, '').trim(); }
 
+function repairTextArtifacts(value) {
+  if (value === null || value === undefined) return '';
+  let text = String(value);
+
+  // Corrige texto UTF-8 que foi lido como latin1 (ex.: MÃ³vel -> Móvel).
+  if (/[ÃÂ]/.test(text)) {
+    try {
+      text = decodeURIComponent(escape(text));
+    } catch (_) {
+      // mantém texto original se não for possível converter
+    }
+  }
+
+  // Corrige padrões comuns vistos nos relatórios importados.
+  const replacements = [
+    ['M�vel', 'Móvel'],
+    ['P�s', 'Pós'],
+    ['B�sica', 'Básica'],
+    ['Avan�ada', 'Avançada'],
+    ['Neg�cio', 'Negócio'],
+    ['Aquisi��o', 'Aquisição'],
+    ['Renova��o', 'Renovação'],
+    ['Licen�a', 'Licença'],
+    ['Gest�o', 'Gestão'],
+    ['Pr�dios', 'Prédios'],
+    ['Constru��o', 'Construção'],
+    ['Ind�stria', 'Indústria'],
+    ['Sa�de', 'Saúde'],
+    ['Educa��o', 'Educação'],
+    ['N�o', 'Não'],
+    ['� uma', 'É uma'],
+    ['pr�ximo', 'próximo'],
+    ['h�', 'há']
+  ];
+
+  for (const [from, to] of replacements) {
+    text = text.split(from).join(to);
+  }
+
+  // Remove caracteres de substituição restantes para evitar "?" visível.
+  text = text.replace(/\uFFFD+/g, '');
+  return text;
+}
+
 function excelDateToISO(value) {
   if (!value) return '';
   if (value instanceof Date && !isNaN(value)) {

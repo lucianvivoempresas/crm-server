@@ -523,14 +523,14 @@ function renderClientesGrid() {
 
   container.innerHTML = clientesVisiveis.map(cliente => {
     const inicial = cliente.nome ? cliente.nome.charAt(0).toUpperCase() : '?';
-    const observacao = String(cliente.observacao || '').trim();
+    const observacao = repairTextArtifacts(String(cliente.observacao || '')).trim();
     const observacaoEscaped = String(observacao)
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
-    const tipoProduto = String(cliente.tipoProduto || '').trim();
+    const tipoProduto = repairTextArtifacts(String(cliente.tipoProduto || '')).trim();
     const qtMovel = Number.isFinite(Number(cliente.qtMovel)) ? String(Number(cliente.qtMovel)) : '';
     const quantidadeBasicaBL = Number.isFinite(Number(cliente.quantidadeBasicaBL)) ? String(Number(cliente.quantidadeBasicaBL)) : '';
     const obsTargetId = `cliente-observacao-${cliente.id}`;

@@ -257,10 +257,10 @@ function showClientProfileModal(id) {
   document.getElementById('client-profile-meses').textContent = mesesValue;
   document.getElementById('client-profile-fator').textContent = fatorValue;
   document.getElementById('client-profile-excedente').textContent = excedenteValue;
-  document.getElementById('client-profile-tipoProduto').textContent = cliente.tipoProduto || 'N/A';
+  document.getElementById('client-profile-tipoProduto').textContent = repairTextArtifacts(cliente.tipoProduto || 'N/A');
   document.getElementById('client-profile-qtMovel').textContent = Number.isFinite(Number(cliente.qtMovel)) ? String(Number(cliente.qtMovel)) : '0';
   document.getElementById('client-profile-quantidadeBasicaBL').textContent = Number.isFinite(Number(cliente.quantidadeBasicaBL)) ? String(Number(cliente.quantidadeBasicaBL)) : '0';
-  document.getElementById('client-profile-observacao').textContent = String(cliente.observacao || '').trim() || 'N/A';
+  document.getElementById('client-profile-observacao').textContent = repairTextArtifacts(String(cliente.observacao || '').trim()) || 'N/A';
 
   // Filtrar vendas do cliente por vendedor se não for master
   const user = obterUsuarioLogado();
