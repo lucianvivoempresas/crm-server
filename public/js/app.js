@@ -1176,6 +1176,15 @@ async function handleImportClientesFile(file) {
 
 async function runImportClientes() {
   try {
+    importClientesRunning = true;
+    const btnRun = document.getElementById('btn-import-clientes-run');
+    const btnCancel = document.getElementById('btn-import-clientes-cancel');
+    const btnClose = document.getElementById('btn-import-clientes-close');
+    const originalRunText = btnRun ? btnRun.textContent : 'Importar';
+    if (btnRun) { btnRun.disabled = true; btnRun.textContent = 'Importando...'; }
+    if (btnCancel) btnCancel.disabled = true;
+    if (btnClose) btnClose.disabled = true;
+
     const userId = obterIdUsuario();
     if (!userId) throw new Error('Sessão expirada ou usuário não identificado. Faça login novamente.');
 
@@ -1304,23 +1313,49 @@ async function runImportClientes() {
     const chunkSize = 300;
     let createOffset = 0;
     let updateOffset = 0;
+    const totalToSend = createBatch.length + updateBatch.length;
+    let sentSoFar = 0;
+    setImportClientesProgress(2, `Preparando ${totalToSend} registro(s) para envio...`);
+
     while (createOffset < createBatch.length || updateOffset < updateBatch.length) {
       const createChunk = createBatch.slice(createOffset, createOffset + chunkSize);
       const updateChunk = updateBatch.slice(updateOffset, updateOffset + chunkSize);
       await bulkUpsertClientes(createChunk, updateChunk);
       createOffset += createChunk.length;
       updateOffset += updateChunk.length;
+      sentSoFar += createChunk.length + updateChunk.length;
+
+      const percent = totalToSend > 0
+        ? Math.min(98, Math.round((sentSoFar / totalToSend) * 100))
+        : 98;
+      setImportClientesProgress(percent, `Processados ${sentSoFar} de ${totalToSend} registro(s)...`);
+
       // Mantém a UI responsiva entre lotes grandes.
       await new Promise(resolve => setTimeout(resolve, 0));
     }
 
+    setImportClientesProgress(100, 'Importação finalizada com sucesso. Atualizando tela...');
     await renderAll();
-    hideImportClientesModal();
+    hideImportClientesModal(true);
     showQuickMessage(`Importação: ${created} novo(s), ${updated} atualizado(s), ${duplicated} duplicado(s) ignorado(s).`);
+
+    if (btnRun) { btnRun.disabled = false; btnRun.textContent = originalRunText; }
+    if (btnCancel) btnCancel.disabled = false;
+    if (btnClose) btnClose.disabled = false;
+    importClientesRunning = false;
   } catch (err) {
     console.error(err);
+    setImportClientesProgress(0, 'Falha na importação.');
     if (importClientesError) { importClientesError.textContent = err.message || String(err); importClientesError.classList.remove('hidden'); }
     else alert('Erro: ' + (err.message || err));
+
+    const btnRun = document.getElementById('btn-import-clientes-run');
+    const btnCancel = document.getElementById('btn-import-clientes-cancel');
+    const btnClose = document.getElementById('btn-import-clientes-close');
+    if (btnRun) { btnRun.disabled = false; btnRun.textContent = 'Importar'; }
+    if (btnCancel) btnCancel.disabled = false;
+    if (btnClose) btnClose.disabled = false;
+    importClientesRunning = false;
   }
 }
 

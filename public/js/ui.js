@@ -374,15 +374,30 @@ function hideConfirmModal() {
 
 function showImportClientesModal() {
   if (importClientesError) { importClientesError.classList.add('hidden'); importClientesError.textContent = ''; }
+  setImportClientesProgress(0, 'Aguardando início...');
   importClientesModal.classList.remove('hidden');
   if (window.lucide) lucide.createIcons();
 }
 
-function hideImportClientesModal() {
+function hideImportClientesModal(force = false) {
+  if (importClientesRunning && !force) return;
   importClientesModal.classList.add('hidden');
   importRowsCache = []; importHeadersCache = [];
   if (importPreviewBody) importPreviewBody.innerHTML = '';
   if (importPreviewCount) importPreviewCount.textContent = '0 linhas';
+  setImportClientesProgress(0, 'Aguardando início...');
+}
+
+function setImportClientesProgress(percent = 0, text = '') {
+  const p = Math.max(0, Math.min(100, Number(percent) || 0));
+  if (importClientesProgressWrap) {
+    if (p > 0 && p < 100) importClientesProgressWrap.classList.remove('hidden');
+    else if (p === 0 && !importClientesRunning) importClientesProgressWrap.classList.add('hidden');
+    else importClientesProgressWrap.classList.remove('hidden');
+  }
+  if (importClientesProgressBar) importClientesProgressBar.style.width = `${p}%`;
+  if (importClientesProgressLabel) importClientesProgressLabel.textContent = `${Math.round(p)}%`;
+  if (importClientesProgressText) importClientesProgressText.textContent = text || '';
 }
 
 function showImportVendasModal() {

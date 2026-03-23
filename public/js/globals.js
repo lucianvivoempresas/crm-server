@@ -64,6 +64,11 @@ const importClientesModal = document.getElementById('import-clientes-modal');
 const importClientesError = document.getElementById('import-clientes-error');
 const importPreviewBody = document.getElementById('import-preview-body');
 const importPreviewCount = document.getElementById('import-preview-count');
+const importClientesProgressWrap = document.getElementById('import-clientes-progress-wrap');
+const importClientesProgressBar = document.getElementById('import-clientes-progress-bar');
+const importClientesProgressLabel = document.getElementById('import-clientes-progress-label');
+const importClientesProgressText = document.getElementById('import-clientes-progress-text');
+let importClientesRunning = false;
 
 // Variáveis para importação de clientes
 const importMappings = {

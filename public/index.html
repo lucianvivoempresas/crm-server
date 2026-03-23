@@ -1137,6 +1137,16 @@
             <tbody id="import-preview-body"></tbody>
           </table>
         </div>
+        <div id="import-clientes-progress-wrap" class="hidden bg-slate-900/40 rounded-xl p-4 border border-slate-700/50">
+          <div class="flex justify-between mb-2">
+            <p class="text-white text-sm">Progresso da importação</p>
+            <span id="import-clientes-progress-label" class="text-slate-300 text-sm">0%</span>
+          </div>
+          <div class="w-full h-2.5 bg-slate-700 rounded-full overflow-hidden">
+            <div id="import-clientes-progress-bar" class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full" style="width: 0%"></div>
+          </div>
+          <p id="import-clientes-progress-text" class="text-xs text-slate-400 mt-2">Aguardando início...</p>
+        </div>
         <div id="import-clientes-error" class="text-red-300 bg-red-500/10 p-3 rounded-lg hidden"></div>
         <div class="flex gap-3">
           <button id="btn-import-clientes-cancel" class="flex-1 px-6 py-3 bg-slate-700 text-white rounded-lg">Cancelar</button>
