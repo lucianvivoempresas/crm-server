@@ -568,6 +568,9 @@ function setupEventListeners() {
   const elSearchClientes = document.getElementById('search-clientes');
   if (elSearchClientes) elSearchClientes.oninput = renderClientesGrid;
 
+  const elFilterClientesOferta = document.getElementById('filter-clientes-oferta');
+  if (elFilterClientesOferta) elFilterClientesOferta.oninput = renderClientesGrid;
+
   const btnLeadsQuentes = document.getElementById('btn-card-leads-quentes');
   if (btnLeadsQuentes) {
     btnLeadsQuentes.onclick = () => {
@@ -643,11 +646,13 @@ function setupEventListeners() {
 
   // == EVENTOS DINÂMICOS (TABELAS E CARDS) ==
   document.body.addEventListener('click', async (e) => {
-    const target = e.target.closest('.btn-edit, .btn-delete, .btn-view-profile, .btn-dismiss-lembrete, .btn-toggle-observacao, .btn-clientes-load-more');
+    const target = e.target.closest('.btn-edit, .btn-delete, .btn-view-profile, .btn-dismiss-lembrete, .btn-toggle-observacao, .btn-clientes-page');
     if (!target) return;
 
-    if (target.classList.contains('btn-clientes-load-more')) {
-      window.__clientesGridLimit = Number(window.__clientesGridLimit || 120) + 120;
+    if (target.classList.contains('btn-clientes-page')) {
+      const nextPage = Number(target.dataset.page || 1);
+      if (!Number.isFinite(nextPage) || nextPage < 1) return;
+      window.__clientesGridPage = nextPage;
       renderClientesGrid();
       return;
     }
@@ -1111,8 +1116,25 @@ async function handleImportClientesFile(file) {
     if (!window.XLSX) throw new Error('Biblioteca XLSX não carregou. Verifique sua internet.');
     const ext = (file.name || '').toLowerCase();
     let rows = [];
+
+    const decodeCsvTextSmart = async (inputFile) => {
+      const buffer = await inputFile.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+      const win1252 = new TextDecoder('windows-1252', { fatal: false }).decode(bytes);
+
+      const score = (text) => {
+        const replacementCount = (text.match(/�/g) || []).length;
+        const length = Math.max(text.length, 1);
+        return replacementCount / length;
+      };
+
+      // Se UTF-8 vier com muitos caracteres de substituição, prefere Windows-1252.
+      return score(win1252) < score(utf8) ? win1252 : utf8;
+    };
+
     if (ext.endsWith('.csv')) {
-      const text = await file.text();
+      const text = await decodeCsvTextSmart(file);
       const wb = XLSX.read(text, { type: 'string' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
@@ -1154,7 +1176,6 @@ async function runImportClientes() {
     });
 
     let created = 0, updated = 0, duplicated = 0;
-    const newClients = [];
 
     const cleanCellValue = (value) => String(value ?? '').replace(/\u0000/g, '').trim();
     const firstNonEmpty = (row, aliases = []) => {
@@ -1177,9 +1198,15 @@ async function runImportClientes() {
       return Number.isFinite(n) ? n : 0;
     };
 
+    const processedDocs = new Set();
     for (const row of importRowsCache) {
       const doc = normalizeDoc(mappedOrAlias(row, 'cpfCnpj', ['NR_CNPJ', 'CNPJ', 'CPF/CNPJ', 'CPF']));
       if (!doc) continue;
+      if (processedDocs.has(doc)) {
+        duplicated++;
+        continue;
+      }
+      processedDocs.add(doc);
 
       const tipoProduto = mappedOrAlias(row, 'tipoProduto', ['TP_PRODUTO', 'TIPO_PRODUTO', 'TIPO PRODUTO']);
       const qtMovelDireto = mappedOrAlias(row, 'qtMovel', ['QT_MOVEL', 'QTD_MOVEL', 'QNT_MOVEL']);
@@ -1221,15 +1248,21 @@ async function runImportClientes() {
 
       const existing = byDoc.get(doc);
       if (!existing) {
-          // Atribui o usuário que está fazendo a importação como vendedor/dono do cliente
+          // Para importacao feita por master, novos clientes ficam com o master.
+          // Para outros perfis, mantem o comportamento atual de usar o proprio usuario.
           const uid = obterIdUsuario();
-          if (uid) clientePayload.vendedor_id = parseInt(uid, 10);
+          if (uid) {
+            if (ehMaster()) {
+              clientePayload.vendedor_id = parseInt(uid, 10);
+            } else {
+              clientePayload.vendedor_id = parseInt(uid, 10);
+            }
+          }
           const newId = await addData('clientes', clientePayload);
         clientePayload.id = newId;
         clientes.push(clientePayload);
         byDoc.set(doc, clientePayload);
         created++;
-        newClients.push(clientePayload);
       } else if (existing && existing.id) {
         // Cliente já existe - atualizar dados sem duplicar
         const merged = JSON.parse(JSON.stringify(existing));
@@ -1261,21 +1294,12 @@ async function runImportClientes() {
         if (idx >= 0) clientes[idx] = merged;
         byDoc.set(doc, merged);
         updated++;
-      } else {
-        // CNPJ já foi processado nesta importação (duplicata dentro da planilha)
-        duplicated++;
       }
     }
 
     await renderAll();
     hideImportClientesModal();
     showQuickMessage(`Importação: ${created} novo(s), ${updated} atualizado(s), ${duplicated} duplicado(s) ignorado(s).`);
-
-    // se foi master e há novos clientes, permite atribuir vendedor
-    if (ehMaster() && newClients.length) {
-      // aguarda um pouco para interface refrescar
-      setTimeout(() => showAssignVendorModal(newClients), 100);
-    }
   } catch (err) {
     console.error(err);
     if (importClientesError) { importClientesError.textContent = err.message || String(err); importClientesError.classList.remove('hidden'); }
@@ -1289,8 +1313,24 @@ async function handleImportVendasFile(file) {
     if (!window.XLSX) throw new Error('Biblioteca XLSX não carregou. Verifique sua internet.');
     const ext = (file.name || '').toLowerCase();
     let rows = [];
+
+    const decodeCsvTextSmart = async (inputFile) => {
+      const buffer = await inputFile.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      const utf8 = new TextDecoder('utf-8', { fatal: false }).decode(bytes);
+      const win1252 = new TextDecoder('windows-1252', { fatal: false }).decode(bytes);
+
+      const score = (text) => {
+        const replacementCount = (text.match(/�/g) || []).length;
+        const length = Math.max(text.length, 1);
+        return replacementCount / length;
+      };
+
+      return score(win1252) < score(utf8) ? win1252 : utf8;
+    };
+
     if (ext.endsWith('.csv')) {
-      const text = await file.text();
+      const text = await decodeCsvTextSmart(file);
       const wb = XLSX.read(text, { type: 'string' });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });

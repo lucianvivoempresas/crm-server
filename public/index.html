@@ -593,10 +593,17 @@
           <button id="btn-novo-cliente" class="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"><i data-lucide="plus" class="w-5 h-5"></i>Novo Cliente</button>
         </div>
       </div>
-      <div class="relative max-w-md">
-        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></i>
-        <input type="text" id="search-clientes" list="lista-clientes-busca" placeholder="Pesquisar cliente por nome..." class="w-full pl-10 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
-        <datalist id="lista-clientes-busca"></datalist>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-4xl">
+        <div class="relative">
+          <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></i>
+          <input type="text" id="search-clientes" list="lista-clientes-busca" placeholder="Pesquisar cliente por nome..." class="w-full pl-10 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
+          <datalist id="lista-clientes-busca"></datalist>
+        </div>
+        <div class="relative">
+          <i data-lucide="filter" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></i>
+          <input type="text" id="filter-clientes-oferta" list="lista-clientes-ofertas" placeholder="Filtrar por oferta da observação (ex: Renovação Móvel)" class="w-full pl-10 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
+          <datalist id="lista-clientes-ofertas"></datalist>
+        </div>
       </div>
       <div id="clientes-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
       <div id="clientes-grid-controls" class="hidden mt-4"></div>
@@ -1054,6 +1061,7 @@
                 <div><p class="text-slate-400">TP Produto</p><p id="client-profile-tipoProduto" class="text-white font-medium"></p></div>
                 <div><p class="text-slate-400">Qnt Móvel</p><p id="client-profile-qtMovel" class="text-white font-medium"></p></div>
                 <div><p class="text-slate-400">Qnt Básica BL</p><p id="client-profile-quantidadeBasicaBL" class="text-white font-medium"></p></div>
+                <div class="sm:col-span-2"><p class="text-slate-400">Observação</p><p id="client-profile-observacao" class="text-white font-medium whitespace-pre-wrap"></p></div>
             </div>
         </div>
         <div>

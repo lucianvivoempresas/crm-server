@@ -418,14 +418,55 @@ function renderClientesGrid() {
   const controls = document.getElementById('clientes-grid-controls');
   const emptyEl = document.getElementById('clientes-grid-empty');
   const searchTerm = (document.getElementById('search-clientes')?.value || '').toLowerCase().trim();
+  const ofertaTerm = (document.getElementById('filter-clientes-oferta')?.value || '').trim();
   const pageSize = 120;
 
-  if (window.__clientesGridLastSearch !== searchTerm) {
-    window.__clientesGridLastSearch = searchTerm;
-    window.__clientesGridLimit = pageSize;
+  const normalizeText = (v) => String(v || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+  const extractOffersFromObservacao = (obs) => {
+    const text = String(obs || '').replace(/\s+/g, ' ').trim();
+    if (!text) return [];
+
+    const offers = [];
+    let m;
+
+    // Ex.: "1ª Oferta -> Renovação ... /// 2ª Oferta -> Wifi Pro ..."
+    const reOferta = /(\d+\s*[ºoª]?\s*oferta\s*->\s*)(.*?)(?=(?:\/\/\/|\d+\s*[ºoª]?\s*oferta\s*->|$))/gi;
+    while ((m = reOferta.exec(text)) !== null) {
+      const offer = String(m[2] || '').trim();
+      if (offer) offers.push(offer);
+    }
+
+    // Ex.: "1 > Ofertar Renovação Movel, 2 > Ofertar Wifi Pro"
+    const reArrow = /(?:^|[,;]\s*)(\d+)\s*>\s*([^,;]+)/gi;
+    while ((m = reArrow.exec(text)) !== null) {
+      const offer = String(m[2] || '').trim();
+      if (offer) offers.push(offer);
+    }
+
+    // Fallback: sentencas com "Ofertar ..."
+    const reOfertar = /(Ofertar\s+[^.;|]+)/gi;
+    while ((m = reOfertar.exec(text)) !== null) {
+      const offer = String(m[1] || '').trim();
+      if (offer) offers.push(offer);
+    }
+
+    return [...new Set(offers.map(o => o.replace(/\s+/g, ' ').trim()).filter(Boolean))];
+  };
+
+  const ofertaNeedle = normalizeText(ofertaTerm);
+
+  const filterKey = `${searchTerm}||${ofertaNeedle}`;
+  if (window.__clientesGridLastSearch !== filterKey) {
+    window.__clientesGridLastSearch = filterKey;
+    window.__clientesGridPage = 1;
   }
-  if (!window.__clientesGridLimit || window.__clientesGridLimit < pageSize) {
-    window.__clientesGridLimit = pageSize;
+  if (!window.__clientesGridPage || window.__clientesGridPage < 1) {
+    window.__clientesGridPage = 1;
   }
   
   // Filtrar clientes baseado no perfil
@@ -441,6 +482,25 @@ function renderClientesGrid() {
   if (searchTerm) {
     clientesFiltrados = clientesFiltrados.filter(c => (c.nome || '').toLowerCase().includes(searchTerm));
   }
+
+  // Atualiza sugestões de ofertas com base na carteira visível por perfil.
+  const ofertasDataList = document.getElementById('lista-clientes-ofertas');
+  if (ofertasDataList) {
+    const offersSet = new Set();
+    clientesFiltrados.forEach(c => {
+      extractOffersFromObservacao(c.observacao).forEach(o => offersSet.add(o));
+    });
+    const options = Array.from(offersSet).sort((a, b) => a.localeCompare(b, 'pt-BR')).slice(0, 300);
+    ofertasDataList.innerHTML = options.map(o => `<option value="${String(o).replace(/"/g, '&quot;')}"></option>`).join('');
+  }
+
+  if (ofertaNeedle) {
+    clientesFiltrados = clientesFiltrados.filter(c => {
+      const offers = extractOffersFromObservacao(c.observacao);
+      if (offers.some(o => normalizeText(o).includes(ofertaNeedle))) return true;
+      return normalizeText(c.observacao).includes(ofertaNeedle);
+    });
+  }
   
   if (!clientesFiltrados.length) {
     container.innerHTML = '';
@@ -454,8 +514,12 @@ function renderClientesGrid() {
   
   emptyEl.classList.add('hidden');
   const total = clientesFiltrados.length;
-  const limit = Math.min(window.__clientesGridLimit, total);
-  const clientesVisiveis = clientesFiltrados.slice(0, limit);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  if (window.__clientesGridPage > totalPages) window.__clientesGridPage = totalPages;
+  const page = window.__clientesGridPage;
+  const start = (page - 1) * pageSize;
+  const end = Math.min(start + pageSize, total);
+  const clientesVisiveis = clientesFiltrados.slice(start, end);
 
   container.innerHTML = clientesVisiveis.map(cliente => {
     const inicial = cliente.nome ? cliente.nome.charAt(0).toUpperCase() : '?';
@@ -529,20 +593,16 @@ function renderClientesGrid() {
   }).join('');
 
   if (controls) {
-    if (total > limit) {
-      controls.classList.remove('hidden');
-      controls.innerHTML = `
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-lg border border-slate-700 bg-slate-800/40">
-          <p class="text-sm text-slate-300">Exibindo ${limit} de ${total} clientes</p>
-          <button class="btn-clientes-load-more px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-all border border-blue-500/30">
-            Carregar mais ${Math.min(pageSize, total - limit)}
-          </button>
+    controls.classList.remove('hidden');
+    controls.innerHTML = `
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-lg border border-slate-700 bg-slate-800/40">
+        <p class="text-sm text-slate-300">Exibindo ${start + 1}-${end} de ${total} clientes • Página ${page}/${totalPages}</p>
+        <div class="flex items-center gap-2">
+          <button class="btn-clientes-page px-3 py-2 rounded-lg border border-slate-600 text-slate-200 hover:bg-slate-700/60 ${page <= 1 ? 'opacity-40 cursor-not-allowed' : ''}" data-page="${page - 1}" ${page <= 1 ? 'disabled' : ''}>Anterior</button>
+          <button class="btn-clientes-page px-3 py-2 rounded-lg border border-slate-600 text-slate-200 hover:bg-slate-700/60 ${page >= totalPages ? 'opacity-40 cursor-not-allowed' : ''}" data-page="${page + 1}" ${page >= totalPages ? 'disabled' : ''}>Próxima</button>
         </div>
-      `;
-    } else {
-      controls.classList.remove('hidden');
-      controls.innerHTML = `<p class="text-sm text-slate-400">Exibindo ${total} de ${total} clientes</p>`;
-    }
+      </div>
+    `;
   }
 
   if (window.lucide) lucide.createIcons();
