@@ -188,6 +188,17 @@ function mostrarPainelMarketing(painel) {
     history: 'marketing-history-panel',
     templates: 'marketing-templates-panel'
   };
+  const atualizarEstadoAba = (elementId, ativa) => {
+    const elemento = document.getElementById(elementId);
+    if (!elemento) {
+      return;
+    }
+
+    elemento.classList.toggle('border-blue-500', ativa);
+    elemento.classList.toggle('text-white', ativa);
+    elemento.classList.toggle('border-transparent', !ativa);
+    elemento.classList.toggle('text-slate-400', !ativa);
+  };
 
   // Esconder todos
   document.getElementById('marketing-compose-panel').classList.add('hidden');
@@ -200,14 +211,9 @@ function mostrarPainelMarketing(painel) {
   }
 
   // Atualizar abas
-  document.getElementById('marketing-tab-compose').classList.toggle('border-blue-500 text-white', painel === 'compose');
-  document.getElementById('marketing-tab-compose').classList.toggle('border-transparent text-slate-400', painel !== 'compose');
-
-  document.getElementById('marketing-tab-history').classList.toggle('border-blue-500 text-white', painel === 'history');
-  document.getElementById('marketing-tab-history').classList.toggle('border-transparent text-slate-400', painel !== 'history');
-
-  document.getElementById('marketing-tab-templates').classList.toggle('border-blue-500 text-white', painel === 'templates');
-  document.getElementById('marketing-tab-templates').classList.toggle('border-transparent text-slate-400', painel !== 'templates');
+  atualizarEstadoAba('marketing-tab-compose', painel === 'compose');
+  atualizarEstadoAba('marketing-tab-history', painel === 'history');
+  atualizarEstadoAba('marketing-tab-templates', painel === 'templates');
 }
 
 /**
