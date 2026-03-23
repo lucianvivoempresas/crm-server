@@ -130,14 +130,22 @@ function setupLoginListeners() {
 // ============ UI ESTADO ============
 
 function mostraInterfacePrincipal() {
-  document.getElementById('login-container').classList.add('hidden');
+  const loginEl = document.getElementById('login-container');
+  if (loginEl) {
+    loginEl.classList.add('hidden');
+    loginEl.style.display = 'none';
+  }
   document.getElementById('app-header').classList.remove('hidden');
   document.getElementById('app-nav').classList.remove('hidden');
   document.getElementById('app-main').classList.remove('hidden');
 }
 
 function ocultaInterfacePrincipal() {
-  document.getElementById('login-container').classList.remove('hidden');
+  const loginEl = document.getElementById('login-container');
+  if (loginEl) {
+    loginEl.classList.remove('hidden');
+    loginEl.style.display = 'flex';
+  }
   document.getElementById('app-header').classList.add('hidden');
   document.getElementById('app-nav').classList.add('hidden');
   document.getElementById('app-main').classList.add('hidden');
