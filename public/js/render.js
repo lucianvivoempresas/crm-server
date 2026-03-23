@@ -28,18 +28,18 @@ function normalizeOfferText(value) {
 
 function buildClientesOfferIndex() {
   const catalog = [
-    { label: 'Renovacao Movel', patterns: [/renovacao.{0,20}movel/i, /blindagem.{0,20}movel/i] },
-    { label: 'Vivo Tech', patterns: [/vivo\s*tech/i] },
-    { label: 'Wifi Pro', patterns: [/wifi\s*pro/i] },
-    { label: 'Link Dedicado', patterns: [/link\s*dedicado/i, /internet\s*dedicada/i] },
-    { label: 'Vivo Voz Negocio', patterns: [/vivo\s*voz\s*negocio/i, /vvn/i] },
-    { label: 'Banda Larga', patterns: [/banda\s*larga/i, /\b2p\b/i] },
-    { label: 'Microsoft 365', patterns: [/microsoft\s*365/i] },
-    { label: 'Google Workspace', patterns: [/google\s*workspace/i] },
-    { label: 'Antivirus', patterns: [/antivirus/i, /antivirus/i] },
-    { label: 'Gestao de Dispositivo', patterns: [/gestao\s*de\s*dispositivo/i] },
-    { label: 'Aparelhos', patterns: [/aparelho/i, /aparelhos/i] },
-    { label: 'Winback', patterns: [/winback/i] }
+    { label: 'Renovacao Movel', terms: ['renovacao movel', 'renovacao de movel', 'blindagem movel'] },
+    { label: 'Vivo Tech', terms: ['vivo tech'] },
+    { label: 'Wifi Pro', terms: ['wifi pro'] },
+    { label: 'Link Dedicado', terms: ['link dedicado', 'internet dedicada'] },
+    { label: 'Vivo Voz Negocio', terms: ['vivo voz negocio', 'vvn'] },
+    { label: 'Banda Larga', terms: ['banda larga', ' 2p ', ' 2 p '] },
+    { label: 'Microsoft 365', terms: ['microsoft 365'] },
+    { label: 'Google Workspace', terms: ['google workspace'] },
+    { label: 'Antivirus', terms: ['antivirus'] },
+    { label: 'Gestao de Dispositivo', terms: ['gestao de dispositivo'] },
+    { label: 'Aparelhos', terms: ['aparelho', 'aparelhos'] },
+    { label: 'Winback', terms: ['winback'] }
   ];
 
   const byClientId = new Map();
@@ -51,7 +51,7 @@ function buildClientesOfferIndex() {
     const tags = [];
 
     catalog.forEach(item => {
-      if (item.patterns.some(re => re.test(obsRaw))) {
+      if ((item.terms || []).some(term => obsNorm.includes(term))) {
         tags.push(item.label);
         tagCount.set(item.label, (tagCount.get(item.label) || 0) + 1);
       }
