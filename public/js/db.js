@@ -173,3 +173,36 @@ async function deleteData(storeName, id) {
     throw err;
   }
 }
+
+async function bulkUpsertClientes(createRows = [], updateRows = []) {
+  try {
+    const userId = obterIdUsuario();
+    const perfil = obterUsuarioLogado()?.perfil;
+    const headers = { 'Content-Type': 'application/json' };
+    const token = (typeof obterAuthToken === 'function')
+      ? obterAuthToken()
+      : (sessionStorage.getItem('CRM_AUTH_TOKEN') || localStorage.getItem('CRM_AUTH_TOKEN'));
+
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (userId) {
+      headers['X-User-Id'] = userId;
+      headers['X-User-Perfil'] = perfil;
+    }
+
+    const res = await fetch(`${API_URL}/clientes/bulk-upsert`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ create: createRows, update: updateRows })
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || `Falha no bulk-upsert (${res.status})`);
+    }
+
+    return await res.json();
+  } catch (err) {
+    console.error('Erro no bulkUpsertClientes:', err);
+    throw err;
+  }
+}

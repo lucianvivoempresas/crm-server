@@ -1212,6 +1212,9 @@ async function runImportClientes() {
     };
 
     const processedDocs = new Set();
+    const createBatch = [];
+    const updateBatch = [];
+
     for (const row of importRowsCache) {
       const doc = normalizeDoc(mappedOrAlias(row, 'cpfCnpj', ['NR_CNPJ', 'CNPJ', 'CPF/CNPJ', 'CPF']));
       if (!doc) continue;
@@ -1261,20 +1264,10 @@ async function runImportClientes() {
 
       const existing = byDoc.get(doc);
       if (!existing) {
-          // Para importacao feita por master, novos clientes ficam com o master.
-          // Para outros perfis, mantem o comportamento atual de usar o proprio usuario.
           const uid = obterIdUsuario();
-          if (uid) {
-            if (ehMaster()) {
-              clientePayload.vendedor_id = parseInt(uid, 10);
-            } else {
-              clientePayload.vendedor_id = parseInt(uid, 10);
-            }
-          }
-          const newId = await addData('clientes', clientePayload);
-        clientePayload.id = newId;
-        clientes.push(clientePayload);
-        byDoc.set(doc, clientePayload);
+          if (uid) clientePayload.vendedor_id = parseInt(uid, 10);
+        createBatch.push(clientePayload);
+        byDoc.set(doc, { ...clientePayload, id: -1 });
         created++;
       } else if (existing && existing.id) {
         // Cliente já existe - atualizar dados sem duplicar
@@ -1300,14 +1293,25 @@ async function runImportClientes() {
         end.uf = end.uf || clientePayload.endereco.uf;
         merged.importedAt = clientePayload.importedAt;
 
-        // PRESERVAR vendedor_id original - não atribuir cliente existente ao importador
-        // Master verá todos independente; vendedor verá apenas os seus
-        await updateData('clientes', merged);
-        const idx = clientes.findIndex(c => Number(c.id) === Number(merged.id));
-        if (idx >= 0) clientes[idx] = merged;
+        // Preserva vendedor existente; apenas atualiza campos de dados.
+        updateBatch.push({ id: merged.id, payload: merged });
         byDoc.set(doc, merged);
         updated++;
       }
+    }
+
+    // Envia em blocos para evitar milhares de requisições individuais.
+    const chunkSize = 300;
+    let createOffset = 0;
+    let updateOffset = 0;
+    while (createOffset < createBatch.length || updateOffset < updateBatch.length) {
+      const createChunk = createBatch.slice(createOffset, createOffset + chunkSize);
+      const updateChunk = updateBatch.slice(updateOffset, updateOffset + chunkSize);
+      await bulkUpsertClientes(createChunk, updateChunk);
+      createOffset += createChunk.length;
+      updateOffset += updateChunk.length;
+      // Mantém a UI responsiva entre lotes grandes.
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
 
     await renderAll();

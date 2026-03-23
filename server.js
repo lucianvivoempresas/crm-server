@@ -741,6 +741,96 @@ app.delete('/api/usuarios/:id', requireAuth, requireMaster, (req, res) => {
 });
 
 // ============ ROTAS DE DADOS (CLIENTES, VENDAS, ETC) ============
+app.post('/api/clientes/bulk-upsert', requireAuth, (req, res) => {
+    const userId = req.auth.userId;
+    const perfil = req.auth.perfil;
+
+    const createRows = Array.isArray(req.body?.create) ? req.body.create : [];
+    const updateRows = Array.isArray(req.body?.update) ? req.body.update : [];
+
+    if (!createRows.length && !updateRows.length) {
+        return res.json({ success: true, created: 0, updated: 0 });
+    }
+
+    // Proteção simples para evitar payloads gigantes por requisição.
+    if (createRows.length > 1000 || updateRows.length > 1000) {
+        return res.status(400).json({
+            success: false,
+            error: 'Lote muito grande. Envie no máximo 1000 registros por tipo.'
+        });
+    }
+
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION', (beginErr) => {
+            if (beginErr) return res.status(500).json({ success: false, error: beginErr.message });
+
+            const totalOps = createRows.length + updateRows.length;
+            let pending = totalOps;
+            let created = 0;
+            let updated = 0;
+            let failed = false;
+
+            const rollbackAndRespond = (err) => {
+                if (failed) return;
+                failed = true;
+                db.run('ROLLBACK', () => {
+                    res.status(500).json({ success: false, error: err.message || String(err) });
+                });
+            };
+
+            const finishOne = () => {
+                if (failed) return;
+                pending -= 1;
+                if (pending > 0) return;
+
+                db.run('COMMIT', (commitErr) => {
+                    if (commitErr) return rollbackAndRespond(commitErr);
+                    return res.json({ success: true, created, updated });
+                });
+            };
+
+            const normalizeForWrite = (payload) => {
+                const normalized = normalizarVendedorId({ ...(payload || {}) });
+                if (userId && perfil !== 'master') {
+                    normalized.vendedor_id = parseInt(userId, 10);
+                }
+                return normalized;
+            };
+
+            createRows.forEach((row) => {
+                const normalized = normalizeForWrite(row);
+                db.run(
+                    'INSERT INTO documents (collection, payload) VALUES (?, ?)',
+                    ['clientes', JSON.stringify(normalized)],
+                    function(insertErr) {
+                        if (insertErr) return rollbackAndRespond(insertErr);
+                        created += 1;
+                        finishOne();
+                    }
+                );
+            });
+
+            updateRows.forEach((row) => {
+                const id = Number(row?.id);
+                if (!Number.isFinite(id) || id <= 0) {
+                    return rollbackAndRespond(new Error('Registro de update sem id válido.'));
+                }
+
+                const normalized = normalizeForWrite(row?.payload);
+                db.run(
+                    'UPDATE documents SET payload = ? WHERE collection = ? AND id = ?',
+                    [JSON.stringify(normalized), 'clientes', id],
+                    function(updateErr) {
+                        if (updateErr) return rollbackAndRespond(updateErr);
+                        updated += 1;
+                        finishOne();
+                    }
+                );
+            });
+        });
+    });
+});
+
 app.get('/api/:collection', requireAuth, (req, res) => {
     const collection = req.params.collection;
     const userId = req.auth.userId;
