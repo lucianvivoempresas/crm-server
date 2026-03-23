@@ -643,8 +643,14 @@ function setupEventListeners() {
 
   // == EVENTOS DINÂMICOS (TABELAS E CARDS) ==
   document.body.addEventListener('click', async (e) => {
-    const target = e.target.closest('.btn-edit, .btn-delete, .btn-view-profile, .btn-dismiss-lembrete, .btn-toggle-observacao');
+    const target = e.target.closest('.btn-edit, .btn-delete, .btn-view-profile, .btn-dismiss-lembrete, .btn-toggle-observacao, .btn-clientes-load-more');
     if (!target) return;
+
+    if (target.classList.contains('btn-clientes-load-more')) {
+      window.__clientesGridLimit = Number(window.__clientesGridLimit || 120) + 120;
+      renderClientesGrid();
+      return;
+    }
 
     if (target.classList.contains('btn-toggle-observacao')) {
       const targetId = target.dataset.target;

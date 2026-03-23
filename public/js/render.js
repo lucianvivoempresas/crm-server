@@ -415,8 +415,18 @@ function renderVendasTable() {
 
 function renderClientesGrid() {
   const container = document.getElementById('clientes-grid-container');
+  const controls = document.getElementById('clientes-grid-controls');
   const emptyEl = document.getElementById('clientes-grid-empty');
   const searchTerm = (document.getElementById('search-clientes')?.value || '').toLowerCase().trim();
+  const pageSize = 120;
+
+  if (window.__clientesGridLastSearch !== searchTerm) {
+    window.__clientesGridLastSearch = searchTerm;
+    window.__clientesGridLimit = pageSize;
+  }
+  if (!window.__clientesGridLimit || window.__clientesGridLimit < pageSize) {
+    window.__clientesGridLimit = pageSize;
+  }
   
   // Filtrar clientes baseado no perfil
   let clientesFiltrados = clientes;
@@ -432,10 +442,22 @@ function renderClientesGrid() {
     clientesFiltrados = clientesFiltrados.filter(c => (c.nome || '').toLowerCase().includes(searchTerm));
   }
   
-  if (!clientesFiltrados.length) { container.innerHTML = ''; emptyEl.classList.remove('hidden'); return; }
+  if (!clientesFiltrados.length) {
+    container.innerHTML = '';
+    if (controls) {
+      controls.innerHTML = '';
+      controls.classList.add('hidden');
+    }
+    emptyEl.classList.remove('hidden');
+    return;
+  }
   
   emptyEl.classList.add('hidden');
-  container.innerHTML = clientesFiltrados.map(cliente => {
+  const total = clientesFiltrados.length;
+  const limit = Math.min(window.__clientesGridLimit, total);
+  const clientesVisiveis = clientesFiltrados.slice(0, limit);
+
+  container.innerHTML = clientesVisiveis.map(cliente => {
     const inicial = cliente.nome ? cliente.nome.charAt(0).toUpperCase() : '?';
     const observacao = String(cliente.observacao || '').trim();
     const observacaoEscaped = String(observacao)
@@ -505,6 +527,24 @@ function renderClientesGrid() {
       </div>
     `;
   }).join('');
+
+  if (controls) {
+    if (total > limit) {
+      controls.classList.remove('hidden');
+      controls.innerHTML = `
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-lg border border-slate-700 bg-slate-800/40">
+          <p class="text-sm text-slate-300">Exibindo ${limit} de ${total} clientes</p>
+          <button class="btn-clientes-load-more px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 transition-all border border-blue-500/30">
+            Carregar mais ${Math.min(pageSize, total - limit)}
+          </button>
+        </div>
+      `;
+    } else {
+      controls.classList.remove('hidden');
+      controls.innerHTML = `<p class="text-sm text-slate-400">Exibindo ${total} de ${total} clientes</p>`;
+    }
+  }
+
   if (window.lucide) lucide.createIcons();
 }
 
