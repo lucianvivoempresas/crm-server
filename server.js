@@ -424,27 +424,34 @@ function criarUsuariosPadroes() {
             perfil: 'vendedor'
         }
     ];
-    
-    usuarios.forEach(user => {
-        db.get(
-            'SELECT id FROM usuarios WHERE email = ?',
-            [user.email],
-            (err, row) => {
-                if (!row) {
-                    db.run(
-                        'INSERT INTO usuarios (nome, email, senha, perfil) VALUES (?, ?, ?, ?)',
-                        [user.nome, user.email, user.senha, user.perfil],
-                        function(err) {
-                            if (err) {
-                                console.error(`❌ Erro ao criar usuário ${user.email}:`, err.message);
-                            } else {
-                                console.log(`✅ Usuário criado: ${user.email} (${user.perfil})`);
-                            }
-                        }
-                    );
+
+    // Evita recriar usuários padrão em cada reinício.
+    // Só semeia a base na primeira execução (tabela vazia).
+    db.get('SELECT COUNT(*) AS total FROM usuarios', [], (countErr, row) => {
+        if (countErr) {
+            console.error('❌ Erro ao verificar seed de usuários:', countErr.message);
+            return;
+        }
+
+        const totalUsuarios = Number(row?.total || 0);
+        if (totalUsuarios > 0) {
+            console.log('ℹ️ Seed de usuários padrão ignorado: tabela já possui usuários cadastrados.');
+            return;
+        }
+
+        usuarios.forEach(user => {
+            db.run(
+                'INSERT INTO usuarios (nome, email, senha, perfil) VALUES (?, ?, ?, ?)',
+                [user.nome, user.email, user.senha, user.perfil],
+                function(err) {
+                    if (err) {
+                        console.error(`❌ Erro ao criar usuário ${user.email}:`, err.message);
+                    } else {
+                        console.log(`✅ Usuário criado: ${user.email} (${user.perfil})`);
+                    }
                 }
-            }
-        );
+            );
+        });
     });
 }
 
