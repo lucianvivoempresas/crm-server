@@ -1,10 +1,54 @@
 const express = require('express');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-require('dotenv').config();
 const nodemailer = require('nodemailer');
+
+function carregarEnvLocal() {
+    const envPath = path.join(__dirname, '.env');
+
+    if (!fs.existsSync(envPath)) {
+        return;
+    }
+
+    try {
+        const conteudo = fs.readFileSync(envPath, 'utf8');
+        conteudo.split(/\r?\n/).forEach((linha) => {
+            const texto = linha.trim();
+
+            if (!texto || texto.startsWith('#')) {
+                return;
+            }
+
+            const separadorIndex = texto.indexOf('=');
+            if (separadorIndex <= 0) {
+                return;
+            }
+
+            const chave = texto.slice(0, separadorIndex).trim();
+            let valor = texto.slice(separadorIndex + 1).trim();
+
+            if (!chave || process.env[chave] !== undefined) {
+                return;
+            }
+
+            if (
+                (valor.startsWith('"') && valor.endsWith('"')) ||
+                (valor.startsWith("'") && valor.endsWith("'"))
+            ) {
+                valor = valor.slice(1, -1);
+            }
+
+            process.env[chave] = valor;
+        });
+    } catch (error) {
+        console.warn('⚠️ Falha ao carregar .env local:', error.message);
+    }
+}
+
+carregarEnvLocal();
 
 const app = express();
 
