@@ -4,6 +4,7 @@ async function renderAll() {
     [clientes, vendas, comissoes, metas] = await Promise.all([
       getAllData('clientes'), getAllData('vendas'), getAllData('comissoes'), getAllData('metas')
     ]);
+    window.__clientesDataVersion = Date.now();
     renderDashboard();
     renderVendasTable();
     renderClientesGrid();
@@ -15,6 +16,74 @@ async function renderAll() {
     }
     updateDynamicSelects();
   } catch (err) { console.error(err); }
+}
+
+function normalizeOfferText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function buildClientesOfferIndex() {
+  const catalog = [
+    { label: 'Renovacao Movel', patterns: [/renovacao.{0,20}movel/i, /blindagem.{0,20}movel/i] },
+    { label: 'Vivo Tech', patterns: [/vivo\s*tech/i] },
+    { label: 'Wifi Pro', patterns: [/wifi\s*pro/i] },
+    { label: 'Link Dedicado', patterns: [/link\s*dedicado/i, /internet\s*dedicada/i] },
+    { label: 'Vivo Voz Negocio', patterns: [/vivo\s*voz\s*negocio/i, /vvn/i] },
+    { label: 'Banda Larga', patterns: [/banda\s*larga/i, /\b2p\b/i] },
+    { label: 'Microsoft 365', patterns: [/microsoft\s*365/i] },
+    { label: 'Google Workspace', patterns: [/google\s*workspace/i] },
+    { label: 'Antivirus', patterns: [/antivirus/i, /antivirus/i] },
+    { label: 'Gestao de Dispositivo', patterns: [/gestao\s*de\s*dispositivo/i] },
+    { label: 'Aparelhos', patterns: [/aparelho/i, /aparelhos/i] },
+    { label: 'Winback', patterns: [/winback/i] }
+  ];
+
+  const byClientId = new Map();
+  const tagCount = new Map();
+
+  (clientes || []).forEach(c => {
+    const obsRaw = repairTextArtifacts(c?.observacao || '');
+    const obsNorm = normalizeOfferText(obsRaw);
+    const tags = [];
+
+    catalog.forEach(item => {
+      if (item.patterns.some(re => re.test(obsRaw))) {
+        tags.push(item.label);
+        tagCount.set(item.label, (tagCount.get(item.label) || 0) + 1);
+      }
+    });
+
+    const tagsNorm = tags.map(normalizeOfferText);
+    const searchBlob = `${obsNorm} ${tagsNorm.join(' ')}`.trim();
+
+    byClientId.set(Number(c.id), {
+      tags,
+      tagsNorm,
+      searchBlob
+    });
+  });
+
+  const tags = Array.from(tagCount.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'pt-BR'))
+    .map(([name]) => name);
+
+  window.__clientesOfferIndexCache = {
+    version: window.__clientesDataVersion,
+    byClientId,
+    tags
+  };
+
+  return window.__clientesOfferIndexCache;
+}
+
+function getClientesOfferIndex() {
+  const cache = window.__clientesOfferIndexCache;
+  if (cache && cache.version === window.__clientesDataVersion) return cache;
+  return buildClientesOfferIndex();
 }
 
 function renderDashboard() {
@@ -421,44 +490,8 @@ function renderClientesGrid() {
   const ofertaTerm = (document.getElementById('filter-clientes-oferta')?.value || '').trim();
   const pageSize = 120;
 
-  const normalizeText = (v) => String(v || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-
-  const extractOffersFromObservacao = (obs) => {
-    const text = String(obs || '').replace(/\s+/g, ' ').trim();
-    if (!text) return [];
-
-    const offers = [];
-    let m;
-
-    // Ex.: "1ª Oferta -> Renovação ... /// 2ª Oferta -> Wifi Pro ..."
-    const reOferta = /(\d+\s*[ºoª]?\s*oferta\s*->\s*)(.*?)(?=(?:\/\/\/|\d+\s*[ºoª]?\s*oferta\s*->|$))/gi;
-    while ((m = reOferta.exec(text)) !== null) {
-      const offer = String(m[2] || '').trim();
-      if (offer) offers.push(offer);
-    }
-
-    // Ex.: "1 > Ofertar Renovação Movel, 2 > Ofertar Wifi Pro"
-    const reArrow = /(?:^|[,;]\s*)(\d+)\s*>\s*([^,;]+)/gi;
-    while ((m = reArrow.exec(text)) !== null) {
-      const offer = String(m[2] || '').trim();
-      if (offer) offers.push(offer);
-    }
-
-    // Fallback: sentencas com "Ofertar ..."
-    const reOfertar = /(Ofertar\s+[^.;|]+)/gi;
-    while ((m = reOfertar.exec(text)) !== null) {
-      const offer = String(m[1] || '').trim();
-      if (offer) offers.push(offer);
-    }
-
-    return [...new Set(offers.map(o => o.replace(/\s+/g, ' ').trim()).filter(Boolean))];
-  };
-
-  const ofertaNeedle = normalizeText(ofertaTerm);
+  const offerIndex = getClientesOfferIndex();
+  const ofertaNeedle = normalizeOfferText(ofertaTerm);
 
   const filterKey = `${searchTerm}||${ofertaNeedle}`;
   if (window.__clientesGridLastSearch !== filterKey) {
@@ -487,18 +520,21 @@ function renderClientesGrid() {
   const ofertasDataList = document.getElementById('lista-clientes-ofertas');
   if (ofertasDataList) {
     const offersSet = new Set();
-    clientesFiltrados.forEach(c => {
-      extractOffersFromObservacao(c.observacao).forEach(o => offersSet.add(o));
+    const visibleIds = new Set(clientesFiltrados.map(c => Number(c.id)));
+    (offerIndex.tags || []).forEach(tag => offersSet.add(tag));
+    offerIndex.byClientId.forEach((entry, clientId) => {
+      if (!visibleIds.has(clientId)) return;
+      (entry.tags || []).forEach(tag => offersSet.add(tag));
     });
-    const options = Array.from(offersSet).sort((a, b) => a.localeCompare(b, 'pt-BR')).slice(0, 300);
+    const options = Array.from(offersSet).sort((a, b) => a.localeCompare(b, 'pt-BR')).slice(0, 80);
     ofertasDataList.innerHTML = options.map(o => `<option value="${String(o).replace(/"/g, '&quot;')}"></option>`).join('');
   }
 
   if (ofertaNeedle) {
     clientesFiltrados = clientesFiltrados.filter(c => {
-      const offers = extractOffersFromObservacao(c.observacao);
-      if (offers.some(o => normalizeText(o).includes(ofertaNeedle))) return true;
-      return normalizeText(c.observacao).includes(ofertaNeedle);
+      const entry = offerIndex.byClientId.get(Number(c.id));
+      if (!entry) return false;
+      return entry.searchBlob.includes(ofertaNeedle);
     });
   }
   

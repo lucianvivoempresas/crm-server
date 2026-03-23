@@ -565,11 +565,24 @@ function setupEventListeners() {
   const elFilterMonth = document.getElementById('filter-vendas-month');
   if (elFilterMonth) elFilterMonth.onchange = renderVendasTable;
 
+  const debounce = (fn, wait = 180) => {
+    let timer = null;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), wait);
+    };
+  };
+
+  const debouncedRenderClientes = debounce(renderClientesGrid, 180);
+
   const elSearchClientes = document.getElementById('search-clientes');
-  if (elSearchClientes) elSearchClientes.oninput = renderClientesGrid;
+  if (elSearchClientes) elSearchClientes.oninput = debouncedRenderClientes;
 
   const elFilterClientesOferta = document.getElementById('filter-clientes-oferta');
-  if (elFilterClientesOferta) elFilterClientesOferta.oninput = renderClientesGrid;
+  if (elFilterClientesOferta) {
+    elFilterClientesOferta.oninput = debouncedRenderClientes;
+    elFilterClientesOferta.onfocus = renderClientesGrid;
+  }
 
   const btnClearClientesFilters = document.getElementById('btn-clear-clientes-filters');
   if (btnClearClientesFilters) {
