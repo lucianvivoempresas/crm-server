@@ -643,8 +643,32 @@ function setupEventListeners() {
 
   // == EVENTOS DINÂMICOS (TABELAS E CARDS) ==
   document.body.addEventListener('click', async (e) => {
-    const target = e.target.closest('.btn-edit, .btn-delete, .btn-view-profile, .btn-dismiss-lembrete');
+    const target = e.target.closest('.btn-edit, .btn-delete, .btn-view-profile, .btn-dismiss-lembrete, .btn-toggle-observacao');
     if (!target) return;
+
+    if (target.classList.contains('btn-toggle-observacao')) {
+      const targetId = target.dataset.target;
+      const expanded = target.dataset.expanded === 'true';
+      const textEl = targetId ? document.getElementById(targetId) : null;
+      if (!textEl) return;
+
+      if (expanded) {
+        textEl.style.display = '-webkit-box';
+        textEl.style.webkitLineClamp = '3';
+        textEl.style.webkitBoxOrient = 'vertical';
+        textEl.style.overflow = 'hidden';
+        target.dataset.expanded = 'false';
+        target.textContent = 'Ver mais';
+      } else {
+        textEl.style.display = 'block';
+        textEl.style.webkitLineClamp = '';
+        textEl.style.webkitBoxOrient = '';
+        textEl.style.overflow = 'visible';
+        target.dataset.expanded = 'true';
+        target.textContent = 'Ver menos';
+      }
+      return;
+    }
     
     if (target.classList.contains('btn-edit')) {
       showModal(target.dataset.type, target.dataset.id);
@@ -1151,8 +1175,8 @@ async function runImportClientes() {
       const doc = normalizeDoc(mappedOrAlias(row, 'cpfCnpj', ['NR_CNPJ', 'CNPJ', 'CPF/CNPJ', 'CPF']));
       if (!doc) continue;
 
-      const tipoProduto = firstNonEmpty(row, ['TP_PRODUTO', 'TIPO_PRODUTO', 'TIPO PRODUTO']);
-      const qtMovelDireto = firstNonEmpty(row, ['QT_MOVEL', 'QTD_MOVEL', 'QNT_MOVEL']);
+      const tipoProduto = mappedOrAlias(row, 'tipoProduto', ['TP_PRODUTO', 'TIPO_PRODUTO', 'TIPO PRODUTO']);
+      const qtMovelDireto = mappedOrAlias(row, 'qtMovel', ['QT_MOVEL', 'QTD_MOVEL', 'QNT_MOVEL']);
       const qtMovel = qtMovelDireto
         ? toIntSafe(qtMovelDireto)
         : (
@@ -1161,7 +1185,7 @@ async function runImportClientes() {
             toIntSafe(firstNonEmpty(row, ['QT_MOVEL_M2M'])) +
             toIntSafe(firstNonEmpty(row, ['QT_MOVEL_FWT']))
           );
-      const quantidadeBasicaBL = toIntSafe(firstNonEmpty(row, ['QT_BASICA_BL', 'QNT_BASICA_BL', 'QTD_BASICA_BL']));
+      const quantidadeBasicaBL = toIntSafe(mappedOrAlias(row, 'quantidadeBasicaBL', ['QT_BASICA_BL', 'QNT_BASICA_BL', 'QTD_BASICA_BL']));
       const nomeContatoSFA = firstNonEmpty(row, ['NM_CONTATO_SFA', 'NOME_CONTATO_SFA', 'NOME CONTATO SFA']);
       const observacaoImportada = firstNonEmpty(row, ['RECOMENDACAO', 'OBSERVACAO', 'OBS', 'BQ']);
 

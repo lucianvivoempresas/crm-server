@@ -80,6 +80,9 @@ const importMappings = {
   uf: document.getElementById('map-uf'),
   contaContrato: document.getElementById('map-contaContrato'),
   dataNascimento: document.getElementById('map-dataNascimento'),
+  tipoProduto: document.getElementById('map-tipoProduto'),
+  qtMovel: document.getElementById('map-qtMovel'),
+  quantidadeBasicaBL: document.getElementById('map-quantidadeBasicaBL'),
 };
 
 // Variáveis para importação de vendas

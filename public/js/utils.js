@@ -145,6 +145,9 @@ function autoMapHeaders(headers) {
     uf: pick('UF','Estado'),
     contaContrato: pick('Conta Contrato','Instalação','Instalacao','Conta'),
     dataNascimento: pick('Data Nascimento','Nascimento'),
+    tipoProduto: pick('TP_PRODUTO','TIPO_PRODUTO','TIPO PRODUTO'),
+    qtMovel: pick('QT_MOVEL','QTD_MOVEL','QNT_MOVEL','QT_MOVEL_TERM'),
+    quantidadeBasicaBL: pick('QT_BASICA_BL','QTD_BASICA_BL','QNT_BASICA_BL'),
   };
 }
 

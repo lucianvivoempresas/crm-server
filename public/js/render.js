@@ -438,6 +438,17 @@ function renderClientesGrid() {
   container.innerHTML = clientesFiltrados.map(cliente => {
     const inicial = cliente.nome ? cliente.nome.charAt(0).toUpperCase() : '?';
     const observacao = String(cliente.observacao || '').trim();
+    const observacaoEscaped = String(observacao)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    const tipoProduto = String(cliente.tipoProduto || '').trim();
+    const qtMovel = Number.isFinite(Number(cliente.qtMovel)) ? String(Number(cliente.qtMovel)) : '';
+    const quantidadeBasicaBL = Number.isFinite(Number(cliente.quantidadeBasicaBL)) ? String(Number(cliente.quantidadeBasicaBL)) : '';
+    const obsTargetId = `cliente-observacao-${cliente.id}`;
+    const shouldClampObs = observacao.length > 220;
     // para master, mostrar nome do vendedor responsável
     const user = obterUsuarioLogado();
     let vendorInfo = '';
@@ -471,10 +482,25 @@ function renderClientesGrid() {
           <p>Aniversário: ${formatDate(cliente.dataNascimento)}</p>
           ${vendorInfo}
         </div>
+        <div class="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div class="rounded-lg border border-slate-700 bg-slate-900/30 p-2">
+            <p class="text-[11px] uppercase tracking-wide text-slate-400">TP Produto</p>
+            <p class="text-sm text-slate-200 truncate">${tipoProduto || 'N/A'}</p>
+          </div>
+          <div class="rounded-lg border border-slate-700 bg-slate-900/30 p-2">
+            <p class="text-[11px] uppercase tracking-wide text-slate-400">Qnt Móvel</p>
+            <p class="text-sm text-slate-200">${qtMovel || '0'}</p>
+          </div>
+          <div class="rounded-lg border border-slate-700 bg-slate-900/30 p-2">
+            <p class="text-[11px] uppercase tracking-wide text-slate-400">Qnt Básica BL</p>
+            <p class="text-sm text-slate-200">${quantidadeBasicaBL || '0'}</p>
+          </div>
+        </div>
         ${observacao ? `
         <div class="mt-3 rounded-lg border border-slate-700 bg-slate-900/40 p-3">
           <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Observação</p>
-          <p class="text-sm text-slate-200 whitespace-pre-wrap">${observacao}</p>
+          <p id="${obsTargetId}" class="text-sm text-slate-200 whitespace-pre-wrap" ${shouldClampObs ? 'style="display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;"' : ''}>${observacaoEscaped}</p>
+          ${shouldClampObs ? `<button class="btn-toggle-observacao mt-2 text-xs text-cyan-300 hover:text-cyan-200" data-target="${obsTargetId}" data-expanded="false">Ver mais</button>` : ''}
         </div>` : ''}
       </div>
     `;
