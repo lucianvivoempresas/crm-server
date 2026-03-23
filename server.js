@@ -3,6 +3,7 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 const crypto = require('crypto');
+require('dotenv').config();
 const nodemailer = require('nodemailer');
 
 const app = express();
@@ -104,6 +105,18 @@ const db = new sqlite3.Database('./crm_database.sqlite', (err) => {
     else console.log('Conectado ao banco SQLite com sucesso!');
 });
 
+function dbRunAsync(sql, params = []) {
+    return new Promise((resolve, reject) => {
+        db.run(sql, params, function(err) {
+            if (err) {
+                reject(err);
+                return;
+            }
+            resolve(this);
+        });
+    });
+}
+
 // ============ FUNÇÕES UTILITÁRIAS DE SEGURANÇA ============
 
 /**
@@ -130,6 +143,28 @@ function parsePayloadSeguro(payload, collection, id) {
         console.error(`❌ JSON inválido em ${collection} (id=${id}):`, err.message);
         return null;
     }
+}
+
+function parseEnvInt(value, fallback) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function delay(ms) {
+    if (!ms || ms <= 0) {
+        return Promise.resolve();
+    }
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function montarHtmlEmailMarketing(corpo) {
+    return `
+        <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+            <p>${corpo.replace(/\n/g, '<br>')}</p>
+            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
+            <p style="color: #999; font-size: 12px;">Este é um email de marketing. Não responda este email.</p>
+        </div>
+    `;
 }
 
 /**
@@ -1022,24 +1057,37 @@ let emailTransporter = null;
 
 // Função para configurar email
 function configurarEmail() {
-    // IMPORTANTE: Configure com suas credenciais reais!
-    // Para desenvolvimento, você pode usar uma conta Gmail com "Senha de App"
-    
+    const smtpHost = process.env.SMTP_HOST;
+    const smtpPort = parseEnvInt(process.env.SMTP_PORT, 587);
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+
+    if (!smtpHost || !smtpUser || !smtpPass) {
+        emailTransporter = null;
+        console.warn('⚠️  Email não configurado. Defina SMTP_HOST, SMTP_PORT, SMTP_USER e SMTP_PASS no arquivo .env ou no ambiente.');
+        return;
+    }
+
     emailTransporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: process.env.SMTP_PORT || 587,
-        secure: false,
+        pool: true,
+        maxConnections: parseEnvInt(process.env.SMTP_MAX_CONNECTIONS, 5),
+        maxMessages: parseEnvInt(process.env.SMTP_MAX_MESSAGES, 100),
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
         auth: {
-            user: process.env.SMTP_USER || 'seu-email@gmail.com',
-            pass: process.env.SMTP_PASS || 'sua-senha-app-google'
-        }
+            user: smtpUser,
+            pass: smtpPass
+        },
+        rateDelta: parseEnvInt(process.env.SMTP_RATE_DELTA_MS, 1000),
+        rateLimit: parseEnvInt(process.env.SMTP_RATE_LIMIT, 20)
     });
 
     // Verificar conexão
     emailTransporter.verify((error, success) => {
         if (error) {
             console.warn('⚠️  Email não configurado corretamente:', error.message);
-            console.log('ℹ️  Configure as variáveis: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS');
+            console.log('ℹ️  Revise as variáveis: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS');
         } else {
             console.log('✅ Servidor de email configurado com sucesso');
         }
@@ -1055,17 +1103,21 @@ configurarEmail();
  * POST /api/marketing/enviar-emails
  * Enviar emails de marketing para clientes
  */
-app.post('/api/marketing/enviar-emails', requireAuth, (req, res) => {
+app.post('/api/marketing/enviar-emails', requireAuth, async (req, res) => {
     const { assunto, corpo, clientes } = req.body;
     const usuario_id = req.auth.userId;
 
-    console.log(`📧 Enviando ${clientes.length} emails de marketing...`);
+    const clientesValidos = Array.isArray(clientes)
+        ? clientes.filter(cliente => cliente && typeof cliente.email === 'string' && cliente.email.includes('@'))
+        : [];
+
+    console.log(`📧 Preparando envio de ${clientesValidos.length} emails de marketing...`);
 
     // Validar entrada
-    if (!assunto || !corpo || !clientes || clientes.length === 0) {
+    if (!assunto || !corpo || clientesValidos.length === 0) {
         return res.json({
             success: false,
-            error: 'Assunto, corpo e clientes são obrigatórios'
+            error: 'Assunto, corpo e ao menos um cliente com email válido são obrigatórios'
         });
     }
 
@@ -1076,81 +1128,76 @@ app.post('/api/marketing/enviar-emails', requireAuth, (req, res) => {
         });
     }
 
-    // Registrar campanha no banco
-    db.run(
-        'INSERT INTO email_campanhas (usuario_id, assunto, corpo, total_destinos, status) VALUES (?, ?, ?, ?, ?)',
-        [usuario_id, assunto, corpo, clientes.length, 'enviado'],
-        function(err) {
-            if (err) {
-                console.error('❌ Erro ao registrar campanha:', err.message);
-                return res.json({
-                    success: false,
-                    error: 'Erro ao registrar campanha'
-                });
-            }
+    try {
+        const campanha = await dbRunAsync(
+            'INSERT INTO email_campanhas (usuario_id, assunto, corpo, total_destinos, status) VALUES (?, ?, ?, ?, ?)',
+            [usuario_id, assunto, corpo, clientesValidos.length, 'processando']
+        );
 
-            const campanhaId = this.lastID;
-            let enviados = 0;
-            let falhados = 0;
+        const campanhaId = campanha.lastID;
+        const batchSize = parseEnvInt(process.env.EMAIL_BATCH_SIZE, 10);
+        const batchDelayMs = parseEnvInt(process.env.EMAIL_BATCH_DELAY_MS, 250);
+        const remetente = process.env.SMTP_FROM || process.env.SMTP_USER;
+        let enviados = 0;
+        let falhados = 0;
 
-            // Enviar emails
-            clientes.forEach(cliente => {
+        for (let inicio = 0; inicio < clientesValidos.length; inicio += batchSize) {
+            const lote = clientesValidos.slice(inicio, inicio + batchSize);
+
+            await Promise.all(lote.map(async (cliente) => {
                 const corpoPersonalizado = corpo.replace(/{{nome}}/g, cliente.nome || 'Cliente');
-
                 const mailOptions = {
-                    from: process.env.SMTP_USER || 'seu-email@gmail.com',
+                    from: remetente,
                     to: cliente.email,
                     subject: assunto,
                     text: corpoPersonalizado,
-                    html: `
-                        <div style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-                            <p>${corpoPersonalizado.replace(/\n/g, '<br>')}</p>
-                            <hr style="border: none; border-top: 1px solid #ddd; margin: 20px 0;">
-                            <p style="color: #999; font-size: 12px;">Este é um email de marketing. Não responda este email.</p>
-                        </div>
-                    `
+                    html: montarHtmlEmailMarketing(corpoPersonalizado)
                 };
 
-                // Enviar email de forma assíncrona
-                emailTransporter.sendMail(mailOptions, (error, info) => {
-                    if (error) {
-                        console.warn(`❌ Erro ao enviar email para ${cliente.email}:`, error.message);
-                        falhados++;
-                        
-                        // Registrar falha no log
-                        db.run(
-                            'INSERT INTO email_logs (campanha_id, cliente_id, email_destinatario, nome_cliente, status, erro_mensagem) VALUES (?, ?, ?, ?, ?, ?)',
-                            [campanhaId, cliente.id || null, cliente.email, cliente.nome, 'erro', error.message]
-                        );
-                    } else {
-                        console.log(`✅ Email enviado para ${cliente.email}`);
-                        enviados++;
-                        
-                        // Registrar sucesso no log
-                        db.run(
-                            'INSERT INTO email_logs (campanha_id, cliente_id, email_destinatario, nome_cliente, status) VALUES (?, ?, ?, ?, ?)',
-                            [campanhaId, cliente.id || null, cliente.email, cliente.nome, 'enviado']
-                        );
-                    }
-                });
-            });
+                try {
+                    await emailTransporter.sendMail(mailOptions);
+                    enviados += 1;
+                    await dbRunAsync(
+                        'INSERT INTO email_logs (campanha_id, cliente_id, email_destinatario, nome_cliente, status) VALUES (?, ?, ?, ?, ?)',
+                        [campanhaId, cliente.id || null, cliente.email, cliente.nome, 'enviado']
+                    );
+                    console.log(`✅ Email enviado para ${cliente.email}`);
+                } catch (error) {
+                    falhados += 1;
+                    await dbRunAsync(
+                        'INSERT INTO email_logs (campanha_id, cliente_id, email_destinatario, nome_cliente, status, erro_mensagem) VALUES (?, ?, ?, ?, ?, ?)',
+                        [campanhaId, cliente.id || null, cliente.email, cliente.nome, 'erro', error.message]
+                    );
+                    console.warn(`❌ Erro ao enviar email para ${cliente.email}:`, error.message);
+                }
+            }));
 
-            // Atualizar total de enviados
-            setTimeout(() => {
-                db.run(
-                    'UPDATE email_campanhas SET total_enviados = ? WHERE id = ?',
-                    [enviados, campanhaId]
-                );
-            }, 1000);
-
-            res.json({
-                success: true,
-                enviados: clientes.length,
-                campanha_id: campanhaId,
-                mensagem: `Iniciado envio de ${clientes.length} email(s). Você receberá uma confirmação em breve.`
-            });
+            if (inicio + batchSize < clientesValidos.length) {
+                await delay(batchDelayMs);
+            }
         }
-    );
+
+        const statusCampanha = falhados === 0 ? 'enviado' : enviados > 0 ? 'parcial' : 'erro';
+
+        await dbRunAsync(
+            'UPDATE email_campanhas SET total_enviados = ?, status = ? WHERE id = ?',
+            [enviados, statusCampanha, campanhaId]
+        );
+
+        res.json({
+            success: true,
+            enviados,
+            falhados,
+            campanha_id: campanhaId,
+            mensagem: `Envio concluído: ${enviados} enviado(s) e ${falhados} falha(s).`
+        });
+    } catch (err) {
+        console.error('❌ Erro ao processar campanha de email:', err.message);
+        res.json({
+            success: false,
+            error: 'Erro ao processar campanha de email'
+        });
+    }
 });
 
 /**
