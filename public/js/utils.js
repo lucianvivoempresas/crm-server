@@ -132,16 +132,16 @@ function fillSelectOptions(selectEl, headers, preferred) {
 function autoMapHeaders(headers) {
   const pick = (...cands) => cands.find(c => headers.includes(c)) || '';
   return {
-    cpfCnpj: pick('CPF/CNPJ','CPF','CNPJ'),
-    nome: pick('Razão Social','Nome Contato','Nome'),
-    telefone: pick('Celular','Telefone Comercial','Telefone'),
-    email: pick('Email','E-mail'),
-    cep: pick('CEP'),
-    logradouro: pick('Logradouro','Endereço','Endereco'),
+    cpfCnpj: pick('CPF/CNPJ','CPF','CNPJ','NR_CNPJ'),
+    nome: pick('Razão Social','Nome Contato','Nome','NM_CLIENTE'),
+    telefone: pick('Celular','Telefone Comercial','Telefone','CELULAR_CONTATO_PRINCIPAL_SFA','TEL_CELULAR_SIEBEL','TEL_COMERCIAL_SIEBEL','TLFN_1'),
+    email: pick('Email','E-mail','EMAIL_CONTATO_PRINCIPAL_SFA','EMAIL_SIEBEL'),
+    cep: pick('CEP','NR_CEP'),
+    logradouro: pick('Logradouro','Endereço','Endereco','DS_ENDERECO'),
     numero: pick('Número','Numero'),
     complemento: pick('Complemento'),
     bairro: pick('Bairro'),
-    cidade: pick('Cidade'),
+    cidade: pick('Cidade','DS_CIDADE'),
     uf: pick('UF','Estado'),
     contaContrato: pick('Conta Contrato','Instalação','Instalacao','Conta'),
     dataNascimento: pick('Data Nascimento','Nascimento'),

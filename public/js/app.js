@@ -1125,24 +1125,65 @@ async function runImportClientes() {
 
     let created = 0, updated = 0, duplicated = 0;
     const newClients = [];
+
+    const cleanCellValue = (value) => String(value ?? '').replace(/\u0000/g, '').trim();
+    const firstNonEmpty = (row, aliases = []) => {
+      for (const key of aliases) {
+        if (!Object.prototype.hasOwnProperty.call(row, key)) continue;
+        const val = cleanCellValue(row[key]);
+        if (val) return val;
+      }
+      return '';
+    };
+    const mappedOrAlias = (row, mapKey, aliases = []) => {
+      const mapped = cleanCellValue(getMappedValue(row, mapKey));
+      if (mapped) return mapped;
+      return firstNonEmpty(row, aliases);
+    };
+    const toIntSafe = (value) => {
+      const v = cleanCellValue(value);
+      if (!v) return 0;
+      const n = parseInt(v.replace(/[^\d-]/g, ''), 10);
+      return Number.isFinite(n) ? n : 0;
+    };
+
     for (const row of importRowsCache) {
-      const doc = normalizeDoc(getMappedValue(row,'cpfCnpj'));
+      const doc = normalizeDoc(mappedOrAlias(row, 'cpfCnpj', ['NR_CNPJ', 'CNPJ', 'CPF/CNPJ', 'CPF']));
       if (!doc) continue;
+
+      const tipoProduto = firstNonEmpty(row, ['TP_PRODUTO', 'TIPO_PRODUTO', 'TIPO PRODUTO']);
+      const qtMovelDireto = firstNonEmpty(row, ['QT_MOVEL', 'QTD_MOVEL', 'QNT_MOVEL']);
+      const qtMovel = qtMovelDireto
+        ? toIntSafe(qtMovelDireto)
+        : (
+            toIntSafe(firstNonEmpty(row, ['QT_MOVEL_TERM'])) +
+            toIntSafe(firstNonEmpty(row, ['QT_MOVEL_PEN'])) +
+            toIntSafe(firstNonEmpty(row, ['QT_MOVEL_M2M'])) +
+            toIntSafe(firstNonEmpty(row, ['QT_MOVEL_FWT']))
+          );
+      const quantidadeBasicaBL = toIntSafe(firstNonEmpty(row, ['QT_BASICA_BL', 'QNT_BASICA_BL', 'QTD_BASICA_BL']));
+      const nomeContatoSFA = firstNonEmpty(row, ['NM_CONTATO_SFA', 'NOME_CONTATO_SFA', 'NOME CONTATO SFA']);
+      const observacaoImportada = firstNonEmpty(row, ['RECOMENDACAO', 'OBSERVACAO', 'OBS', 'BQ']);
 
       const clientePayload = {
         cpfCnpj: doc,
-        nome: String(getMappedValue(row,'nome') || doc).trim(),
-        telefone: normalizePhone(getMappedValue(row,'telefone')),
-        email: String(getMappedValue(row,'email') || '').trim(),
+        nome: cleanCellValue(mappedOrAlias(row, 'nome', ['NM_CLIENTE', 'NOME_CLIENTE', 'RAZAO SOCIAL'])) || doc,
+        telefone: normalizePhone(mappedOrAlias(row, 'telefone', ['CELULAR_CONTATO_PRINCIPAL_SFA', 'TLFN_1', 'TEL_CELULAR_SIEBEL', 'TEL_COMERCIAL_SIEBEL'])),
+        email: cleanCellValue(mappedOrAlias(row, 'email', ['EMAIL_CONTATO_PRINCIPAL_SFA', 'EMAIL_SIEBEL', 'EMAIL'])),
         dataNascimento: excelDateToISO(getMappedValue(row,'dataNascimento')),
         contaContrato: String(getMappedValue(row,'contaContrato') || '').trim(),
+        nomeContatoSFA,
+        tipoProduto,
+        qtMovel,
+        quantidadeBasicaBL,
+        observacao: observacaoImportada,
         endereco: {
-          cep: String(getMappedValue(row,'cep') || '').trim(),
-          logradouro: String(getMappedValue(row,'logradouro') || '').trim(),
-          numero: String(getMappedValue(row,'numero') || '').trim(),
+          cep: cleanCellValue(mappedOrAlias(row, 'cep', ['NR_CEP', 'CEP'])),
+          logradouro: cleanCellValue(mappedOrAlias(row, 'logradouro', ['DS_ENDERECO', 'ENDERECO', 'ENDEREÇO'])),
+          numero: cleanCellValue(mappedOrAlias(row, 'numero', ['NUMERO', 'NR_NUMERO'])),
           complemento: String(getMappedValue(row,'complemento') || '').trim(),
           bairro: String(getMappedValue(row,'bairro') || '').trim(),
-          cidade: String(getMappedValue(row,'cidade') || '').trim(),
+          cidade: cleanCellValue(mappedOrAlias(row, 'cidade', ['DS_CIDADE', 'CIDADE'])),
           uf: String(getMappedValue(row,'uf') || '').trim(),
         },
         importedAt: new Date().toISOString()
@@ -1165,6 +1206,11 @@ async function runImportClientes() {
         merged.nome = merged.nome || clientePayload.nome;
         merged.telefone = merged.telefone || clientePayload.telefone;
         merged.email = merged.email || clientePayload.email;
+        merged.nomeContatoSFA = merged.nomeContatoSFA || clientePayload.nomeContatoSFA;
+        merged.tipoProduto = merged.tipoProduto || clientePayload.tipoProduto;
+        merged.qtMovel = Number(merged.qtMovel || 0) || Number(clientePayload.qtMovel || 0);
+        merged.quantidadeBasicaBL = Number(merged.quantidadeBasicaBL || 0) || Number(clientePayload.quantidadeBasicaBL || 0);
+        merged.observacao = merged.observacao || clientePayload.observacao;
         merged.dataNascimento = merged.dataNascimento || clientePayload.dataNascimento;
         merged.contaContrato = merged.contaContrato || clientePayload.contaContrato;
         merged.endereco = merged.endereco || {};

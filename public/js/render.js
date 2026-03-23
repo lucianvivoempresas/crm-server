@@ -437,6 +437,7 @@ function renderClientesGrid() {
   emptyEl.classList.add('hidden');
   container.innerHTML = clientesFiltrados.map(cliente => {
     const inicial = cliente.nome ? cliente.nome.charAt(0).toUpperCase() : '?';
+    const observacao = String(cliente.observacao || '').trim();
     // para master, mostrar nome do vendedor responsável
     const user = obterUsuarioLogado();
     let vendorInfo = '';
@@ -470,6 +471,11 @@ function renderClientesGrid() {
           <p>Aniversário: ${formatDate(cliente.dataNascimento)}</p>
           ${vendorInfo}
         </div>
+        ${observacao ? `
+        <div class="mt-3 rounded-lg border border-slate-700 bg-slate-900/40 p-3">
+          <p class="text-xs uppercase tracking-wide text-slate-400 mb-1">Observação</p>
+          <p class="text-sm text-slate-200 whitespace-pre-wrap">${observacao}</p>
+        </div>` : ''}
       </div>
     `;
   }).join('');

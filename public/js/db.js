@@ -48,6 +48,19 @@ async function getAllData(storeName) {
     }
 
     const res = await fetch(url.toString(), { headers });
+
+    // Token expirado ou inválido → limpar sessão e voltar para login
+    if (res.status === 401) {
+      ['CRM_AUTH_TOKEN', 'CRM_USER_SESSION'].forEach(k => {
+        localStorage.removeItem(k);
+        sessionStorage.removeItem(k);
+      });
+      if (typeof ocultaInterfacePrincipal === 'function') ocultaInterfacePrincipal();
+      if (typeof setupLoginListeners === 'function') setupLoginListeners();
+      console.warn('⚠️ Sessão expirada. Por favor, faça login novamente.');
+      return [];
+    }
+
     if (!res.ok) throw new Error('Falha ao buscar dados');
     const raw = await res.json();
     return normalizeStoreData(storeName, raw);
