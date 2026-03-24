@@ -1190,11 +1190,16 @@ function setupEventListeners() {
 
   // == EVENTOS DINÂMICOS (TABELAS E CARDS) ==
   document.body.addEventListener('click', async (e) => {
-    const target = e.target.closest('.btn-edit, .btn-delete, .btn-view-profile, .btn-dismiss-lembrete, .btn-toggle-observacao, .btn-clientes-page, .btn-cadencia-touch');
+    const target = e.target.closest('.btn-edit, .btn-delete, .btn-view-profile, .btn-dismiss-lembrete, .btn-toggle-observacao, .btn-clientes-page, .btn-cadencia-touch, .btn-recuperar-perdas');
     if (!target) return;
 
     if (target.classList.contains('btn-cadencia-touch')) {
       await registrarContatoRapido(target.dataset.id);
+      return;
+    }
+
+    if (target.classList.contains('btn-recuperar-perdas')) {
+      await recuperarPerdasPorMotivo(target.dataset.motivo || '');
       return;
     }
 
@@ -1538,6 +1543,45 @@ async function registrarContatoRapido(vendaId) {
 
   await renderAll();
   showQuickMessage('Contato registrado e proximo follow-up reagendado.');
+}
+
+async function recuperarPerdasPorMotivo(motivo) {
+  const motivoNormalizado = String(motivo || '').trim().toLowerCase();
+  if (!motivoNormalizado) return;
+
+  const elegiveis = (vendas || []).filter(v => {
+    return v.status === 'Cancelado' && String(v.motivoPerda || '').trim().toLowerCase() === motivoNormalizado;
+  });
+
+  if (!elegiveis.length) {
+    showQuickMessage('Nenhuma venda cancelada encontrada para esse motivo.', true);
+    return;
+  }
+
+  const confirmado = await showConfirmModal(
+    'Recuperar perdas',
+    `Reativar ${elegiveis.length} venda(s) com motivo "${motivo}" para Negociando?`
+  );
+  if (!confirmado) return;
+
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const hoje = d.toISOString().split('T')[0];
+  d.setDate(d.getDate() + 1);
+  const amanha = d.toISOString().split('T')[0];
+
+  await Promise.all(elegiveis.map(v => updateData('vendas', {
+    ...v,
+    status: 'Negociando',
+    motivoPerda: '',
+    proximaAcao: 'Reabordar oportunidade com foco no motivo anterior da perda',
+    dataProximoContato: amanha,
+    dataMudancaStatus: hoje,
+    ultimaInteracao: hoje
+  })));
+
+  await renderAll();
+  showQuickMessage(`Recuperacao concluida: ${elegiveis.length} venda(s) reativada(s).`);
 }
 
 function setupQuickFormListeners() {

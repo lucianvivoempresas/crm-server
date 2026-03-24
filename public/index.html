@@ -596,6 +596,40 @@
           </div>
         </div>
       </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-slate-800/40 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
+          <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wide mb-3">Pipeline de Conversao</h3>
+          <div id="vendas-pipeline-list" class="space-y-2"></div>
+          <p id="vendas-pipeline-empty" class="text-sm text-slate-400 hidden">Sem dados de pipeline para o filtro atual.</p>
+        </div>
+        <div class="bg-slate-800/40 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
+          <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wide mb-3">Gargalos e Recuperacao</h3>
+          <div id="vendas-gargalos-list" class="space-y-2 mb-4"></div>
+          <p id="vendas-gargalos-empty" class="text-sm text-slate-400 hidden">Nenhum gargalo critico detectado.</p>
+          <div>
+            <p class="text-xs text-slate-400 mb-2">Recuperar perdas por motivo</p>
+            <div id="vendas-recuperacao-list" class="flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-slate-800/40 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
+        <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wide mb-3">Produtividade por Vendedor</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-slate-400 border-b border-slate-700">
+                <th class="text-left py-2 pr-3">Vendedor</th>
+                <th class="text-left py-2 pr-3">Abertas</th>
+                <th class="text-left py-2 pr-3">Concluidas</th>
+                <th class="text-left py-2 pr-3">Taxa Conversao</th>
+                <th class="text-left py-2 pr-3">Idade Media Abertas</th>
+              </tr>
+            </thead>
+            <tbody id="vendas-produtividade-body"></tbody>
+          </table>
+        </div>
+        <p id="vendas-produtividade-empty" class="text-sm text-slate-400 hidden">Sem dados para produtividade no filtro atual.</p>
+      </div>
     </section>
     
     <!-- Seção Clientes -->

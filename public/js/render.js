@@ -605,7 +605,12 @@ function renderVendasTable() {
   const tbody = document.getElementById('vendas-table-body');
   const emptyEl = document.getElementById('vendas-table-empty');
   
-  if (!filtradas.length) { tbody.innerHTML = ''; emptyEl.classList.remove('hidden'); return; }
+  if (!filtradas.length) {
+    tbody.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    renderVendasInsights(filtradas);
+    return;
+  }
   emptyEl.classList.add('hidden');
   
   tbody.innerHTML = filtradas.map(v => {
@@ -636,7 +641,138 @@ function renderVendasTable() {
       </div></td>
     </tr>`;
   }).join('');
+  renderVendasInsights(filtradas);
   if (window.lucide) lucide.createIcons();
+}
+
+function renderVendasInsights(vendasFiltradas) {
+  const pipelineList = document.getElementById('vendas-pipeline-list');
+  const pipelineEmpty = document.getElementById('vendas-pipeline-empty');
+  const gargalosList = document.getElementById('vendas-gargalos-list');
+  const gargalosEmpty = document.getElementById('vendas-gargalos-empty');
+  const recuperacaoList = document.getElementById('vendas-recuperacao-list');
+  const produtividadeBody = document.getElementById('vendas-produtividade-body');
+  const produtividadeEmpty = document.getElementById('vendas-produtividade-empty');
+
+  if (!pipelineList || !pipelineEmpty || !gargalosList || !gargalosEmpty || !recuperacaoList || !produtividadeBody || !produtividadeEmpty) {
+    return;
+  }
+
+  const list = Array.isArray(vendasFiltradas) ? vendasFiltradas : [];
+  const total = list.length;
+  const etapas = ['Negociando', 'Aguardando Aceite', 'Inputado', 'Aguardando fatura', 'Aguardando Distribuidora', 'Concluído', 'Cancelado'];
+
+  if (!total) {
+    pipelineList.innerHTML = '';
+    pipelineEmpty.classList.remove('hidden');
+    gargalosList.innerHTML = '';
+    gargalosEmpty.classList.remove('hidden');
+    recuperacaoList.innerHTML = '<span class="text-xs text-slate-500">Sem oportunidades de recuperacao</span>';
+    produtividadeBody.innerHTML = '';
+    produtividadeEmpty.classList.remove('hidden');
+    return;
+  }
+
+  pipelineEmpty.classList.add('hidden');
+  pipelineList.innerHTML = etapas.map(status => {
+    const count = list.filter(v => v.status === status).length;
+    const pct = Math.round((count / total) * 100);
+    return `<div>
+      <div class="flex items-center justify-between text-xs text-slate-300 mb-1">
+        <span>${status}</span><span>${count} (${pct}%)</span>
+      </div>
+      <div class="h-2 bg-slate-700 rounded-full overflow-hidden">
+        <div class="h-full bg-gradient-to-r from-cyan-500 to-blue-500" style="width:${pct}%"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const gargalos = etapas
+    .filter(status => !['Concluído', 'Cancelado'].includes(status))
+    .map(status => {
+      const daEtapa = list.filter(v => v.status === status);
+      const atrasadas = daEtapa.filter(v => getVendaSlaInfo(v).atrasado).length;
+      return { status, total: daEtapa.length, atrasadas };
+    })
+    .filter(item => item.atrasadas > 0)
+    .sort((a, b) => b.atrasadas - a.atrasadas)
+    .slice(0, 4);
+
+  if (!gargalos.length) {
+    gargalosList.innerHTML = '';
+    gargalosEmpty.classList.remove('hidden');
+  } else {
+    gargalosEmpty.classList.add('hidden');
+    gargalosList.innerHTML = gargalos.map(item => {
+      const pct = item.total ? Math.round((item.atrasadas / item.total) * 100) : 0;
+      return `<div class="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-200">
+        ${item.status}: ${item.atrasadas} atraso(s) de ${item.total} (${pct}%)
+      </div>`;
+    }).join('');
+  }
+
+  const perdasPorMotivo = list
+    .filter(v => v.status === 'Cancelado' && String(v.motivoPerda || '').trim())
+    .reduce((acc, v) => {
+      const key = String(v.motivoPerda || '').trim();
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+  const motivos = Object.entries(perdasPorMotivo)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
+  if (!motivos.length) {
+    recuperacaoList.innerHTML = '<span class="text-xs text-slate-500">Sem oportunidades de recuperacao</span>';
+  } else {
+    recuperacaoList.innerHTML = motivos.map(([motivo, qtd]) => (
+      `<button class="px-3 py-1.5 text-xs rounded-full bg-violet-500/20 text-violet-200 border border-violet-500/30 hover:bg-violet-500/30 btn-recuperar-perdas" data-motivo="${escapeHtml(motivo)}">${escapeHtml(motivo)} (${qtd})</button>`
+    )).join('');
+  }
+
+  const porVendedor = {};
+  list.forEach(v => {
+    const vid = Number(v.vendedor_id || 0);
+    if (!porVendedor[vid]) {
+      porVendedor[vid] = { id: vid, abertas: 0, concluidas: 0, canceladas: 0, idadeAbertaSoma: 0, idadeAbertaQtd: 0 };
+    }
+    const item = porVendedor[vid];
+    if (v.status === 'Concluído') item.concluidas += 1;
+    else if (v.status === 'Cancelado') item.canceladas += 1;
+    else {
+      item.abertas += 1;
+      const dias = Math.max(0, diffDaysFromToday(v.dataMudancaStatus || v.dataRegistro) || 0);
+      item.idadeAbertaSoma += dias;
+      item.idadeAbertaQtd += 1;
+    }
+  });
+
+  const linhas = Object.values(porVendedor)
+    .map(item => {
+      const nome = usuariosList?.find(u => Number(u.id) === Number(item.id))?.nome || 'Sem vendedor';
+      const totalMovimento = item.abertas + item.concluidas + item.canceladas;
+      const taxa = totalMovimento ? Math.round((item.concluidas / totalMovimento) * 100) : 0;
+      const idadeMedia = item.idadeAbertaQtd ? Math.round(item.idadeAbertaSoma / item.idadeAbertaQtd) : 0;
+      return { nome, abertas: item.abertas, concluidas: item.concluidas, taxa, idadeMedia };
+    })
+    .sort((a, b) => b.taxa - a.taxa || b.concluidas - a.concluidas);
+
+  if (!linhas.length) {
+    produtividadeBody.innerHTML = '';
+    produtividadeEmpty.classList.remove('hidden');
+  } else {
+    produtividadeEmpty.classList.add('hidden');
+    produtividadeBody.innerHTML = linhas.map(l => `
+      <tr class="border-b border-slate-700/70 last:border-b-0">
+        <td class="py-2 pr-3 text-slate-200">${escapeHtml(l.nome)}</td>
+        <td class="py-2 pr-3 text-slate-300">${l.abertas}</td>
+        <td class="py-2 pr-3 text-slate-300">${l.concluidas}</td>
+        <td class="py-2 pr-3 text-emerald-300">${l.taxa}%</td>
+        <td class="py-2 pr-3 text-slate-300">${l.idadeMedia} dia(s)</td>
+      </tr>
+    `).join('');
+  }
 }
 
 function renderClientesGrid() {
