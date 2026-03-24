@@ -1190,8 +1190,13 @@ function setupEventListeners() {
 
   // == EVENTOS DINÂMICOS (TABELAS E CARDS) ==
   document.body.addEventListener('click', async (e) => {
-    const target = e.target.closest('.btn-edit, .btn-delete, .btn-view-profile, .btn-dismiss-lembrete, .btn-toggle-observacao, .btn-clientes-page');
+    const target = e.target.closest('.btn-edit, .btn-delete, .btn-view-profile, .btn-dismiss-lembrete, .btn-toggle-observacao, .btn-clientes-page, .btn-cadencia-touch');
     if (!target) return;
+
+    if (target.classList.contains('btn-cadencia-touch')) {
+      await registrarContatoRapido(target.dataset.id);
+      return;
+    }
 
     if (target.classList.contains('btn-clientes-page')) {
       const nextPage = Number(target.dataset.page || 1);
@@ -1356,6 +1361,68 @@ function setupVendaFormListeners() {
   const dataProximoContatoInput = document.getElementById('venda-dataProximoContato');
   const comissaoContainer = document.getElementById('venda-comissao-estimada');
   const comissaoValor = document.getElementById('venda-comissao-valor');
+  const cadenciaResumo = document.getElementById('venda-cadencia-resumo');
+  const scriptSugestao = document.getElementById('venda-scriptSugestao');
+  const btnAplicarCadencia = document.getElementById('venda-aplicar-cadencia');
+  const btnCopiarScript = document.getElementById('venda-script-copiar');
+
+  const getCadenciaPorStatus = (status) => {
+    const mapa = {
+      'Negociando': { dias: 1, acao: 'Retornar com proposta resumida e validar principal objecao' },
+      'Aguardando Aceite': { dias: 1, acao: 'Fazer follow-up do aceite e reforcar prazo da condicao' },
+      'Inputado': { dias: 2, acao: 'Confirmar documentos enviados e alinhar proximo marco' },
+      'Aguardando fatura': { dias: 3, acao: 'Validar recebimento da fatura e confirmar pagamento' },
+      'Aguardando Distribuidora': { dias: 3, acao: 'Atualizar cliente sobre prazo da distribuidora' }
+    };
+    return mapa[status] || { dias: 2, acao: 'Realizar follow-up comercial' };
+  };
+
+  const addDaysIso = (days) => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + (Number(days) || 0));
+    return d.toISOString().split('T')[0];
+  };
+
+  const buildScriptSugestao = () => {
+    const clienteNome = (document.getElementById('venda-clienteNome')?.value || 'cliente').trim();
+    const produto = (document.getElementById('venda-produto')?.value || 'proposta').trim();
+    const operadora = (document.getElementById('venda-operadora')?.value || '').trim();
+    const status = statusSelect.value;
+    const cfg = getCadenciaPorStatus(status);
+    const sufixo = operadora ? ` / ${operadora}` : '';
+    return `Oi ${clienteNome}, tudo bem? Passando para ${cfg.acao.toLowerCase()}.\nSobre ${produto}${sufixo}, posso te enviar um resumo objetivo agora e alinharmos hoje?`;
+  };
+
+  const atualizarAssistenteCadencia = (forcarAplicacao = false) => {
+    const status = statusSelect.value;
+    const statusFinal = ['Concluído', 'Cancelado'].includes(status);
+    const cfg = getCadenciaPorStatus(status);
+
+    if (cadenciaResumo) {
+      cadenciaResumo.textContent = statusFinal
+        ? 'Venda em status final. Cadencia automatica nao e necessaria.'
+        : `Sugestao: ${cfg.acao} • proximo contato em ${cfg.dias} dia(s).`;
+    }
+
+    if (scriptSugestao) {
+      scriptSugestao.value = statusFinal
+        ? 'Sem script sugerido para status finalizado.'
+        : buildScriptSugestao();
+    }
+
+    if (btnAplicarCadencia) {
+      btnAplicarCadencia.disabled = statusFinal;
+      btnAplicarCadencia.classList.toggle('opacity-60', statusFinal);
+    }
+
+    if (!statusFinal && (forcarAplicacao || !proximaAcaoInput?.value.trim())) {
+      if (proximaAcaoInput) proximaAcaoInput.value = cfg.acao;
+    }
+    if (!statusFinal && (forcarAplicacao || !dataProximoContatoInput?.value)) {
+      if (dataProximoContatoInput) dataProximoContatoInput.value = addDaysIso(cfg.dias);
+    }
+  };
 
   if (!statusSelect) return;
   if (!statusSelect.dataset.listenersAttached) {
@@ -1380,6 +1447,7 @@ function setupVendaFormListeners() {
       const statusFinal = ['Concluído', 'Cancelado'].includes(statusSelect.value);
       if (proximaAcaoInput) proximaAcaoInput.required = !statusFinal;
       if (dataProximoContatoInput) dataProximoContatoInput.required = !statusFinal;
+      atualizarAssistenteCadencia(false);
     });
 
     const inputs = ['venda-produto','venda-operadora','venda-tipoCliente','venda-valorVenda','venda-vendedor_id'].map(id => document.getElementById(id)).filter(Boolean);
@@ -1408,8 +1476,68 @@ function setupVendaFormListeners() {
     
     inputs.forEach(inp => inp.addEventListener('input', updateEstimativa));
     inputs.forEach(inp => inp.addEventListener('change', updateEstimativa));
+
+    if (btnAplicarCadencia) {
+      btnAplicarCadencia.addEventListener('click', () => {
+        atualizarAssistenteCadencia(true);
+        showQuickMessage('Cadencia aplicada para esta etapa.');
+      });
+    }
+
+    if (btnCopiarScript) {
+      btnCopiarScript.addEventListener('click', async () => {
+        try {
+          const content = (scriptSugestao?.value || '').trim();
+          if (!content) return;
+          await navigator.clipboard.writeText(content);
+          showQuickMessage('Script de abordagem copiado.');
+        } catch (err) {
+          console.error('Falha ao copiar script de venda:', err);
+          showQuickMessage('Nao foi possivel copiar o script.', true);
+        }
+      });
+    }
+
+    ['venda-clienteNome', 'venda-produto', 'venda-operadora'].forEach((fieldId) => {
+      const field = document.getElementById(fieldId);
+      if (!field) return;
+      field.addEventListener('input', () => atualizarAssistenteCadencia(false));
+      field.addEventListener('change', () => atualizarAssistenteCadencia(false));
+    });
+
     statusSelect.dispatchEvent(new Event('change'));
   }
+}
+
+async function registrarContatoRapido(vendaId) {
+  const idNum = Number(vendaId);
+  const venda = (vendas || []).find(v => Number(v.id) === idNum);
+  if (!venda) return;
+
+  const mapa = {
+    'Negociando': { dias: 1, acao: 'Retornar com proposta resumida e validar principal objecao' },
+    'Aguardando Aceite': { dias: 1, acao: 'Fazer follow-up do aceite e reforcar prazo da condicao' },
+    'Inputado': { dias: 2, acao: 'Confirmar documentos enviados e alinhar proximo marco' },
+    'Aguardando fatura': { dias: 3, acao: 'Validar recebimento da fatura e confirmar pagamento' },
+    'Aguardando Distribuidora': { dias: 3, acao: 'Atualizar cliente sobre prazo da distribuidora' }
+  };
+  const cfg = mapa[venda.status] || { dias: 2, acao: 'Realizar follow-up comercial' };
+
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const hoje = d.toISOString().split('T')[0];
+  d.setDate(d.getDate() + cfg.dias);
+  const proximaData = d.toISOString().split('T')[0];
+
+  await updateData('vendas', {
+    ...venda,
+    proximaAcao: venda.proximaAcao || cfg.acao,
+    dataProximoContato: proximaData,
+    ultimaInteracao: hoje
+  });
+
+  await renderAll();
+  showQuickMessage('Contato registrado e proximo follow-up reagendado.');
 }
 
 function setupQuickFormListeners() {

@@ -550,6 +550,7 @@ function renderVendasAcoesHoje() {
       </div>
       <div class="flex items-center gap-2">
         <span class="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">${atrasoLabel}</span>
+        <button class="px-2 py-1 text-xs rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30 btn-cadencia-touch" data-id="${venda.id}">Contato feito</button>
         <button class="px-2 py-1 text-xs rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 btn-edit" data-id="${venda.id}" data-type="venda">Abrir</button>
       </div>
     </div>`;
