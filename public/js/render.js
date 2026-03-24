@@ -629,12 +629,12 @@ function renderVendasTable() {
     const nomeCliente = String(c?.nome || 'N/A');
     const nomeClienteEscaped = escapeHtml(nomeCliente);
     const nomeTargetId = `venda-cliente-${v.id}`;
-    const clampNome = nomeCliente.length > 34;
+    const clampNome = nomeCliente.length > 80;
     const nomeClienteHtml = c?.id
-      ? `<button class="btn-view-profile text-left text-white hover:text-cyan-200 transition-colors" data-id="${c.id}" title="Abrir perfil do cliente">
-          <p id="${nomeTargetId}" style="display:-webkit-box;-webkit-line-clamp:${clampNome ? '1' : 'unset'};-webkit-box-orient:vertical;overflow:${clampNome ? 'hidden' : 'visible'}">${nomeClienteEscaped}</p>
+      ? `<button class="btn-edit text-left text-white hover:text-cyan-200 transition-colors" data-id="${v.id}" data-type="venda" title="Abrir venda">
+          <p id="${nomeTargetId}" style="display:-webkit-box;-webkit-line-clamp:${clampNome ? '2' : 'unset'};-webkit-box-orient:vertical;overflow:${clampNome ? 'hidden' : 'visible'}">${nomeClienteEscaped}</p>
         </button>`
-      : `<p id="${nomeTargetId}" style="display:-webkit-box;-webkit-line-clamp:${clampNome ? '1' : 'unset'};-webkit-box-orient:vertical;overflow:${clampNome ? 'hidden' : 'visible'}">${nomeClienteEscaped}</p>`;
+      : `<p id="${nomeTargetId}" style="display:-webkit-box;-webkit-line-clamp:${clampNome ? '2' : 'unset'};-webkit-box-orient:vertical;overflow:${clampNome ? 'hidden' : 'visible'}">${nomeClienteEscaped}</p>`;
     const acaoTexto = String(v.proximaAcao || 'Sem proxima acao');
     const acaoEscaped = escapeHtml(acaoTexto);
     const acaoTargetId = `venda-acao-${v.id}`;
