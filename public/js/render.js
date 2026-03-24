@@ -437,6 +437,17 @@ function diffDaysUntil(dateValue) {
   return Math.floor((date.getTime() - baseToday.getTime()) / 86400000);
 }
 
+function getVendaOwnerId(venda, clienteRef = null) {
+  const vendedorDaVenda = Number(venda?.vendedor_id);
+  if (Number.isFinite(vendedorDaVenda) && vendedorDaVenda > 0) return vendedorDaVenda;
+
+  const cliente = clienteRef || clientes.find(c => Number(c.id) === Number(venda?.clienteId));
+  const vendedorDoCliente = Number(cliente?.vendedor_id);
+  if (Number.isFinite(vendedorDoCliente) && vendedorDoCliente > 0) return vendedorDoCliente;
+
+  return null;
+}
+
 function getVendaSlaInfo(venda) {
   const status = venda?.status || '';
   if (['Concluído', 'Cancelado'].includes(status)) {
@@ -521,7 +532,7 @@ function renderVendasAcoesHoje() {
   const user = obterUsuarioLogado();
   let visiveis = vendas || [];
   if (user && user.perfil === 'vendedor') {
-    visiveis = visiveis.filter(v => Number(v.vendedor_id) === Number(user.id));
+    visiveis = visiveis.filter(v => Number(getVendaOwnerId(v)) === Number(user.id));
   }
 
   const pendentes = visiveis
@@ -573,13 +584,14 @@ function renderVendasTable() {
   
   let filtradas = vendas.filter(v => {
     const c = clientes.find(cl => cl.id === v.clienteId);
+    const ownerId = getVendaOwnerId(v, c);
     // Se é vendedor, filtrar apenas suas vendas
-    if (user && user.perfil === 'vendedor' && Number(v.vendedor_id) !== Number(user.id)) {
+    if (user && user.perfil === 'vendedor' && Number(ownerId) !== Number(user.id)) {
       return false;
     }
     return (!searchTerm || (c?.nome||'').toLowerCase().includes(searchTerm)) &&
            (!filterStatus || v.status === filterStatus) &&
-          (!filterVendedor || String(v.vendedor_id) === String(filterVendedor)) &&
+          (!filterVendedor || String(ownerId) === String(filterVendedor)) &&
            (!filterMonth || (v.dataConclusao && v.dataConclusao.startsWith(filterMonth)));
   });
 
@@ -615,7 +627,10 @@ function renderVendasTable() {
   
   tbody.innerHTML = filtradas.map(v => {
     const c = clientes.find(cl => cl.id === v.clienteId);
-    const vendedorNome = usuariosList?.find(u => Number(u.id) === Number(v.vendedor_id))?.nome || 'N/A';
+    const ownerId = getVendaOwnerId(v, c);
+    const vendedorNome = ownerId
+      ? (usuariosList?.find(u => Number(u.id) === Number(ownerId))?.nome || `Vendedor #${ownerId}`)
+      : 'N/A';
     const vendedorCell = isMaster ? `<td class="px-6 py-4 text-slate-300">${vendedorNome}</td>` : '';
     const prioridade = getVendaPrioridade(v);
     const sla = getVendaSlaInfo(v);
@@ -751,7 +766,8 @@ function renderVendasInsights(vendasFiltradas) {
 
   const porVendedor = {};
   list.forEach(v => {
-    const vid = Number(v.vendedor_id || 0);
+    const clienteRef = clientes.find(c => Number(c.id) === Number(v.clienteId));
+    const vid = Number(getVendaOwnerId(v, clienteRef) || 0);
     if (!porVendedor[vid]) {
       porVendedor[vid] = { id: vid, abertas: 0, concluidas: 0, canceladas: 0, idadeAbertaSoma: 0, idadeAbertaQtd: 0 };
     }

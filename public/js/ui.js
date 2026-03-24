@@ -169,6 +169,22 @@ function showModal(type, id=null) {
           if (st) st.dispatchEvent(new Event('change'));
           const val = document.getElementById('venda-valorVenda');
           if (val) val.dispatchEvent(new Event('input'));
+
+          const clienteSel = document.getElementById('venda-clienteId');
+          const clienteNomeInp = document.getElementById('venda-clienteNome');
+          const clienteHint = document.getElementById('venda-clienteNome-hint');
+          if (clienteSel && item.clienteId) {
+            clienteSel.value = String(item.clienteId);
+          }
+          const clienteObj = (clientes || []).find(c => Number(c.id) === Number(item.clienteId));
+          if (clienteNomeInp && clienteObj) {
+            clienteNomeInp.value = clienteObj.nome || '';
+            if (clienteHint) {
+              clienteHint.textContent = 'Cliente selecionado ✔';
+              clienteHint.className = 'text-xs text-green-400 mt-1';
+            }
+          }
+
           const vendedorSel = document.getElementById('venda-vendedor_id');
           if (vendedorSel && item.vendedor_id) {
             const wanted = String(item.vendedor_id);
