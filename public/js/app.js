@@ -364,6 +364,10 @@ function setupEventListeners() {
   const clientesCampanhaDestinoId = document.getElementById('clientes-campanha-destino-id');
   const clientesCampanhaTotalFiltrados = document.getElementById('clientes-campanha-total-filtrados');
   const clientesCampanhaTotalElegiveis = document.getElementById('clientes-campanha-total-elegiveis');
+  const clientesCampanhaRelatorio = document.getElementById('clientes-campanha-relatorio');
+  const btnClientesCampanhaExportCsv = document.getElementById('btn-clientes-campanha-export-csv');
+  const btnClientesCampanhaUnlockVendedor = document.getElementById('btn-clientes-campanha-unlock-vendedor');
+  const btnClientesCampanhaUnlockOferta = document.getElementById('btn-clientes-campanha-unlock-oferta');
 
   let distribuicaoHistoricoCache = [];
   let distribuicaoCampanhasCache = [];
@@ -412,6 +416,63 @@ function setupEventListeners() {
     return snapshot.clientesFiltrados.filter(c => !enviados.has(Number(c.id)));
   };
 
+  const obterHistoricoDaOferta = (snapshot) => {
+    if (!snapshot) return [];
+    const ofertaChave = normalizarChaveOfertaCampanha(snapshot.filtroOfertaNormalizado);
+    return (distribuicaoHistoricoCache || []).filter(h => {
+      return normalizarChaveOfertaCampanha(h.oferta_chave) === ofertaChave;
+    });
+  };
+
+  const renderRelatorioDistribuicao = (snapshot) => {
+    if (!clientesCampanhaRelatorio) return;
+    if (!snapshot) {
+      clientesCampanhaRelatorio.innerHTML = '<p class="text-slate-400">Sem dados de filtro para montar relatório.</p>';
+      return;
+    }
+
+    const historicoOferta = obterHistoricoDaOferta(snapshot);
+    const vendedorSelecionado = parseNumericId(clientesCampanhaVendedor?.value);
+    const enviadosUnicos = new Set(historicoOferta.map(h => Number(h.cliente_id))).size;
+    const vendedoresUnicos = new Set(historicoOferta.map(h => Number(h.vendedor_id))).size;
+    const totalRegistros = historicoOferta.length;
+    const elegiveisAtual = obterElegiveisSemRepeticao(snapshot, vendedorSelecionado).length;
+
+    const porVendedor = new Map();
+    historicoOferta.forEach((row) => {
+      const vendedorId = Number(row.vendedor_id);
+      const current = porVendedor.get(vendedorId) || { vendedorId, total: 0, clientes: new Set(), ultimoEnvio: '' };
+      current.total += 1;
+      current.clientes.add(Number(row.cliente_id));
+      if (!current.ultimoEnvio || String(row.enviado_em || '') > current.ultimoEnvio) {
+        current.ultimoEnvio = String(row.enviado_em || '');
+      }
+      porVendedor.set(vendedorId, current);
+    });
+
+    const ranking = Array.from(porVendedor.values())
+      .sort((a, b) => b.clientes.size - a.clientes.size)
+      .slice(0, 5);
+
+    const rankingHtml = ranking.length
+      ? `<div class="mt-2 space-y-1">${ranking.map((item) => {
+          const vendedorNome = usuariosList?.find(u => Number(u.id) === Number(item.vendedorId))?.nome || `Vendedor #${item.vendedorId}`;
+          const ultimo = item.ultimoEnvio ? new Date(item.ultimoEnvio).toLocaleString('pt-BR') : 'N/A';
+          return `<p class="text-xs text-slate-300">${vendedorNome}: <span class="text-white">${item.clientes.size}</span> cliente(s) únicos • último envio ${ultimo}</p>`;
+        }).join('')}</div>`
+      : '<p class="text-xs text-slate-400 mt-2">Nenhum envio registrado ainda para esta observação.</p>';
+
+    clientesCampanhaRelatorio.innerHTML = `
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <div class="rounded border border-slate-700 bg-slate-800/60 p-2"><p class="text-[11px] text-slate-400">Registros</p><p class="text-white font-semibold">${totalRegistros}</p></div>
+        <div class="rounded border border-slate-700 bg-slate-800/60 p-2"><p class="text-[11px] text-slate-400">Clientes Únicos</p><p class="text-white font-semibold">${enviadosUnicos}</p></div>
+        <div class="rounded border border-slate-700 bg-slate-800/60 p-2"><p class="text-[11px] text-slate-400">Vendedores</p><p class="text-white font-semibold">${vendedoresUnicos}</p></div>
+        <div class="rounded border border-slate-700 bg-slate-800/60 p-2"><p class="text-[11px] text-slate-400">Elegíveis Agora</p><p class="text-emerald-300 font-semibold">${vendedorSelecionado ? elegiveisAtual : '-'}</p></div>
+      </div>
+      ${rankingHtml}
+    `;
+  };
+
   const atualizarEstadoDestinoDistribuicao = () => {
     const destino = clientesCampanhaDestinoTipo?.value || 'nova';
     if (clientesCampanhaNomeWrap) clientesCampanhaNomeWrap.classList.toggle('hidden', destino !== 'nova');
@@ -428,7 +489,133 @@ function setupEventListeners() {
     if (clientesCampanhaTotalElegiveis) {
       clientesCampanhaTotalElegiveis.textContent = String(elegiveis.length);
     }
+    if (btnClientesCampanhaUnlockVendedor) {
+      btnClientesCampanhaUnlockVendedor.disabled = !vendedorId;
+      btnClientesCampanhaUnlockVendedor.classList.toggle('opacity-50', !vendedorId);
+      btnClientesCampanhaUnlockVendedor.classList.toggle('cursor-not-allowed', !vendedorId);
+    }
     filtrarCampanhasDestino();
+    renderRelatorioDistribuicao(snapshot);
+  };
+
+  const desbloquearHistoricoDistribuicao = async (modo = 'vendedor') => {
+    const snapshot = obterSnapshotDistribuicao();
+    if (!snapshot) throw new Error('Sem contexto de filtro para desbloquear.');
+
+    const ofertaChave = normalizarChaveOfertaCampanha(snapshot.filtroOfertaNormalizado);
+    const vendedorId = parseNumericId(clientesCampanhaVendedor?.value);
+
+    if (modo === 'vendedor' && !vendedorId) {
+      throw new Error('Selecione um vendedor para desbloquear.');
+    }
+
+    const registros = obterHistoricoDaOferta(snapshot).filter((row) => {
+      if (modo === 'oferta') return true;
+      return Number(row.vendedor_id) === Number(vendedorId);
+    });
+
+    if (!registros.length) {
+      throw new Error('Nenhum registro encontrado para desbloqueio com esse critério.');
+    }
+
+    const alvo = modo === 'oferta' ? 'todos os vendedores dessa observação' : 'o vendedor selecionado';
+    const ok = confirm(`Desbloquear ${registros.length} registro(s) para ${alvo}?`);
+    if (!ok) return;
+
+    for (const row of registros) {
+      await deleteData('campanha_distribuicao_historico', row.id);
+    }
+
+    distribuicaoHistoricoCache = (distribuicaoHistoricoCache || []).filter((row) => {
+      if (normalizarChaveOfertaCampanha(row.oferta_chave) !== ofertaChave) return true;
+      if (modo === 'oferta') return false;
+      return Number(row.vendedor_id) !== Number(vendedorId);
+    });
+
+    atualizarResumoDistribuicao();
+    if (typeof showQuickMessage === 'function') {
+      showQuickMessage(`Desbloqueio concluído: ${registros.length} registro(s) removido(s).`);
+    }
+  };
+
+  const csvCellDistribuicao = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
+
+  const exportarRelatorioDistribuicaoCsv = () => {
+    const snapshot = obterSnapshotDistribuicao();
+    if (!snapshot) {
+      alert('Sem contexto de filtro para exportar relatório.');
+      return;
+    }
+
+    const historicoOferta = obterHistoricoDaOferta(snapshot);
+    if (!historicoOferta.length) {
+      alert('Nenhum registro para exportar nesta observação.');
+      return;
+    }
+
+    const headers = [
+      'Oferta',
+      'Oferta Chave',
+      'Data Envio',
+      'Vendedor ID',
+      'Vendedor Nome',
+      'Campanha ID',
+      'Campanha Nome',
+      'Cliente ID',
+      'Cliente Nome',
+      'Cliente CPF/CNPJ',
+      'Cliente Telefone',
+      'Cliente Email',
+      'Enviado Por',
+      'Origem'
+    ];
+
+    const rows = historicoOferta
+      .slice()
+      .sort((a, b) => String(b.enviado_em || '').localeCompare(String(a.enviado_em || '')))
+      .map((row) => {
+        const vendedorId = Number(row.vendedor_id);
+        const clienteId = Number(row.cliente_id);
+        const campanhaId = Number(row.campanha_id);
+
+        const vendedorNome = usuariosList?.find(u => Number(u.id) === vendedorId)?.nome || '';
+        const campanhaNome = (distribuicaoCampanhasCache || []).find(c => Number(c.id) === campanhaId)?.nome || '';
+        const cliente = (clientes || []).find(c => Number(c.id) === clienteId) || {};
+
+        return [
+          row.oferta_label || snapshot.filtroOfertaRaw || '',
+          row.oferta_chave || snapshot.filtroOfertaNormalizado || '',
+          row.enviado_em || '',
+          vendedorId || '',
+          vendedorNome,
+          campanhaId || '',
+          campanhaNome,
+          clienteId || '',
+          cliente.nome || '',
+          cliente.cpfCnpj || '',
+          cliente.telefone || '',
+          cliente.email || '',
+          row.enviado_por || '',
+          row.origem || ''
+        ];
+      });
+
+    const csv = [
+      headers.map(csvCellDistribuicao).join(','),
+      ...rows.map(r => r.map(csvCellDistribuicao).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    const nomeBase = String(snapshot.filtroOfertaRaw || 'relatorio_distribuicao')
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]+/g, '_')
+      .replace(/^_+|_+$/g, '') || 'relatorio_distribuicao';
+    const dataRef = new Date().toISOString().slice(0, 10);
+    a.href = URL.createObjectURL(blob);
+    a.download = `${nomeBase}_${dataRef}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   const fecharModalDistribuicaoClientes = () => {
@@ -875,6 +1062,39 @@ function setupEventListeners() {
   if (clientesCampanhaVendedor) {
     clientesCampanhaVendedor.onchange = () => {
       atualizarResumoDistribuicao();
+    };
+  }
+
+  if (btnClientesCampanhaUnlockVendedor) {
+    btnClientesCampanhaUnlockVendedor.onclick = async () => {
+      try {
+        await desbloquearHistoricoDistribuicao('vendedor');
+      } catch (err) {
+        console.error('Erro ao desbloquear vendedor:', err);
+        alert(err.message || 'Não foi possível desbloquear para o vendedor selecionado.');
+      }
+    };
+  }
+
+  if (btnClientesCampanhaUnlockOferta) {
+    btnClientesCampanhaUnlockOferta.onclick = async () => {
+      try {
+        await desbloquearHistoricoDistribuicao('oferta');
+      } catch (err) {
+        console.error('Erro ao desbloquear observação:', err);
+        alert(err.message || 'Não foi possível desbloquear esta observação.');
+      }
+    };
+  }
+
+  if (btnClientesCampanhaExportCsv) {
+    btnClientesCampanhaExportCsv.onclick = () => {
+      try {
+        exportarRelatorioDistribuicaoCsv();
+      } catch (err) {
+        console.error('Erro ao exportar CSV da distribuicao:', err);
+        alert(err.message || 'Nao foi possivel exportar o CSV.');
+      }
     };
   }
 
