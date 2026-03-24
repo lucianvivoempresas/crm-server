@@ -254,6 +254,17 @@ function renderCampanhaExpandableText(rawValue, targetId, maxLen = 30, textClass
   `;
 }
 
+function renderCampanhaLeadNameCell(rawValue, leadId, maxLen = 34) {
+  const text = String(rawValue || 'N/A');
+  const escaped = escapeCampanhasHtml(text);
+  const shouldClamp = text.length > maxLen;
+  return `
+    <button class="btn-open-campanha-lead text-left text-white hover:text-cyan-200 transition-colors" data-id="${leadId}" title="Abrir lead">
+      <p style="display:-webkit-box;-webkit-line-clamp:${shouldClamp ? '1' : 'unset'};-webkit-box-orient:vertical;overflow:${shouldClamp ? 'hidden' : 'visible'}">${escaped}</p>
+    </button>
+  `;
+}
+
 function renderCampanhasTable(leads) {
   const tbody = document.getElementById('campanhas-leads-table-body');
   const empty = document.getElementById('campanhas-leads-empty');
@@ -281,7 +292,7 @@ function renderCampanhasTable(leads) {
   tbody.innerHTML = leads.map(lead => {
     const agenda = lead.data_proximo_contato ? formatDate(lead.data_proximo_contato) : 'Sem data';
     const marcado = campanhasSelectedLeadIds.has(Number(lead.id));
-    const empresaCell = renderCampanhaExpandableText(lead.empresa || 'N/A', `campanha-empresa-${lead.id}`, 34, 'text-white font-medium');
+    const empresaCell = renderCampanhaLeadNameCell(lead.empresa || 'N/A', lead.id, 34);
     const emailCell = renderCampanhaExpandableText(lead.email || 'N/A', `campanha-email-${lead.id}`, 28, 'text-slate-300');
     const socioCell = renderCampanhaExpandableText(lead.socio || 'N/A', `campanha-socio-${lead.id}`, 26, 'text-slate-300');
     const produtoCell = renderCampanhaExpandableText(lead.produto_ofertado || 'N/A', `campanha-produto-${lead.id}`, 28, 'text-slate-300');

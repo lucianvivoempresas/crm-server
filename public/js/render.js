@@ -630,14 +630,18 @@ function renderVendasTable() {
     const nomeClienteEscaped = escapeHtml(nomeCliente);
     const nomeTargetId = `venda-cliente-${v.id}`;
     const clampNome = nomeCliente.length > 34;
+    const nomeClienteHtml = c?.id
+      ? `<button class="btn-view-profile text-left text-white hover:text-cyan-200 transition-colors" data-id="${c.id}" title="Abrir perfil do cliente">
+          <p id="${nomeTargetId}" style="display:-webkit-box;-webkit-line-clamp:${clampNome ? '1' : 'unset'};-webkit-box-orient:vertical;overflow:${clampNome ? 'hidden' : 'visible'}">${nomeClienteEscaped}</p>
+        </button>`
+      : `<p id="${nomeTargetId}" style="display:-webkit-box;-webkit-line-clamp:${clampNome ? '1' : 'unset'};-webkit-box-orient:vertical;overflow:${clampNome ? 'hidden' : 'visible'}">${nomeClienteEscaped}</p>`;
     const acaoTexto = String(v.proximaAcao || 'Sem proxima acao');
     const acaoEscaped = escapeHtml(acaoTexto);
     const acaoTargetId = `venda-acao-${v.id}`;
     const clampAcao = acaoTexto.length > 56;
     return `<tr class="hover:bg-slate-700/30">
       <td class="px-6 py-4 text-white">
-        <p id="${nomeTargetId}" style="display:-webkit-box;-webkit-line-clamp:${clampNome ? '1' : 'unset'};-webkit-box-orient:vertical;overflow:${clampNome ? 'hidden' : 'visible'}">${nomeClienteEscaped}</p>
-        ${clampNome ? `<button class="btn-toggle-observacao mt-1 text-[11px] text-cyan-300 hover:text-cyan-200" data-target="${nomeTargetId}" data-expanded="false">Ver mais</button>` : ''}
+        ${nomeClienteHtml}
       </td><td class="px-6 py-4 text-slate-300">${v.produto}</td><td class="px-6 py-4 text-slate-300">${v.operadora}</td>${vendedorCell}
       <td class="px-6 py-4"><span class="px-2 py-1 text-xs rounded-full border ${prioridade.className}" title="Score ${prioridade.score}">${prioridade.label}</span></td>
       <td class="px-6 py-4 text-white font-medium">${formatCurrency(v.valorVenda)}</td><td class="px-6 py-4 text-green-400 font-medium">${formatCurrency(calcularComissao(v))}</td>
