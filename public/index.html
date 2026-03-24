@@ -308,6 +308,9 @@
           <button id="btn-campanhas-delete" class="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg border border-red-500/40 hover:bg-red-500/30 transition-all flex items-center gap-2">
             <i data-lucide="trash-2" class="w-4 h-4"></i>Apagar Campanha
           </button>
+          <button id="btn-campanhas-delete-selected" class="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg border border-red-500/40 hover:bg-red-500/30 transition-all flex items-center gap-2 opacity-50 cursor-not-allowed" disabled>
+            <i data-lucide="trash" class="w-4 h-4"></i>Excluir Selecionados (0)
+          </button>
         </div>
       </div>
 
@@ -378,6 +381,9 @@
               <table class="w-full text-sm">
                 <thead class="bg-slate-700/50">
                   <tr>
+                    <th class="px-4 py-3 text-left text-slate-300 w-10">
+                      <input id="campanhas-select-all" type="checkbox" class="w-4 h-4 rounded" title="Selecionar leads visíveis" />
+                    </th>
                     <th class="px-4 py-3 text-left text-slate-300">Empresa</th>
                     <th class="px-4 py-3 text-left text-slate-300">Telefone</th>
                     <th class="px-4 py-3 text-left text-slate-300">Email</th>
@@ -525,6 +531,61 @@
           </div>
         </div>
       </div>
+
+      <div id="clientes-campanha-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-slate-800 rounded-2xl border border-slate-700 w-full max-w-2xl overflow-hidden flex flex-col">
+          <div class="sticky top-0 bg-slate-800 border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+            <h3 class="text-xl font-bold text-white">Enviar Clientes para Campanha</h3>
+            <button id="btn-clientes-campanha-close" class="p-2 hover:bg-slate-700 rounded-lg"><i data-lucide="x" class="w-5 h-5 text-slate-400"></i></button>
+          </div>
+          <div class="p-6 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm text-slate-300 mb-2">Filtro de Observação</label>
+                <input id="clientes-campanha-oferta" type="text" readonly class="w-full px-4 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-slate-200" />
+              </div>
+              <div>
+                <label class="block text-sm text-slate-300 mb-2">Vendedor Destino</label>
+                <select id="clientes-campanha-vendedor" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white">
+                  <option value="">Selecione</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-sm text-slate-300 mb-2">Quantidade de Clientes</label>
+                <input id="clientes-campanha-quantidade" type="number" min="1" value="10" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" />
+              </div>
+              <div>
+                <label class="block text-sm text-slate-300 mb-2">Destino</label>
+                <select id="clientes-campanha-destino-tipo" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white">
+                  <option value="nova">Criar nova campanha</option>
+                  <option value="existente">Usar campanha existente</option>
+                </select>
+              </div>
+              <div id="clientes-campanha-nome-wrap" class="md:col-span-2">
+                <label class="block text-sm text-slate-300 mb-2">Nome da Nova Campanha</label>
+                <input id="clientes-campanha-nome" type="text" placeholder="Ex: Renovacao Movel - Abril" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" />
+              </div>
+              <div id="clientes-campanha-select-wrap" class="md:col-span-2 hidden">
+                <label class="block text-sm text-slate-300 mb-2">Campanha Existente</label>
+                <select id="clientes-campanha-destino-id" class="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white">
+                  <option value="">Selecione</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="rounded-lg border border-slate-700 bg-slate-900/40 p-3 text-sm">
+              <p class="text-slate-300">Clientes filtrados: <span id="clientes-campanha-total-filtrados" class="text-white font-semibold">0</span></p>
+              <p class="text-slate-300">Disponíveis sem repetição: <span id="clientes-campanha-total-elegiveis" class="text-emerald-300 font-semibold">0</span></p>
+              <p class="text-xs text-slate-400 mt-2">A distribuição é aleatória e não reenviará o mesmo cliente para o mesmo vendedor dentro da mesma observação.</p>
+            </div>
+
+            <div class="flex gap-3">
+              <button id="btn-clientes-campanha-cancel" class="flex-1 px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600">Cancelar</button>
+              <button id="btn-clientes-campanha-enviar" class="flex-1 px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700">Distribuir Clientes</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
     
     <!-- Seção Vendas -->
@@ -593,7 +654,7 @@
           <button id="btn-novo-cliente" class="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"><i data-lucide="plus" class="w-5 h-5"></i>Novo Cliente</button>
         </div>
       </div>
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-3 max-w-5xl">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 max-w-6xl">
         <div class="relative">
           <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></i>
           <input type="text" id="search-clientes" list="lista-clientes-busca" placeholder="Pesquisar cliente por nome..." class="w-full pl-10 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500" />
@@ -606,6 +667,9 @@
         </div>
         <button id="btn-clear-clientes-filters" class="px-4 py-3 bg-slate-700/60 border border-slate-600 text-slate-200 rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center gap-2">
           <i data-lucide="x-circle" class="w-4 h-4"></i>Limpar Filtros
+        </button>
+        <button id="btn-clientes-enviar-campanha" class="px-4 py-3 bg-violet-500/20 border border-violet-500/40 text-violet-200 rounded-lg hover:bg-violet-500/30 transition-all flex items-center justify-center gap-2">
+          <i data-lucide="shuffle" class="w-4 h-4"></i>Enviar para Campanha
         </button>
       </div>
       <div id="clientes-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>

@@ -537,6 +537,21 @@ function renderClientesGrid() {
       return entry.searchBlob.includes(ofertaNeedle);
     });
   }
+
+  window.__clientesCampanhaSnapshot = {
+    filtroBusca: searchTerm,
+    filtroOfertaRaw: ofertaTerm,
+    filtroOfertaNormalizado: ofertaNeedle,
+    clientesFiltrados: clientesFiltrados.map(c => ({
+      id: Number(c.id),
+      nome: c.nome || '',
+      cpfCnpj: c.cpfCnpj || '',
+      telefone: c.telefone || '',
+      email: c.email || '',
+      nomeContatoSFA: c.nomeContatoSFA || '',
+      observacao: c.observacao || ''
+    }))
+  };
   
   if (!clientesFiltrados.length) {
     container.innerHTML = '';

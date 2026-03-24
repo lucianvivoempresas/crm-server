@@ -338,6 +338,250 @@ function setupEventListeners() {
     }
   };
 
+  const normalizarChaveOfertaCampanha = (value) => String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+  const embaralharArray = (array) => {
+    const out = [...array];
+    for (let i = out.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [out[i], out[j]] = [out[j], out[i]];
+    }
+    return out;
+  };
+
+  const clientesCampanhaModal = document.getElementById('clientes-campanha-modal');
+  const clientesCampanhaOferta = document.getElementById('clientes-campanha-oferta');
+  const clientesCampanhaVendedor = document.getElementById('clientes-campanha-vendedor');
+  const clientesCampanhaQuantidade = document.getElementById('clientes-campanha-quantidade');
+  const clientesCampanhaDestinoTipo = document.getElementById('clientes-campanha-destino-tipo');
+  const clientesCampanhaNomeWrap = document.getElementById('clientes-campanha-nome-wrap');
+  const clientesCampanhaNome = document.getElementById('clientes-campanha-nome');
+  const clientesCampanhaSelectWrap = document.getElementById('clientes-campanha-select-wrap');
+  const clientesCampanhaDestinoId = document.getElementById('clientes-campanha-destino-id');
+  const clientesCampanhaTotalFiltrados = document.getElementById('clientes-campanha-total-filtrados');
+  const clientesCampanhaTotalElegiveis = document.getElementById('clientes-campanha-total-elegiveis');
+
+  let distribuicaoHistoricoCache = [];
+  let distribuicaoCampanhasCache = [];
+
+  const obterSnapshotDistribuicao = () => {
+    const snapshot = window.__clientesCampanhaSnapshot || null;
+    if (!snapshot) return null;
+    const clientesFiltrados = Array.isArray(snapshot.clientesFiltrados) ? snapshot.clientesFiltrados : [];
+    return {
+      ...snapshot,
+      filtroOfertaNormalizado: normalizarChaveOfertaCampanha(snapshot.filtroOfertaNormalizado || snapshot.filtroOfertaRaw || ''),
+      clientesFiltrados
+    };
+  };
+
+  const filtrarCampanhasDestino = () => {
+    if (!clientesCampanhaDestinoId) return;
+    const vendedorId = parseNumericId(clientesCampanhaVendedor?.value);
+    const user = obterUsuarioLogado();
+    const campanhas = (distribuicaoCampanhasCache || []).filter(c => {
+      if (!vendedorId) return true;
+      return Number(c.vendedor_id) === Number(vendedorId);
+    });
+    const atual = clientesCampanhaDestinoId.value;
+    clientesCampanhaDestinoId.innerHTML = '<option value="">Selecione</option>';
+    campanhas.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = String(c.id);
+      const vendedorNome = usuariosList?.find(u => Number(u.id) === Number(c.vendedor_id))?.nome || `#${c.vendedor_id || 'N/A'}`;
+      opt.textContent = user?.perfil === 'master' ? `${c.nome || `Campanha #${c.id}`} (${vendedorNome})` : (c.nome || `Campanha #${c.id}`);
+      clientesCampanhaDestinoId.appendChild(opt);
+    });
+    if (atual && campanhas.some(c => String(c.id) === String(atual))) {
+      clientesCampanhaDestinoId.value = atual;
+    }
+  };
+
+  const obterElegiveisSemRepeticao = (snapshot, vendedorId) => {
+    if (!snapshot || !vendedorId) return [];
+    const ofertaChave = normalizarChaveOfertaCampanha(snapshot.filtroOfertaNormalizado);
+    const enviados = new Set(
+      (distribuicaoHistoricoCache || [])
+        .filter(h => Number(h.vendedor_id) === Number(vendedorId) && normalizarChaveOfertaCampanha(h.oferta_chave) === ofertaChave)
+        .map(h => Number(h.cliente_id))
+    );
+    return snapshot.clientesFiltrados.filter(c => !enviados.has(Number(c.id)));
+  };
+
+  const atualizarEstadoDestinoDistribuicao = () => {
+    const destino = clientesCampanhaDestinoTipo?.value || 'nova';
+    if (clientesCampanhaNomeWrap) clientesCampanhaNomeWrap.classList.toggle('hidden', destino !== 'nova');
+    if (clientesCampanhaSelectWrap) clientesCampanhaSelectWrap.classList.toggle('hidden', destino !== 'existente');
+  };
+
+  const atualizarResumoDistribuicao = () => {
+    const snapshot = obterSnapshotDistribuicao();
+    const vendedorId = parseNumericId(clientesCampanhaVendedor?.value);
+    const elegiveis = obterElegiveisSemRepeticao(snapshot, vendedorId);
+    if (clientesCampanhaTotalFiltrados) {
+      clientesCampanhaTotalFiltrados.textContent = String(snapshot?.clientesFiltrados?.length || 0);
+    }
+    if (clientesCampanhaTotalElegiveis) {
+      clientesCampanhaTotalElegiveis.textContent = String(elegiveis.length);
+    }
+    filtrarCampanhasDestino();
+  };
+
+  const fecharModalDistribuicaoClientes = () => {
+    if (clientesCampanhaModal) clientesCampanhaModal.classList.add('hidden');
+  };
+
+  const abrirModalDistribuicaoClientes = async () => {
+    const user = obterUsuarioLogado();
+    const snapshot = obterSnapshotDistribuicao();
+    const ofertaRaw = String(document.getElementById('filter-clientes-oferta')?.value || '').trim();
+    const ofertaNormalizada = normalizarChaveOfertaCampanha(snapshot?.filtroOfertaNormalizado || ofertaRaw);
+
+    if (!ofertaNormalizada) {
+      alert('Use primeiro o filtro de observação para definir a oferta da distribuição.');
+      return;
+    }
+
+    if (!snapshot || !Array.isArray(snapshot.clientesFiltrados) || snapshot.clientesFiltrados.length === 0) {
+      alert('Nenhum cliente filtrado encontrado para enviar.');
+      return;
+    }
+
+    const [historicoRows, campanhasRows] = await Promise.all([
+      getAllData('campanha_distribuicao_historico'),
+      getAllData('campanhas')
+    ]);
+
+    distribuicaoHistoricoCache = Array.isArray(historicoRows) ? historicoRows : [];
+    distribuicaoCampanhasCache = Array.isArray(campanhasRows) ? campanhasRows : [];
+
+    if (clientesCampanhaOferta) {
+      clientesCampanhaOferta.value = snapshot.filtroOfertaRaw || ofertaRaw;
+    }
+
+    if (clientesCampanhaQuantidade) {
+      const sugestao = Math.min(10, snapshot.clientesFiltrados.length || 10);
+      clientesCampanhaQuantidade.value = String(Math.max(1, sugestao));
+    }
+
+    if (clientesCampanhaDestinoTipo) {
+      clientesCampanhaDestinoTipo.value = 'nova';
+    }
+
+    atualizarEstadoDestinoDistribuicao();
+
+    if (clientesCampanhaNome) {
+      const base = snapshot.filtroOfertaRaw || 'Distribuicao';
+      clientesCampanhaNome.value = `${base} - ${new Date().toLocaleDateString('pt-BR')}`;
+    }
+
+    if (clientesCampanhaVendedor) {
+      if (user && user.perfil === 'master') {
+        await popularSelectVendedores(clientesCampanhaVendedor, true);
+        if (clientesCampanhaVendedor.options[0]) clientesCampanhaVendedor.options[0].text = 'Selecione';
+        clientesCampanhaVendedor.disabled = false;
+      } else if (user) {
+        clientesCampanhaVendedor.innerHTML = `<option value="${user.id}">${user.nome}</option>`;
+        clientesCampanhaVendedor.value = String(user.id);
+        clientesCampanhaVendedor.disabled = true;
+      }
+    }
+
+    atualizarResumoDistribuicao();
+
+    if (clientesCampanhaModal) clientesCampanhaModal.classList.remove('hidden');
+    if (window.lucide) lucide.createIcons();
+  };
+
+  const distribuirClientesParaCampanha = async () => {
+    const user = obterUsuarioLogado();
+    const snapshot = obterSnapshotDistribuicao();
+    if (!snapshot) throw new Error('Nao foi possivel obter a lista filtrada de clientes.');
+
+    const vendedorId = parseNumericId(clientesCampanhaVendedor?.value);
+    if (!vendedorId) throw new Error('Selecione um vendedor destino.');
+
+    const ofertaChave = normalizarChaveOfertaCampanha(snapshot.filtroOfertaNormalizado);
+    if (!ofertaChave) throw new Error('Informe um filtro de observacao para distribuir.');
+
+    const quantidade = Math.max(1, parseInt(String(clientesCampanhaQuantidade?.value || '1'), 10) || 1);
+    const elegiveis = obterElegiveisSemRepeticao(snapshot, vendedorId);
+    if (!elegiveis.length) {
+      throw new Error('Nao ha clientes disponiveis sem repeticao para este vendedor nessa observacao.');
+    }
+
+    const selecionados = embaralharArray(elegiveis).slice(0, quantidade);
+    const destino = clientesCampanhaDestinoTipo?.value || 'nova';
+    let campanhaId = parseNumericId(clientesCampanhaDestinoId?.value);
+
+    if (destino === 'nova') {
+      const nomeCampanha = String(clientesCampanhaNome?.value || '').trim() || `${snapshot.filtroOfertaRaw || 'Distribuicao'} - ${new Date().toLocaleDateString('pt-BR')}`;
+      campanhaId = await addData('campanhas', {
+        nome: nomeCampanha,
+        produto: snapshot.filtroOfertaRaw || 'Oferta CRM',
+        vendedor_id: vendedorId,
+        criado_por: Number(user?.id || 0),
+        criado_em: new Date().toISOString(),
+        total_leads: selecionados.length
+      });
+    }
+
+    if (!campanhaId) {
+      throw new Error('Selecione uma campanha de destino ou crie uma nova.');
+    }
+
+    for (const cliente of selecionados) {
+      await addData('campanha_leads', {
+        campanha_id: Number(campanhaId),
+        vendedor_id: vendedorId,
+        empresa: cliente.nome || `Cliente #${cliente.id}`,
+        telefone: cliente.telefone || '',
+        email: cliente.email || '',
+        cnpj: cliente.cpfCnpj || '',
+        socio: cliente.nomeContatoSFA || '',
+        produto_ofertado: snapshot.filtroOfertaRaw || 'Oferta CRM',
+        status_funil: 'Novo',
+        objecao_principal: '',
+        retorno: '',
+        proxima_acao: 'Primeiro contato comercial',
+        data_proximo_contato: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+        criado_em: new Date().toISOString()
+      });
+
+      await addData('campanha_distribuicao_historico', {
+        cliente_id: Number(cliente.id),
+        vendedor_id: vendedorId,
+        campanha_id: Number(campanhaId),
+        oferta_chave: ofertaChave,
+        oferta_label: snapshot.filtroOfertaRaw || '',
+        enviado_por: Number(user?.id || 0),
+        enviado_em: new Date().toISOString(),
+        origem: 'clientes_filtro'
+      });
+    }
+
+    if (typeof renderCampanhasTab === 'function') {
+      await renderCampanhasTab();
+    }
+
+    fecharModalDistribuicaoClientes();
+    activateTab('campanhas');
+
+    const campanhaFilter = document.getElementById('campanhas-filter-campanha');
+    if (campanhaFilter) {
+      campanhaFilter.value = String(campanhaId);
+      campanhaFilter.dispatchEvent(new Event('change'));
+    }
+
+    if (typeof showQuickMessage === 'function') {
+      showQuickMessage(`Distribuicao concluida: ${selecionados.length} cliente(s) enviado(s) para campanha.`);
+    }
+  };
+
   const renderGlobalSearch = (query) => {
     const resultsEl = document.getElementById('global-search-results');
     if (!resultsEl) return;
@@ -602,6 +846,52 @@ function setupEventListeners() {
       window.__clientesGridPage = 1;
       window.__clientesGridLastSearch = '';
       renderClientesGrid();
+    };
+  }
+
+  const btnClientesEnviarCampanha = document.getElementById('btn-clientes-enviar-campanha');
+  const btnClientesCampanhaClose = document.getElementById('btn-clientes-campanha-close');
+  const btnClientesCampanhaCancel = document.getElementById('btn-clientes-campanha-cancel');
+  const btnClientesCampanhaEnviar = document.getElementById('btn-clientes-campanha-enviar');
+
+  if (btnClientesEnviarCampanha) {
+    btnClientesEnviarCampanha.onclick = () => {
+      abrirModalDistribuicaoClientes().catch(err => {
+        console.error('Erro ao abrir modal de distribuicao:', err);
+        alert(err.message || 'Nao foi possivel abrir o modal de distribuicao.');
+      });
+    };
+  }
+
+  if (btnClientesCampanhaClose) btnClientesCampanhaClose.onclick = fecharModalDistribuicaoClientes;
+  if (btnClientesCampanhaCancel) btnClientesCampanhaCancel.onclick = fecharModalDistribuicaoClientes;
+
+  if (clientesCampanhaDestinoTipo) {
+    clientesCampanhaDestinoTipo.onchange = () => {
+      atualizarEstadoDestinoDistribuicao();
+    };
+  }
+
+  if (clientesCampanhaVendedor) {
+    clientesCampanhaVendedor.onchange = () => {
+      atualizarResumoDistribuicao();
+    };
+  }
+
+  if (btnClientesCampanhaEnviar) {
+    btnClientesCampanhaEnviar.onclick = async () => {
+      const textoOriginal = btnClientesCampanhaEnviar.textContent;
+      btnClientesCampanhaEnviar.disabled = true;
+      btnClientesCampanhaEnviar.textContent = 'Distribuindo...';
+      try {
+        await distribuirClientesParaCampanha();
+      } catch (err) {
+        console.error('Erro ao distribuir clientes para campanha:', err);
+        alert(err.message || 'Nao foi possivel distribuir os clientes.');
+      } finally {
+        btnClientesCampanhaEnviar.disabled = false;
+        btnClientesCampanhaEnviar.textContent = textoOriginal;
+      }
     };
   }
 

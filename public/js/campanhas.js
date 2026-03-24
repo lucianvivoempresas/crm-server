@@ -5,6 +5,7 @@ let campanhasCache = [];
 let campanhaLeadsCache = [];
 let campanhasInitialized = false;
 let campanhasOnlyOverdue = false;
+let campanhasSelectedLeadIds = new Set();
 const COLD_AUTOMATION_DAYS = 7;
 
 const CAMPANHAS_STATUS = ['Novo', 'Contato', 'Proposta', 'Fechado', 'Perdido'];
@@ -235,11 +236,22 @@ function renderCampanhasFilters() {
 function renderCampanhasTable(leads) {
   const tbody = document.getElementById('campanhas-leads-table-body');
   const empty = document.getElementById('campanhas-leads-empty');
+  const selectAll = document.getElementById('campanhas-select-all');
   if (!tbody || !empty) return;
+
+  const visibleIds = new Set((leads || []).map(l => Number(l.id)));
+  campanhasSelectedLeadIds = new Set(
+    Array.from(campanhasSelectedLeadIds).filter(id => visibleIds.has(Number(id)))
+  );
 
   if (!leads.length) {
     tbody.innerHTML = '';
     empty.classList.remove('hidden');
+    if (selectAll) {
+      selectAll.checked = false;
+      selectAll.indeterminate = false;
+    }
+    atualizarBotaoExcluirSelecionados();
     return;
   }
 
@@ -247,8 +259,12 @@ function renderCampanhasTable(leads) {
 
   tbody.innerHTML = leads.map(lead => {
     const agenda = lead.data_proximo_contato ? formatDate(lead.data_proximo_contato) : 'Sem data';
+    const marcado = campanhasSelectedLeadIds.has(Number(lead.id));
     return `
       <tr class="hover:bg-slate-700/30">
+        <td class="px-4 py-3 text-slate-300">
+          <input type="checkbox" class="campanhas-lead-checkbox w-4 h-4 rounded" data-id="${lead.id}" ${marcado ? 'checked' : ''} />
+        </td>
         <td class="px-4 py-3 text-white font-medium">${lead.empresa || 'N/A'}</td>
         <td class="px-4 py-3 text-slate-300">${lead.telefone || 'N/A'}</td>
         <td class="px-4 py-3 text-slate-300">${lead.email || 'N/A'}</td>
@@ -262,6 +278,28 @@ function renderCampanhasTable(leads) {
       </tr>
     `;
   }).join('');
+
+  if (selectAll) {
+    const totalVisiveis = leads.length;
+    const selecionadosVisiveis = leads.filter(l => campanhasSelectedLeadIds.has(Number(l.id))).length;
+    selectAll.checked = totalVisiveis > 0 && selecionadosVisiveis === totalVisiveis;
+    selectAll.indeterminate = selecionadosVisiveis > 0 && selecionadosVisiveis < totalVisiveis;
+  }
+
+  atualizarBotaoExcluirSelecionados();
+}
+
+function atualizarBotaoExcluirSelecionados() {
+  const btn = document.getElementById('btn-campanhas-delete-selected');
+  if (!btn) return;
+
+  const qtd = campanhasSelectedLeadIds.size;
+  btn.disabled = qtd === 0;
+  btn.classList.toggle('opacity-50', qtd === 0);
+  btn.classList.toggle('cursor-not-allowed', qtd === 0);
+  btn.innerHTML = `<i data-lucide="trash" class="w-4 h-4"></i>Excluir Selecionados (${qtd})`;
+
+  if (window.lucide) lucide.createIcons();
 }
 
 function renderCampanhaReport(leads) {
@@ -744,6 +782,27 @@ async function deleteCurrentCampaign(campanhaIdParam) {
   await renderCampanhasTab();
 }
 
+async function deleteSelectedCampaignLeads() {
+  const ids = Array.from(campanhasSelectedLeadIds);
+  if (!ids.length) {
+    alert('Selecione ao menos um lead para excluir.');
+    return;
+  }
+
+  const ok = confirm(`Excluir ${ids.length} lead(s) selecionado(s)?`);
+  if (!ok) return;
+
+  for (const leadId of ids) {
+    await deleteData('campanha_leads', leadId);
+  }
+
+  campanhasSelectedLeadIds = new Set();
+  if (typeof showQuickMessage === 'function') {
+    showQuickMessage(`${ids.length} lead(s) removido(s) da campanha.`);
+  }
+  await renderCampanhasTab();
+}
+
 async function importarCampanhaPorArquivo(file) {
   const user = obterUsuarioLogado();
   if (!user) throw new Error('Sessao expirada.');
@@ -813,6 +872,8 @@ async function importarCampanhaPorArquivo(file) {
 
 async function renderCampanhasTab() {
   await carregarCampanhasData();
+  const todosIds = new Set((campanhaLeadsCache || []).map(l => Number(l.id)));
+  campanhasSelectedLeadIds = new Set(Array.from(campanhasSelectedLeadIds).filter(id => todosIds.has(Number(id))));
   await applyColdLeadAutomation();
   renderCampanhasFilters();
   populateDeleteCampanhaOptions();
@@ -823,6 +884,7 @@ async function renderCampanhasTab() {
   renderCampanhaReport(filtered);
   renderCampanhasAgenda(filtered);
   renderOverdueFilterIndicator();
+  atualizarBotaoExcluirSelecionados();
 
   const overdueCount = campanhaLeadsCache.filter(l => {
     if (!l.data_proximo_contato) return false;
@@ -882,10 +944,12 @@ function initCampanhasModule() {
   const btnRefresh = document.getElementById('btn-campanhas-refresh');
   const btnExport = document.getElementById('btn-campanhas-export');
   const btnDelete = document.getElementById('btn-campanhas-delete');
+  const btnDeleteSelected = document.getElementById('btn-campanhas-delete-selected');
   const btnDeleteClose = document.getElementById('btn-campanha-delete-close');
   const btnDeleteCancel = document.getElementById('btn-campanha-delete-cancel');
   const btnDeleteConfirm = document.getElementById('btn-campanha-delete-confirm');
   const deleteSelect = document.getElementById('campanha-delete-select');
+  const selectAllLeads = document.getElementById('campanhas-select-all');
   const btnHeaderAlertOpen = document.getElementById('btn-header-followup-open');
   const btnClearOverdue = document.getElementById('btn-campanhas-overdue-clear');
   const campanhaFilter = document.getElementById('campanhas-filter-campanha');
@@ -934,6 +998,16 @@ function initCampanhasModule() {
   if (btnRefresh) btnRefresh.onclick = () => renderCampanhasTab();
   if (btnExport) btnExport.onclick = () => exportCurrentCampaignCsv();
   if (btnDelete) btnDelete.onclick = () => openDeleteCampanhaModal();
+  if (btnDeleteSelected) {
+    btnDeleteSelected.onclick = async () => {
+      try {
+        await deleteSelectedCampaignLeads();
+      } catch (err) {
+        console.error(err);
+        alert(err.message || 'Erro ao excluir leads selecionados.');
+      }
+    };
+  }
   if (btnDeleteClose) btnDeleteClose.onclick = () => closeDeleteCampanhaModal();
   if (btnDeleteCancel) btnDeleteCancel.onclick = () => closeDeleteCampanhaModal();
   if (btnDeleteConfirm) {
@@ -990,6 +1064,7 @@ function initCampanhasModule() {
       return l.data_proximo_contato < getTodayISO();
     }).length;
     setHeaderFollowupAlert(overdueCount);
+    atualizarBotaoExcluirSelecionados();
   };
 
   if (campanhaFilter) campanhaFilter.onchange = rerenderFiltered;
@@ -1010,12 +1085,38 @@ function initCampanhasModule() {
     }
   };
 
+  if (selectAllLeads) {
+    selectAllLeads.onchange = () => {
+      const filtered = getCampanhasFilteredLeads();
+      const checked = !!selectAllLeads.checked;
+      filtered.forEach(lead => {
+        const leadId = Number(lead.id);
+        if (checked) campanhasSelectedLeadIds.add(leadId);
+        else campanhasSelectedLeadIds.delete(leadId);
+      });
+      renderCampanhasTable(filtered);
+    };
+  }
+
   document.body.addEventListener('click', (e) => {
     const openBtn = e.target.closest('.btn-open-campanha-lead');
     if (openBtn) {
       openLeadModal(Number(openBtn.dataset.id));
     }
   });
+
+  document.body.addEventListener('change', (e) => {
+    const checkbox = e.target.closest('.campanhas-lead-checkbox');
+    if (!checkbox) return;
+    const leadId = Number(checkbox.dataset.id);
+    if (!leadId) return;
+    if (checkbox.checked) campanhasSelectedLeadIds.add(leadId);
+    else campanhasSelectedLeadIds.delete(leadId);
+    const filtered = getCampanhasFilteredLeads();
+    renderCampanhasTable(filtered);
+  });
+
+  atualizarBotaoExcluirSelecionados();
 
   campanhasInitialized = true;
 }
