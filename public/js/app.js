@@ -1350,6 +1350,10 @@ function setupVendaFormListeners() {
   const statusSelect = document.getElementById('venda-status');
   const dataConclusaoContainer = document.getElementById('venda-data-conclusao-container');
   const dataConclusaoInput = document.getElementById('venda-dataConclusao');
+  const motivoPerdaContainer = document.getElementById('venda-motivo-perda-container');
+  const motivoPerdaInput = document.getElementById('venda-motivoPerda');
+  const proximaAcaoInput = document.getElementById('venda-proximaAcao');
+  const dataProximoContatoInput = document.getElementById('venda-dataProximoContato');
   const comissaoContainer = document.getElementById('venda-comissao-estimada');
   const comissaoValor = document.getElementById('venda-comissao-valor');
 
@@ -1365,6 +1369,17 @@ function setupVendaFormListeners() {
         if (dataConclusaoContainer) dataConclusaoContainer.classList.add('hidden');
         if (dataConclusaoInput) dataConclusaoInput.value = '';
       }
+
+      if (statusSelect.value === 'Cancelado') {
+        if (motivoPerdaContainer) motivoPerdaContainer.classList.remove('hidden');
+      } else {
+        if (motivoPerdaContainer) motivoPerdaContainer.classList.add('hidden');
+        if (motivoPerdaInput) motivoPerdaInput.value = '';
+      }
+
+      const statusFinal = ['Concluído', 'Cancelado'].includes(statusSelect.value);
+      if (proximaAcaoInput) proximaAcaoInput.required = !statusFinal;
+      if (dataProximoContatoInput) dataProximoContatoInput.required = !statusFinal;
     });
 
     const inputs = ['venda-produto','venda-operadora','venda-tipoCliente','venda-valorVenda','venda-vendedor_id'].map(id => document.getElementById(id)).filter(Boolean);
@@ -1393,6 +1408,7 @@ function setupVendaFormListeners() {
     
     inputs.forEach(inp => inp.addEventListener('input', updateEstimativa));
     inputs.forEach(inp => inp.addEventListener('change', updateEstimativa));
+    statusSelect.dispatchEvent(new Event('change'));
   }
 }
 
@@ -1440,21 +1456,80 @@ function setupQuickFormListeners() {
 
   const qfVenda = document.getElementById('quick-form-venda');
   if (qfVenda) {
+    const qfStatus = document.getElementById('qf-venda-status');
+    const qfDataConclusao = document.getElementById('qf-venda-dataConclusao');
+    const qfMotivoWrap = document.getElementById('qf-venda-motivoPerda-wrap');
+    const qfMotivo = document.getElementById('qf-venda-motivoPerda');
+    const qfProximaAcao = document.getElementById('qf-venda-proximaAcao');
+    const qfProximoContato = document.getElementById('qf-venda-dataProximoContato');
+
+    if (qfStatus && !qfStatus.dataset.listenersAttached) {
+      qfStatus.dataset.listenersAttached = '1';
+      qfStatus.addEventListener('change', () => {
+        const status = qfStatus.value;
+        if (qfDataConclusao) {
+          qfDataConclusao.classList.toggle('hidden', status !== 'Concluído');
+          if (status === 'Concluído' && !qfDataConclusao.value) {
+            qfDataConclusao.value = new Date().toISOString().split('T')[0];
+          }
+          if (status !== 'Concluído') {
+            qfDataConclusao.value = '';
+          }
+        }
+        if (qfMotivoWrap) qfMotivoWrap.classList.toggle('hidden', status !== 'Cancelado');
+        if (status !== 'Cancelado' && qfMotivo) qfMotivo.value = '';
+
+        const statusFinal = ['Concluído', 'Cancelado'].includes(status);
+        if (qfProximaAcao) qfProximaAcao.required = !statusFinal;
+        if (qfProximoContato) qfProximoContato.required = !statusFinal;
+      });
+      qfStatus.dispatchEvent(new Event('change'));
+    }
+
     qfVenda.onsubmit = async (e) => {
       e.preventDefault();
+      const status = document.getElementById('qf-venda-status').value;
+      const proximaAcao = document.getElementById('qf-venda-proximaAcao').value.trim();
+      const dataProximoContato = document.getElementById('qf-venda-dataProximoContato').value;
+      const motivoPerda = document.getElementById('qf-venda-motivoPerda').value;
+      const dataConclusao = document.getElementById('qf-venda-dataConclusao').value;
+
+      if (!['Concluído', 'Cancelado'].includes(status) && (!proximaAcao || !dataProximoContato)) {
+        showQuickMessage('Informe proxima acao e data do proximo contato.', true);
+        return;
+      }
+      if (status === 'Cancelado' && !motivoPerda) {
+        showQuickMessage('Selecione o motivo da perda para vendas canceladas.', true);
+        return;
+      }
+      if (status === 'Concluído' && !dataConclusao) {
+        showQuickMessage('Informe a data de conclusao para vendas concluidas.', true);
+        return;
+      }
+
+      const hoje = new Date().toISOString().split('T')[0];
       const data = { 
         vendedor_id: obterIdUsuario(),
         clienteId: parseInt(document.getElementById('qf-venda-clienteId').value), 
         produto: document.getElementById('qf-venda-produto').value, 
         operadora: document.getElementById('qf-venda-operadora').value, 
         valorVenda: document.getElementById('qf-venda-valorVenda').value, 
-        status: document.getElementById('qf-venda-status').value, 
-        observacao: document.getElementById('qf-venda-observacao').value 
+        tipoCliente: document.getElementById('qf-venda-tipoCliente').value,
+        status,
+        dataConclusao,
+        proximaAcao,
+        dataProximoContato,
+        motivoPerda: status === 'Cancelado' ? motivoPerda : '',
+        observacao: document.getElementById('qf-venda-observacao').value,
+        dataRegistro: hoje,
+        dataMudancaStatus: hoje,
+        ultimaInteracao: hoje
       };
       try { 
         await addData('vendas', data); 
         showQuickMessage('Venda Salva!'); 
         e.target.reset(); 
+        if (qfStatus) qfStatus.dispatchEvent(new Event('change'));
         await renderAll(); 
       } catch(err) { showQuickMessage('Erro', true); }
     };
@@ -1516,9 +1591,30 @@ async function handleModalSave(e) {
     const user = obterUsuarioLogado();
     const vendedorEl = document.getElementById('venda-vendedor_id');
     const vendedorSelecionado = vendedorEl && vendedorEl.value ? parseInt(vendedorEl.value, 10) : null;
+    const statusVenda = document.getElementById('venda-status').value;
+    const proximaAcao = document.getElementById('venda-proximaAcao').value.trim();
+    const dataProximoContato = document.getElementById('venda-dataProximoContato').value;
+    const motivoPerda = document.getElementById('venda-motivoPerda').value;
+    const dataConclusao = document.getElementById('venda-dataConclusao').value;
+    const hoje = new Date().toISOString().split('T')[0];
 
     if (user && user.perfil === 'master' && !vendedorSelecionado) {
       showModalError('Selecione o vendedor da venda.');
+      return;
+    }
+
+    if (!['Concluído', 'Cancelado'].includes(statusVenda) && (!proximaAcao || !dataProximoContato)) {
+      showModalError('Informe a proxima acao e a data do proximo contato para vendas em andamento.');
+      return;
+    }
+
+    if (statusVenda === 'Cancelado' && !motivoPerda) {
+      showModalError('Selecione um motivo de perda para status Cancelado.');
+      return;
+    }
+
+    if (statusVenda === 'Concluído' && !dataConclusao) {
+      showModalError('Preencha a data de conclusao para vendas concluidas.');
       return;
     }
 
@@ -1527,11 +1623,16 @@ async function handleModalSave(e) {
       produto: document.getElementById('venda-produto').value, 
       operadora: document.getElementById('venda-operadora').value, 
       valorVenda: document.getElementById('venda-valorVenda').value, 
-      status: document.getElementById('venda-status').value, 
+      status: statusVenda,
       tipoCliente: document.getElementById('venda-tipoCliente').value, 
-      dataConclusao: document.getElementById('venda-dataConclusao').value, 
+      dataConclusao,
+      proximaAcao,
+      dataProximoContato,
+      motivoPerda: statusVenda === 'Cancelado' ? motivoPerda : '',
       observacao: document.getElementById('venda-observacao').value,
-      dataRegistro: existing ? existing.dataRegistro : new Date().toISOString().split('T')[0],
+      dataRegistro: existing ? existing.dataRegistro : hoje,
+      dataMudancaStatus: (!existing || existing.status !== statusVenda) ? hoje : (existing.dataMudancaStatus || existing.dataRegistro || hoje),
+      ultimaInteracao: hoje,
       posVendaDismissed: existing ? (existing.posVendaDismissed || []) : []
     };
 

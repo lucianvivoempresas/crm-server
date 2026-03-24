@@ -7,6 +7,7 @@ async function renderAll() {
     window.__clientesDataVersion = Date.now();
     renderDashboard();
     renderVendasTable();
+    renderVendasAcoesHoje();
     renderClientesGrid();
     renderPosVenda();
     renderComissoesTable();
@@ -414,6 +415,147 @@ function renderVendasRecentes() {
   }).join('');
 }
 
+function getVendaDateOnly(dateValue) {
+  if (!dateValue) return null;
+  const parsed = new Date(`${String(dateValue).slice(0, 10)}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function diffDaysFromToday(dateValue) {
+  const date = getVendaDateOnly(dateValue);
+  if (!date) return null;
+  const today = new Date();
+  const baseToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.floor((baseToday.getTime() - date.getTime()) / 86400000);
+}
+
+function diffDaysUntil(dateValue) {
+  const date = getVendaDateOnly(dateValue);
+  if (!date) return null;
+  const today = new Date();
+  const baseToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.floor((date.getTime() - baseToday.getTime()) / 86400000);
+}
+
+function getVendaSlaInfo(venda) {
+  const status = venda?.status || '';
+  if (['Concluído', 'Cancelado'].includes(status)) {
+    return { diasNaEtapa: 0, limite: null, atrasado: false, atrasoDias: 0, label: 'Finalizada' };
+  }
+
+  const limites = {
+    'Negociando': 2,
+    'Aguardando Aceite': 2,
+    'Inputado': 1,
+    'Aguardando fatura': 3,
+    'Aguardando Distribuidora': 3
+  };
+  const limite = limites[status] || 2;
+  const referencia = venda.dataMudancaStatus || venda.dataRegistro || venda.dataConclusao;
+  const diasNaEtapa = Math.max(0, diffDaysFromToday(referencia) || 0);
+  const atrasoDias = Math.max(0, diasNaEtapa - limite);
+  return {
+    diasNaEtapa,
+    limite,
+    atrasado: atrasoDias > 0,
+    atrasoDias,
+    label: atrasoDias > 0 ? `Atraso ${atrasoDias}d` : `No prazo (${diasNaEtapa}/${limite}d)`
+  };
+}
+
+function getVendaPrioridade(venda) {
+  if (['Concluído', 'Cancelado'].includes(venda?.status || '')) {
+    return { label: 'Baixa', score: 10, className: 'bg-slate-500/20 text-slate-300 border-slate-500/30' };
+  }
+
+  let score = 0;
+  const sla = getVendaSlaInfo(venda);
+  if (sla.atrasado) score += 40;
+
+  const diasParaContato = diffDaysUntil(venda?.dataProximoContato);
+  if (diasParaContato == null) {
+    score += 35;
+  } else if (diasParaContato <= 0) {
+    score += 30;
+  } else if (diasParaContato <= 1) {
+    score += 20;
+  } else if (diasParaContato <= 2) {
+    score += 10;
+  }
+
+  const pesosStatus = {
+    'Aguardando Aceite': 25,
+    'Negociando': 20,
+    'Inputado': 15,
+    'Aguardando fatura': 12,
+    'Aguardando Distribuidora': 10
+  };
+  score += pesosStatus[venda?.status] || 5;
+
+  if (Number(venda?.valorVenda || 0) >= 2000) score += 10;
+
+  if (score >= 70) {
+    return { label: 'Alta', score, className: 'bg-red-500/20 text-red-300 border-red-500/30' };
+  }
+  if (score >= 40) {
+    return { label: 'Media', score, className: 'bg-amber-500/20 text-amber-300 border-amber-500/30' };
+  }
+  return { label: 'Baixa', score, className: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
+}
+
+function escapeHtml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderVendasAcoesHoje() {
+  const listEl = document.getElementById('vendas-acoes-hoje-list');
+  const emptyEl = document.getElementById('vendas-acoes-hoje-empty');
+  const countEl = document.getElementById('vendas-acoes-hoje-count');
+  if (!listEl || !emptyEl || !countEl) return;
+
+  const user = obterUsuarioLogado();
+  let visiveis = vendas || [];
+  if (user && user.perfil === 'vendedor') {
+    visiveis = visiveis.filter(v => Number(v.vendedor_id) === Number(user.id));
+  }
+
+  const pendentes = visiveis
+    .filter(v => !['Concluído', 'Cancelado'].includes(v.status || ''))
+    .map(v => ({ venda: v, diasParaContato: diffDaysUntil(v.dataProximoContato) }))
+    .filter(item => item.diasParaContato != null && item.diasParaContato <= 0)
+    .sort((a, b) => a.diasParaContato - b.diasParaContato)
+    .slice(0, 8);
+
+  countEl.textContent = `${pendentes.length} pendencia(s)`;
+
+  if (!pendentes.length) {
+    listEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+
+  emptyEl.classList.add('hidden');
+  listEl.innerHTML = pendentes.map(({ venda, diasParaContato }) => {
+    const cliente = clientes.find(c => Number(c.id) === Number(venda.clienteId));
+    const atrasoLabel = diasParaContato < 0 ? `${Math.abs(diasParaContato)} dia(s) atrasado` : 'vence hoje';
+    return `<div class="flex items-center justify-between gap-3 bg-slate-900/40 border border-slate-700 rounded-lg px-3 py-2">
+      <div class="min-w-0">
+        <p class="text-sm text-white truncate">${escapeHtml(cliente?.nome || 'Cliente sem nome')}</p>
+        <p class="text-xs text-slate-400 truncate">${escapeHtml(venda.proximaAcao || 'Sem proxima acao definida')} • ${escapeHtml(venda.status || '')}</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 whitespace-nowrap">${atrasoLabel}</span>
+        <button class="px-2 py-1 text-xs rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30 hover:bg-blue-500/30 btn-edit" data-id="${venda.id}" data-type="venda">Abrir</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderVendasTable() {
   const searchTerm = (document.getElementById('search-vendas')?.value || '').toLowerCase();
   const filterStatus = document.getElementById('filter-vendas-status')?.value;
@@ -469,10 +611,24 @@ function renderVendasTable() {
     const c = clientes.find(cl => cl.id === v.clienteId);
     const vendedorNome = usuariosList?.find(u => Number(u.id) === Number(v.vendedor_id))?.nome || 'N/A';
     const vendedorCell = isMaster ? `<td class="px-6 py-4 text-slate-300">${vendedorNome}</td>` : '';
+    const prioridade = getVendaPrioridade(v);
+    const sla = getVendaSlaInfo(v);
+    const diasParaContato = diffDaysUntil(v.dataProximoContato);
+    const contatoLabel = diasParaContato == null
+      ? 'Sem data'
+      : (diasParaContato < 0 ? `${Math.abs(diasParaContato)}d atrasado` : (diasParaContato === 0 ? 'Hoje' : `D+${diasParaContato}`));
+    const contatoClass = diasParaContato == null || diasParaContato < 0
+      ? 'text-red-300'
+      : (diasParaContato === 0 ? 'text-amber-300' : 'text-slate-300');
     return `<tr class="hover:bg-slate-700/30">
       <td class="px-6 py-4 text-white">${c?.nome||'N/A'}</td><td class="px-6 py-4 text-slate-300">${v.produto}</td><td class="px-6 py-4 text-slate-300">${v.operadora}</td>${vendedorCell}
+      <td class="px-6 py-4"><span class="px-2 py-1 text-xs rounded-full border ${prioridade.className}" title="Score ${prioridade.score}">${prioridade.label}</span></td>
       <td class="px-6 py-4 text-white font-medium">${formatCurrency(v.valorVenda)}</td><td class="px-6 py-4 text-green-400 font-medium">${formatCurrency(calcularComissao(v))}</td>
       <td class="px-6 py-4">${getStatusBadge(v.status)}</td>
+      <td class="px-6 py-4">
+        <div class="text-xs text-slate-300">${sla.label}</div>
+        <div class="text-xs ${contatoClass}">${escapeHtml(v.proximaAcao || 'Sem proxima acao')} • ${contatoLabel}</div>
+      </td>
       <td class="px-6 py-4"><div class="flex gap-2">
         <button class="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors btn-edit" data-id="${v.id}" data-type="venda"><i data-lucide="edit-2" class="w-4 h-4 pointer-events-none"></i></button>
         <button class="p-2 text-red-400 hover:bg-red-500/20 rounded-lg transition-colors btn-delete" data-id="${v.id}" data-type="venda"><i data-lucide="trash-2" class="w-4 h-4 pointer-events-none"></i></button>

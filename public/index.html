@@ -564,6 +564,14 @@
           <button id="btn-nova-venda" class="px-6 py-2 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center gap-2 shadow-lg"><i data-lucide="plus" class="w-5 h-5"></i>Nova Venda</button>
         </div>
       </div>
+      <div class="bg-slate-800/40 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wide">Acoes do Dia</h3>
+          <span id="vendas-acoes-hoje-count" class="text-xs text-slate-400">0 pendencias</span>
+        </div>
+        <div id="vendas-acoes-hoje-list" class="space-y-2"></div>
+        <p id="vendas-acoes-hoje-empty" class="text-sm text-slate-400 hidden">Sem pendencias de contato para hoje.</p>
+      </div>
       <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 overflow-hidden">
         <div class="overflow-x-auto">
           <table class="w-full">
@@ -573,9 +581,11 @@
                 <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Produto</th>
                 <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Operadora</th>
                 <th id="vendas-col-vendedor" class="px-6 py-4 text-left text-sm font-semibold text-slate-300 hidden">Vendedor</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Prioridade</th>
                 <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Valor</th>
                 <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Comissão</th>
                 <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Status</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">SLA / Proxima Acao</th>
                 <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Ações</th>
               </tr>
             </thead>
@@ -1055,6 +1065,19 @@
           <option value="Negociando">Negociando</option><option value="Aguardando Aceite">Aguardando Aceite</option><option value="Inputado">Inputado</option><option value="Concluído">Concluído</option><option value="Cancelado">Cancelado</option><option value="Aguardando fatura">Aguardando fatura</option><option value="Aguardando Distribuidora">Aguardando Distribuidora</option>
         </select>
         <input type="date" id="qf-venda-dataConclusao" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white hidden" title="Data de Conclusão">
+        <input type="text" id="qf-venda-proximaAcao" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="Próxima ação (ex: Retornar ligação)">
+        <input type="date" id="qf-venda-dataProximoContato" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" title="Data do próximo contato">
+        <div id="qf-venda-motivoPerda-wrap" class="hidden">
+          <select id="qf-venda-motivoPerda" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white">
+            <option value="">Motivo da perda *</option>
+            <option value="Preco">Preço</option>
+            <option value="Sem retorno">Sem retorno do cliente</option>
+            <option value="Concorrencia">Concorrência</option>
+            <option value="Sem fit">Sem aderência ao produto</option>
+            <option value="Prazo">Prazo</option>
+            <option value="Outro">Outro</option>
+          </select>
+        </div>
         <textarea id="qf-venda-observacao" rows="2" class="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white" placeholder="Observação (Opcional)"></textarea>
         <button type="submit" class="w-full px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-medium hover:from-green-600 hover:to-emerald-700 transition-all">Salvar Venda</button>
       </form>
@@ -1310,6 +1333,28 @@
       <label class="block text-sm text-slate-300 mb-2">Status *</label>
       <select id="venda-status" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" required>
         <option value="Negociando">Negociando</option><option value="Aguardando Aceite">Aguardando Aceite</option><option value="Inputado">Inputado</option><option value="Concluído">Concluído</option><option value="Cancelado">Cancelado</option><option value="Aguardando fatura">Aguardando fatura</option><option value="Aguardando Distribuidora">Aguardando Distribuidora</option>
+      </select>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm text-slate-300 mb-2">Próxima Ação</label>
+        <input type="text" id="venda-proximaAcao" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white" placeholder="Ex: ligar para confirmar aceite">
+      </div>
+      <div>
+        <label class="block text-sm text-slate-300 mb-2">Data Próximo Contato</label>
+        <input type="date" id="venda-dataProximoContato" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white">
+      </div>
+    </div>
+    <div id="venda-motivo-perda-container" class="hidden">
+      <label class="block text-sm text-slate-300 mb-2">Motivo da Perda *</label>
+      <select id="venda-motivoPerda" class="w-full px-4 py-3 bg-slate-700/50 rounded-lg text-white">
+        <option value="">Selecione</option>
+        <option value="Preco">Preço</option>
+        <option value="Sem retorno">Sem retorno do cliente</option>
+        <option value="Concorrencia">Concorrência</option>
+        <option value="Sem fit">Sem aderência ao produto</option>
+        <option value="Prazo">Prazo</option>
+        <option value="Outro">Outro</option>
       </select>
     </div>
     <div id="venda-data-conclusao-container" class="hidden">
