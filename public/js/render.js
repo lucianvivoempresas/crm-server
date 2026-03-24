@@ -626,14 +626,28 @@ function renderVendasTable() {
     const contatoClass = diasParaContato == null || diasParaContato < 0
       ? 'text-red-300'
       : (diasParaContato === 0 ? 'text-amber-300' : 'text-slate-300');
+    const nomeCliente = String(c?.nome || 'N/A');
+    const nomeClienteEscaped = escapeHtml(nomeCliente);
+    const nomeTargetId = `venda-cliente-${v.id}`;
+    const clampNome = nomeCliente.length > 34;
+    const acaoTexto = String(v.proximaAcao || 'Sem proxima acao');
+    const acaoEscaped = escapeHtml(acaoTexto);
+    const acaoTargetId = `venda-acao-${v.id}`;
+    const clampAcao = acaoTexto.length > 56;
     return `<tr class="hover:bg-slate-700/30">
-      <td class="px-6 py-4 text-white">${c?.nome||'N/A'}</td><td class="px-6 py-4 text-slate-300">${v.produto}</td><td class="px-6 py-4 text-slate-300">${v.operadora}</td>${vendedorCell}
+      <td class="px-6 py-4 text-white">
+        <p id="${nomeTargetId}" style="display:-webkit-box;-webkit-line-clamp:${clampNome ? '1' : 'unset'};-webkit-box-orient:vertical;overflow:${clampNome ? 'hidden' : 'visible'}">${nomeClienteEscaped}</p>
+        ${clampNome ? `<button class="btn-toggle-observacao mt-1 text-[11px] text-cyan-300 hover:text-cyan-200" data-target="${nomeTargetId}" data-expanded="false">Ver mais</button>` : ''}
+      </td><td class="px-6 py-4 text-slate-300">${v.produto}</td><td class="px-6 py-4 text-slate-300">${v.operadora}</td>${vendedorCell}
       <td class="px-6 py-4"><span class="px-2 py-1 text-xs rounded-full border ${prioridade.className}" title="Score ${prioridade.score}">${prioridade.label}</span></td>
       <td class="px-6 py-4 text-white font-medium">${formatCurrency(v.valorVenda)}</td><td class="px-6 py-4 text-green-400 font-medium">${formatCurrency(calcularComissao(v))}</td>
       <td class="px-6 py-4">${getStatusBadge(v.status)}</td>
       <td class="px-6 py-4">
         <div class="text-xs text-slate-300">${sla.label}</div>
-        <div class="text-xs ${contatoClass}">${escapeHtml(v.proximaAcao || 'Sem proxima acao')} • ${contatoLabel}</div>
+        <div class="text-xs ${contatoClass}">
+          <p id="${acaoTargetId}" style="display:-webkit-box;-webkit-line-clamp:${clampAcao ? '1' : 'unset'};-webkit-box-orient:vertical;overflow:${clampAcao ? 'hidden' : 'visible'}">${acaoEscaped} • ${contatoLabel}</p>
+          ${clampAcao ? `<button class="btn-toggle-observacao mt-1 text-[11px] text-cyan-300 hover:text-cyan-200" data-target="${acaoTargetId}" data-expanded="false">Ver mais</button>` : ''}
+        </div>
       </td>
       <td class="px-6 py-4"><div class="flex gap-2">
         <button class="p-2 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors btn-edit" data-id="${v.id}" data-type="venda"><i data-lucide="edit-2" class="w-4 h-4 pointer-events-none"></i></button>

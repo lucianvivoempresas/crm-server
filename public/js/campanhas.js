@@ -233,6 +233,27 @@ function renderCampanhasFilters() {
   campanhaSel.value = current;
 }
 
+function escapeCampanhasHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function renderCampanhaExpandableText(rawValue, targetId, maxLen = 30, textClass = 'text-slate-300') {
+  const text = String(rawValue || 'N/A');
+  const escaped = escapeCampanhasHtml(text);
+  const shouldClamp = text.length > maxLen;
+  return `
+    <div class="${textClass}">
+      <p id="${targetId}" style="display:-webkit-box;-webkit-line-clamp:${shouldClamp ? '1' : 'unset'};-webkit-box-orient:vertical;overflow:${shouldClamp ? 'hidden' : 'visible'}">${escaped}</p>
+      ${shouldClamp ? `<button class="btn-toggle-observacao mt-1 text-[11px] text-cyan-300 hover:text-cyan-200" data-target="${targetId}" data-expanded="false">Ver mais</button>` : ''}
+    </div>
+  `;
+}
+
 function renderCampanhasTable(leads) {
   const tbody = document.getElementById('campanhas-leads-table-body');
   const empty = document.getElementById('campanhas-leads-empty');
@@ -260,16 +281,20 @@ function renderCampanhasTable(leads) {
   tbody.innerHTML = leads.map(lead => {
     const agenda = lead.data_proximo_contato ? formatDate(lead.data_proximo_contato) : 'Sem data';
     const marcado = campanhasSelectedLeadIds.has(Number(lead.id));
+    const empresaCell = renderCampanhaExpandableText(lead.empresa || 'N/A', `campanha-empresa-${lead.id}`, 34, 'text-white font-medium');
+    const emailCell = renderCampanhaExpandableText(lead.email || 'N/A', `campanha-email-${lead.id}`, 28, 'text-slate-300');
+    const socioCell = renderCampanhaExpandableText(lead.socio || 'N/A', `campanha-socio-${lead.id}`, 26, 'text-slate-300');
+    const produtoCell = renderCampanhaExpandableText(lead.produto_ofertado || 'N/A', `campanha-produto-${lead.id}`, 28, 'text-slate-300');
     return `
       <tr class="hover:bg-slate-700/30">
         <td class="px-4 py-3 text-slate-300">
           <input type="checkbox" class="campanhas-lead-checkbox w-4 h-4 rounded" data-id="${lead.id}" ${marcado ? 'checked' : ''} />
         </td>
-        <td class="px-4 py-3 text-white font-medium">${lead.empresa || 'N/A'}</td>
+        <td class="px-4 py-3">${empresaCell}</td>
         <td class="px-4 py-3 text-slate-300">${lead.telefone || 'N/A'}</td>
-        <td class="px-4 py-3 text-slate-300">${lead.email || 'N/A'}</td>
-        <td class="px-4 py-3 text-slate-300">${lead.socio || 'N/A'}</td>
-        <td class="px-4 py-3 text-slate-300">${lead.produto_ofertado || 'N/A'}</td>
+        <td class="px-4 py-3">${emailCell}</td>
+        <td class="px-4 py-3">${socioCell}</td>
+        <td class="px-4 py-3">${produtoCell}</td>
         <td class="px-4 py-3">${getStatusBadge(lead.status_funil)}</td>
         <td class="px-4 py-3 text-slate-300">${agenda}</td>
         <td class="px-4 py-3">
