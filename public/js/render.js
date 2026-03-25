@@ -98,9 +98,9 @@ function renderDashboard() {
   const user = obterUsuarioLogado();
   let vendasUsuario = vendas;
   if (user && user.perfil === 'vendedor') {
-    vendasUsuario = vendas.filter(v => Number(v.vendedor_id) === Number(user.id));
+    vendasUsuario = vendas.filter(v => Number(getVendaOwnerId(v)) === Number(user.id));
   } else if (vendedorSelecionado) {
-    vendasUsuario = vendas.filter(v => Number(v.vendedor_id) === vendedorSelecionado);
+    vendasUsuario = vendas.filter(v => Number(getVendaOwnerId(v)) === vendedorSelecionado);
   }
 
   const vendasPeriodo = filterVendasByDateRange(vendasUsuario, range);
@@ -173,7 +173,7 @@ function renderDashboard() {
     emptyEl.classList.add('hidden');
     let vendasParaMeta = vendasPeriodo;
     if (metaPeriodo.vendedor_id) {
-      vendasParaMeta = vendasPeriodo.filter(v => Number(v.vendedor_id) === Number(metaPeriodo.vendedor_id));
+      vendasParaMeta = vendasPeriodo.filter(v => Number(getVendaOwnerId(v)) === Number(metaPeriodo.vendedor_id));
     }
 
     const metaVendas = Number(metaPeriodo.valorMeta) || 0;
@@ -261,7 +261,7 @@ function renderDashboard() {
     if (user && user.perfil === 'master') {
       const vendedores = (usuariosList || []).filter(u => u.perfil === 'vendedor' && u.ativo);
       const conversao = vendedores.map(v => {
-        const vendasV = (vendas || []).filter(x => Number(x.vendedor_id) === Number(v.id));
+        const vendasV = (vendas || []).filter(x => Number(getVendaOwnerId(x)) === Number(v.id));
         const concluidasV = vendasV.filter(x => x.status === 'Concluído');
         const taxa = vendasV.length ? (concluidasV.length / vendasV.length) * 100 : 0;
         return `${v.nome}: ${taxa.toFixed(1)}%`;
@@ -342,9 +342,9 @@ function renderDashboardCharts(vendasFiltradas) {
   const vendedorSelecionado = filtroVendedorDashboard ? Number(filtroVendedorDashboard) : null;
   let vendasAnoFiltradas = vendas.filter(v => v.dataConclusao && v.status === 'Concluído' && new Date(v.dataConclusao).getFullYear() === anoAtual);
   if (user && user.perfil === 'vendedor') {
-    vendasAnoFiltradas = vendasAnoFiltradas.filter(v => Number(v.vendedor_id) === Number(user.id));
+    vendasAnoFiltradas = vendasAnoFiltradas.filter(v => Number(getVendaOwnerId(v)) === Number(user.id));
   } else if (vendedorSelecionado) {
-    vendasAnoFiltradas = vendasAnoFiltradas.filter(v => Number(v.vendedor_id) === vendedorSelecionado);
+    vendasAnoFiltradas = vendasAnoFiltradas.filter(v => Number(getVendaOwnerId(v)) === vendedorSelecionado);
   }
   // Master vê todas
 
@@ -397,9 +397,9 @@ function renderVendasRecentes() {
   const vendedorSelecionado = filtroVendedorDashboard ? Number(filtroVendedorDashboard) : null;
   let vendasFiltradas = vendas;
   if (user && user.perfil === 'vendedor') {
-    vendasFiltradas = vendas.filter(v => Number(v.vendedor_id) === Number(user.id));
+    vendasFiltradas = vendas.filter(v => Number(getVendaOwnerId(v)) === Number(user.id));
   } else if (vendedorSelecionado) {
-    vendasFiltradas = vendas.filter(v => Number(v.vendedor_id) === vendedorSelecionado);
+    vendasFiltradas = vendas.filter(v => Number(getVendaOwnerId(v)) === vendedorSelecionado);
   }
   
   const recentes = [...vendasFiltradas].sort((a,b) => (new Date(b.dataConclusao||b.dataRegistro).getTime() || 0) - (new Date(a.dataConclusao||a.dataRegistro).getTime() || 0)).slice(0,5);
@@ -996,7 +996,7 @@ function renderPosVenda() {
   const user = obterUsuarioLogado();
   let vendasFiltradas = vendas.filter(v => v.status === 'Concluído' && v.dataConclusao);
   if (user && user.perfil === 'vendedor') {
-    vendasFiltradas = vendasFiltradas.filter(v => v.vendedor_id === user.id);
+    vendasFiltradas = vendasFiltradas.filter(v => Number(getVendaOwnerId(v)) === Number(user.id));
   }
   // Master vê todas
   
@@ -1130,11 +1130,11 @@ function renderMetasGrid() {
     
     // Se é vendedor, filtrar apenas suas vendas
     if (user && user.perfil === 'vendedor') {
-      vendasParaMeta = vendasParaMeta.filter(v => v.vendedor_id === user.id);
+      vendasParaMeta = vendasParaMeta.filter(v => Number(getVendaOwnerId(v)) === Number(user.id));
     }
     // Se meta é específica, sempre filtra para o vendedor daquela meta
     if (meta.vendedor_id) {
-      vendasParaMeta = vendasParaMeta.filter(v => Number(v.vendedor_id) === Number(meta.vendedor_id));
+      vendasParaMeta = vendasParaMeta.filter(v => Number(getVendaOwnerId(v)) === Number(meta.vendedor_id));
     }
     
     const vendasMeta = vendasParaMeta;

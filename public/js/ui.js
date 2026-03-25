@@ -186,8 +186,9 @@ function showModal(type, id=null) {
           }
 
           const vendedorSel = document.getElementById('venda-vendedor_id');
-          if (vendedorSel && item.vendedor_id) {
-            const wanted = String(item.vendedor_id);
+          const vendedorFallback = item.vendedor_id || clienteObj?.vendedor_id || '';
+          if (vendedorSel && vendedorFallback) {
+            const wanted = String(vendedorFallback);
             vendedorSel.value = wanted;
             if (vendedorSel.value !== wanted) vendedorSel.dataset.pendingValue = wanted;
           }
