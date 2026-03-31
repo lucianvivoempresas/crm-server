@@ -1,1206 +1,587 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VoltConnect - Economia de Energia por Assinatura</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Font Awesome 6.5.1 - Versão mais estável -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&display=swap');
-        
-        :root {
-            --primary-gradient: linear-gradient(135deg, #0ea5a4 0%, #2563eb 55%, #0f766e 100%);
-            --tech-light: #f8fafc;
-            --accent-cyan: #0891b2;
-            --card-white: rgba(255, 255, 255, 0.9);
-            --ink-soft: #334155;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Energia-Volt | Energia Limpa para sua Casa ou Negócio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --green: #00A86B;
+      --green-dark: #008C59;
+      --green-light: #E6F7F0;
+      --yellow: #F5B731;
+      --yellow-light: #FFF8E7;
+      --dark: #1A2B3C;
+      --text: #4A5568;
+      --text-light: #718096;
+      --bg: #FFFFFF;
+      --bg-alt: #F7FAF8;
+      --border: #E2E8F0;
+      --shadow: 0 4px 20px rgba(0,0,0,0.06);
+      --shadow-lg: 0 10px 40px rgba(0,0,0,0.08);
+      --radius: 16px;
+      --radius-sm: 12px;
+      --font-display: 'Outfit', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+    }
+    html { scroll-behavior: smooth; }
+    body { font-family: var(--font-body); background: var(--bg); color: var(--text); line-height: 1.65; overflow-x: hidden; }
+    .container { max-width: 1180px; margin: 0 auto; padding: 0 24px; }
 
-        body {
-            font-family: 'Outfit', sans-serif;
-            background-color: var(--tech-light);
-            color: #0f172a;
-            scroll-behavior: smooth;
-        }
+    /* NAVBAR */
+    .navbar { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; background: rgba(255,255,255,0.92); backdrop-filter: blur(16px); border-bottom: 1px solid var(--border); }
+    .navbar.scrolled { box-shadow: 0 2px 20px rgba(0,0,0,0.06); }
+    .nav-inner { display: flex; justify-content: space-between; align-items: center; height: 72px; }
+    .logo { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; color: var(--dark); text-decoration: none; display: flex; align-items: center; gap: 10px; }
+    .logo-icon { width: 38px; height: 38px; background: var(--green); border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+    .logo-icon svg { width: 22px; height: 22px; }
+    .nav-links { display: flex; gap: 28px; align-items: center; list-style: none; }
+    .nav-links a { color: var(--text); text-decoration: none; font-size: 0.92rem; font-weight: 500; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--green); }
+    .btn-cta { background: var(--green); color: #fff; padding: 10px 26px; border-radius: 50px; font-weight: 600; font-size: 0.92rem; text-decoration: none; transition: all 0.3s; border: none; cursor: pointer; font-family: var(--font-body); }
+    .btn-cta:hover { background: var(--green-dark); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,168,107,0.3); }
+    .hamburger { display: none; background: none; border: none; cursor: pointer; padding: 8px; }
+    .hamburger span { display: block; width: 22px; height: 2px; background: var(--dark); margin: 5px 0; border-radius: 2px; }
 
-        .text-gradient {
-            background: var(--primary-gradient);
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
+    /* HERO */
+    .hero { padding: 130px 0 80px; background: linear-gradient(135deg, var(--bg) 0%, var(--green-light) 50%, var(--yellow-light) 100%); position: relative; overflow: hidden; }
+    .hero::after { content: ''; position: absolute; top: -50%; right: -20%; width: 60%; height: 200%; background: radial-gradient(ellipse, rgba(0,168,107,0.06) 0%, transparent 70%); pointer-events: none; }
+    .hero .container { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 60px; align-items: center; position: relative; z-index: 2; }
+    .hero-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(0,168,107,0.1); border: 1px solid rgba(0,168,107,0.2); border-radius: 50px; padding: 6px 16px; font-size: 0.78rem; font-weight: 600; color: var(--green); margin-bottom: 20px; }
+    .hero h1 { font-family: var(--font-display); font-size: clamp(2.4rem, 4.5vw, 3.5rem); font-weight: 800; color: var(--dark); line-height: 1.12; margin-bottom: 18px; }
+    .hero h1 .highlight { background: linear-gradient(135deg, var(--green), var(--green-dark)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { font-size: 1.1rem; color: var(--text); max-width: 480px; margin-bottom: 32px; }
+    .hero-btns { display: flex; gap: 14px; flex-wrap: wrap; }
+    .btn-green { background: var(--green); color: #fff; padding: 14px 30px; border-radius: 50px; font-weight: 700; font-size: 1rem; text-decoration: none; transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; border: none; cursor: pointer; font-family: var(--font-body); }
+    .btn-green:hover { background: var(--green-dark); transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,168,107,0.3); }
+    .btn-outline { background: transparent; color: var(--dark); padding: 14px 30px; border-radius: 50px; font-weight: 600; font-size: 1rem; text-decoration: none; border: 2px solid var(--border); transition: all 0.3s; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-family: var(--font-body); }
+    .btn-outline:hover { border-color: var(--green); color: var(--green); }
+    .hero-image { position: relative; border-radius: var(--radius); overflow: hidden; }
+    .hero-image img { width: 100%; height: auto; border-radius: var(--radius); display: block; }
 
-        .bg-tech-card {
-            background: var(--card-white);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(0, 0, 0, 0.05);
-            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
-            transition: all 0.4s ease;
-        }
+    /* SECTIONS */
+    .section-label { font-family: var(--font-display); font-size: 0.78rem; font-weight: 700; letter-spacing: 2.5px; text-transform: uppercase; color: var(--green); margin-bottom: 10px; }
+    .section-title { font-family: var(--font-display); font-size: clamp(1.8rem, 3.5vw, 2.6rem); font-weight: 800; color: var(--dark); line-height: 1.15; }
+    .section-desc { font-size: 1.05rem; color: var(--text-light); max-width: 560px; margin-top: 14px; }
 
-        .bg-tech-card:hover {
-            border-color: rgba(34, 211, 238, 0.4);
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.15);
-        }
+    /* BENEFITS */
+    .benefits { padding: 100px 0; }
+    .benefits-header { text-align: center; margin-bottom: 56px; }
+    .benefits-header .section-desc { margin-left: auto; margin-right: auto; }
+    .benefits-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; }
+    .benefit-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 32px 24px; text-align: center; transition: all 0.35s; }
+    .benefit-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); border-color: rgba(0,168,107,0.3); }
+    .benefit-icon { width: 64px; height: 64px; margin: 0 auto 18px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
+    .benefit-icon.green { background: var(--green-light); }
+    .benefit-icon.yellow { background: var(--yellow-light); }
+    .benefit-icon svg { width: 30px; height: 30px; }
+    .benefit-card h3 { font-family: var(--font-display); font-size: 1.05rem; font-weight: 700; color: var(--dark); margin-bottom: 10px; }
+    .benefit-card p { font-size: 0.9rem; color: var(--text-light); line-height: 1.55; }
 
-        .btn-modern {
-            background: var(--primary-gradient);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 8px 22px rgba(14, 116, 144, 0.28);
-        }
+    /* NUMBERS */
+    .numbers { padding: 100px 0; background: var(--bg-alt); }
+    .numbers .container { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+    .numbers-btn { margin-top: 28px; }
+    .numbers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .number-card { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 28px; text-align: center; }
+    .number-value { font-family: var(--font-display); font-size: 2.2rem; font-weight: 800; color: var(--green); line-height: 1; }
+    .number-desc { font-size: 0.82rem; color: var(--text-light); margin-top: 8px; }
 
-        .btn-modern:hover {
-            transform: translateY(-2px) scale(1.02);
-            box-shadow: 0 8px 25px rgba(2, 132, 199, 0.4);
-        }
+    /* TESTIMONIALS CAROUSEL – DARK SECTION */
+    .testimonials { padding: 80px 0 0; background: linear-gradient(170deg, #0D1F2D 0%, #0A3A26 100%); overflow: hidden; }
+    .testimonials-header { text-align: center; margin-bottom: 52px; padding: 0 24px; }
+    .testimonials-header .section-label { color: var(--green); }
+    .testimonials-header .section-title { color: #fff; }
+    .testimonials-header .section-desc { color: rgba(255,255,255,0.62); margin-left: auto; margin-right: auto; }
+    .depo-wrap { position: relative; max-width: 1300px; margin: 0 auto; padding: 0 56px; }
+    .depo-carousel { display: flex; gap: 18px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; -ms-overflow-style: none; scrollbar-width: none; }
+    .depo-carousel::-webkit-scrollbar { display: none; }
+    .depo-card { flex: 0 0 calc(25% - 14px); scroll-snap-align: start; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; overflow: hidden; transition: transform 0.35s, box-shadow 0.35s, border-color 0.35s; cursor: pointer; }
+    .depo-card:hover { transform: translateY(-6px); box-shadow: 0 24px 48px rgba(0,0,0,0.4); border-color: rgba(0,168,107,0.45); }
+    .depo-media { aspect-ratio: 9/16; overflow: hidden; }
+    .depo-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .depo-info { padding: 18px 20px 22px; }
+    .depo-info .depo-quote { font-size: 0.875rem; color: rgba(255,255,255,0.78); font-style: italic; line-height: 1.6; margin-bottom: 14px; }
+    .depo-info .depo-name { font-family: var(--font-display); font-size: 0.95rem; font-weight: 700; color: #fff; }
+    .depo-info .depo-role { font-size: 0.78rem; color: var(--green); font-weight: 500; margin-top: 3px; }
+    .depo-arrow { position: absolute; top: 38%; transform: translateY(-50%); width: 42px; height: 42px; border-radius: 50%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 1.8rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.25s; z-index: 5; line-height: 1; }
+    .depo-arrow:hover { background: var(--green); border-color: var(--green); }
+    .depo-arrow-prev { left: 4px; }
+    .depo-arrow-next { right: 4px; }
+    .depo-dots { display: flex; justify-content: center; gap: 8px; padding: 32px 0 60px; }
+    .depo-dot { width: 24px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.2); border: none; cursor: pointer; transition: all 0.3s; }
+    .depo-dot.active { background: var(--green); width: 40px; }
 
-        .img-container {
-            background: #e2e8f0;
-            position: relative;
-            overflow: hidden;
-            border-radius: 40px;
-        }
+    /* QUOTES STRIP */
+    .quotes-strip { background: #0D1F2D; padding: 72px 0 96px; }
+    .quotes-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .quote-card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius); padding: 32px; transition: 0.3s; }
+    .quote-card:hover { background: rgba(0,168,107,0.08); border-color: rgba(0,168,107,0.28); }
+    .quote-icon { font-size: 2.8rem; color: var(--green); opacity: 0.5; line-height: 1; margin-bottom: 10px; }
+    .quote-card blockquote { font-size: 0.92rem; color: rgba(255,255,255,0.72); line-height: 1.7; margin-bottom: 22px; }
+    .quote-author { display: flex; align-items: center; gap: 12px; }
+    .author-dot { width: 40px; height: 40px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; color: #fff; font-family: var(--font-display); font-weight: 700; font-size: 0.8rem; }
+    .author-info .name { font-weight: 700; color: #fff; font-size: 0.88rem; }
+    .author-info .title { font-size: 0.78rem; color: rgba(255,255,255,0.48); }
 
-        .hero-mask {
-            mask-image: linear-gradient(to bottom, black 90%, transparent 100%);
-        }
+    /* FAQ */
+    .faq { padding: 100px 0; background: var(--bg-alt); }
+    .faq-header { text-align: center; margin-bottom: 48px; }
+    .faq-header .section-desc { margin-left: auto; margin-right: auto; }
+    .faq-cats { display: flex; justify-content: center; gap: 10px; margin-bottom: 36px; flex-wrap: wrap; }
+    .faq-cat { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 8px 20px; border-radius: 50px; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.3s; font-family: var(--font-body); }
+    .faq-cat.active, .faq-cat:hover { background: var(--green); color: #fff; border-color: var(--green); }
+    .faq-list { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+    .faq-item { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; transition: 0.3s; }
+    .faq-item.open { border-color: rgba(0,168,107,0.4); box-shadow: 0 4px 16px rgba(0,168,107,0.06); }
+    .faq-q { width: 100%; background: none; border: none; color: var(--dark); font-family: var(--font-body); font-size: 0.95rem; font-weight: 600; padding: 20px 24px; text-align: left; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+    .faq-q:hover { color: var(--green); }
+    .faq-toggle { width: 28px; height: 28px; min-width: 28px; border-radius: 50%; background: var(--green-light); display: flex; align-items: center; justify-content: center; color: var(--green); font-size: 1.2rem; transition: 0.3s; }
+    .faq-item.open .faq-toggle { background: var(--green); color: #fff; transform: rotate(45deg); }
+    .faq-a { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+    .faq-a-inner { padding: 0 24px 20px; font-size: 0.92rem; color: var(--text-light); line-height: 1.7; }
+    .faq-item.open .faq-a { max-height: 300px; }
 
-        .hero-grid {
-            background-image: radial-gradient(circle at 1px 1px, rgba(15, 23, 42, 0.08) 1px, transparent 0);
-            background-size: 22px 22px;
-            opacity: 0.55;
-        }
+    /* CTA */
+    .cta { padding: 100px 0; text-align: center; }
+    .cta-box { background: linear-gradient(135deg, var(--green), var(--green-dark)); border-radius: 24px; padding: 72px 48px; position: relative; overflow: hidden; }
+    .cta-box::before { content: ''; position: absolute; top: -60%; right: -20%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(255,255,255,0.1), transparent 70%); }
+    .cta-box h2 { font-family: var(--font-display); font-size: clamp(1.8rem, 3.5vw, 2.5rem); font-weight: 800; color: #fff; margin-bottom: 14px; position: relative; z-index: 1; }
+    .cta-box p { color: rgba(255,255,255,0.85); font-size: 1.05rem; max-width: 500px; margin: 0 auto 32px; position: relative; z-index: 1; }
+    .cta-btns { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 1; }
+    .btn-white { background: #fff; color: var(--green-dark); padding: 14px 30px; border-radius: 50px; font-weight: 700; font-size: 1rem; text-decoration: none; transition: all 0.3s; border: none; cursor: pointer; font-family: var(--font-body); }
+    .btn-white:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.15); }
+    .btn-white-outline { background: transparent; color: #fff; padding: 14px 30px; border-radius: 50px; font-weight: 600; font-size: 1rem; text-decoration: none; border: 2px solid rgba(255,255,255,0.4); transition: all 0.3s; cursor: pointer; font-family: var(--font-body); }
+    .btn-white-outline:hover { border-color: #fff; background: rgba(255,255,255,0.1); }
 
-        .trust-chip {
-            border: 1px solid #dbeafe;
-            background: #f8fbff;
-            color: var(--ink-soft);
-        }
+    /* FOOTER */
+    .footer { padding: 56px 0 28px; border-top: 1px solid var(--border); }
+    .footer-grid { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 40px; margin-bottom: 40px; }
+    .footer-brand .logo { margin-bottom: 12px; }
+    .footer-brand p { font-size: 0.88rem; color: var(--text-light); max-width: 260px; }
+    .footer-col h4 { font-family: var(--font-display); font-weight: 700; color: var(--dark); font-size: 0.92rem; margin-bottom: 14px; }
+    .footer-col a { display: block; color: var(--text-light); text-decoration: none; font-size: 0.88rem; margin-bottom: 10px; transition: color 0.2s; }
+    .footer-col a:hover { color: var(--green); }
+    .footer-bottom { border-top: 1px solid var(--border); padding-top: 20px; display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; color: var(--text-light); }
 
-        .headline-safe {
-            line-height: 1.03;
-            padding-right: 0.08em;
-        }
+    /* MODAL FORM */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
+    .modal-overlay.active { display: flex; }
+    .modal-box { background: var(--bg); border-radius: var(--radius); padding: 40px 36px; max-width: 460px; width: 92%; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,0.15); max-height: 90vh; overflow-y: auto; }
+    .modal-close { position: absolute; top: 16px; right: 16px; width: 32px; height: 32px; background: #f0f0f0; border: none; border-radius: 50%; font-size: 1.1rem; color: var(--text); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .modal-close:hover { background: var(--border); }
+    .modal-box h3 { font-family: var(--font-display); font-size: 1.4rem; font-weight: 800; color: var(--dark); margin-bottom: 6px; }
+    .modal-type-label { display: inline-block; background: var(--green-light); color: var(--green); font-size: 0.78rem; font-weight: 700; padding: 4px 12px; border-radius: 50px; margin-bottom: 20px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 0.85rem; font-weight: 600; color: var(--dark); margin-bottom: 6px; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px 16px; border: 1.5px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-body); font-size: 0.92rem; color: var(--dark); background: var(--bg); transition: border-color 0.2s; outline: none; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--green); }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+    .btn-whatsapp { width: 100%; background: #25D366; color: #fff; padding: 14px; border-radius: 50px; font-weight: 700; font-size: 1rem; border: none; cursor: pointer; font-family: var(--font-body); display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.3s; margin-top: 8px; }
+    .btn-whatsapp:hover { background: #20BD5A; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(37,211,102,0.3); }
+    .btn-whatsapp svg { width: 22px; height: 22px; fill: #fff; }
 
+    /* VIDEO MODAL */
+    .video-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 9999; display: none; align-items: center; justify-content: center; }
+    .video-modal.active { display: flex; }
+    .video-modal-inner { position: relative; width: 90%; max-width: 380px; aspect-ratio: 9/16; border-radius: var(--radius); overflow: hidden; }
+    .video-modal-inner img { width: 100%; height: 100%; object-fit: cover; }
+    .vm-close { position: absolute; top: -44px; right: 0; width: 36px; height: 36px; background: rgba(255,255,255,0.15); border: none; border-radius: 50%; color: #fff; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
-        .step-chip {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            min-width: 34px;
-            height: 34px;
-            border-radius: 9999px;
-            font-size: 12px;
-            font-weight: 800;
-            border: 1px solid #cbd5e1;
-            color: #64748b;
-            background: #f8fafc;
-        }
+    /* REVEAL */
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
 
-        .step-chip.active {
-            border-color: #0891b2;
-            color: #ffffff;
-            background: #0891b2;
-        }
-
-        .counter-glow {
-            text-shadow: 0 0 20px rgba(16, 185, 129, 0.3);
-        }
-
-        .reveal {
-            animation: reveal 0.8s ease-out forwards;
-        }
-
-        @keyframes reveal {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .animate-bounce-slow {
-            animation: bounce 3s infinite;
-        }
-
-        .testimonial-stage {
-            position: relative;
-            min-height: 430px;
-        }
-
-        .testimonial-slide {
-            position: absolute;
-            inset: 0;
-            opacity: 0;
-            transform: translateY(14px);
-            transition: opacity 0.55s ease, transform 0.55s ease;
-            pointer-events: none;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-        }
-
-        .testimonial-slide.active {
-            opacity: 1;
-            transform: translateY(0);
-            pointer-events: auto;
-        }
-
-        .testimonial-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 9999px;
-            background: #cbd5e1;
-            transition: all 0.25s ease;
-        }
-
-        .testimonial-dot.active {
-            width: 28px;
-            background: #0891b2;
-        }
-
-        .logo-frame {
-            height: 68px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 14px;
-            padding: 10px;
-        }
-
-        .logo-frame img {
-            max-height: 44px;
-            max-width: 120px;
-            width: auto;
-            object-fit: contain;
-            filter: saturate(0.98) contrast(1.02);
-        }
-
-        @media (max-width: 768px) {
-            .testimonial-stage {
-                min-height: 500px;
-            }
-        }
-
-        .chat-fab {
-            position: fixed;
-            right: 22px;
-            bottom: 22px;
-            width: 62px;
-            height: 62px;
-            border-radius: 9999px;
-            border: none;
-            background: linear-gradient(135deg, #06b6d4 0%, #0284c7 100%);
-            color: #fff;
-            font-size: 24px;
-            box-shadow: 0 12px 32px rgba(2, 132, 199, 0.35);
-            z-index: 70;
-            cursor: pointer;
-            transition: transform 0.2s ease;
-        }
-
-        .chat-fab:hover { transform: translateY(-2px); }
-
-        .chat-widget {
-            position: fixed;
-            right: 22px;
-            bottom: 98px;
-            width: min(360px, calc(100vw - 28px));
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 20px;
-            box-shadow: 0 18px 46px rgba(15, 23, 42, 0.2);
-            overflow: hidden;
-            z-index: 70;
-            transform: translateY(12px);
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.2s ease, transform 0.2s ease;
-        }
-
-        .chat-widget.open {
-            opacity: 1;
-            transform: translateY(0);
-            pointer-events: auto;
-        }
-
-        .chat-messages {
-            max-height: 290px;
-            overflow-y: auto;
-            padding: 14px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            background: #f8fafc;
-        }
-
-        .chat-bubble {
-            max-width: 92%;
-            border-radius: 14px;
-            padding: 10px 12px;
-            font-size: 14px;
-            line-height: 1.35;
-        }
-
-        .chat-bubble.bot {
-            align-self: flex-start;
-            background: #e0f2fe;
-            color: #0f172a;
-        }
-
-        .chat-bubble.user {
-            align-self: flex-end;
-            background: #0ea5e9;
-            color: #fff;
-        }
-
-        @media (max-width: 640px) {
-            .chat-widget { right: 10px; bottom: 86px; width: calc(100vw - 20px); }
-            .chat-fab { right: 12px; bottom: 14px; }
-        }
-
-        @keyframes bounce {
-            0%, 100% { transform: translateY(-5%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); }
-            50% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); }
-        }
-    </style>
+    /* RESPONSIVE */
+    @media (max-width: 1024px) {
+      .benefits-grid { grid-template-columns: repeat(2, 1fr); }
+      .depo-card { flex: 0 0 calc(50% - 9px); }
+      .quotes-grid { grid-template-columns: 1fr 1fr; }
+      .footer-grid { grid-template-columns: 1fr 1fr; gap: 32px; }
+    }
+    @media (max-width: 768px) {
+      .hero .container { grid-template-columns: 1fr; gap: 36px; }
+      .hero-image { max-width: 400px; }
+      .nav-links { display: none; }
+      .nav-links.mobile-open { display: flex !important; flex-direction: column; position: absolute; top: 72px; left: 0; right: 0; background: rgba(255,255,255,0.98); backdrop-filter: blur(16px); padding: 20px 24px; gap: 14px; border-bottom: 1px solid var(--border); box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
+      .hamburger { display: block; }
+      .benefits-grid { grid-template-columns: 1fr; }
+      .numbers .container { grid-template-columns: 1fr; gap: 36px; }
+      .depo-wrap { padding: 0 44px; }
+      .depo-card { flex: 0 0 calc(50% - 9px); }
+      .quotes-grid { grid-template-columns: 1fr; }
+      .cta-box { padding: 48px 24px; }
+      .footer-grid { grid-template-columns: 1fr; }
+      .footer-bottom { flex-direction: column; gap: 12px; text-align: center; }
+      .hero-btns { flex-direction: column; align-items: flex-start; }
+    }
+    @media (max-width: 480px) {
+      .depo-card { flex: 0 0 78vw; }
+      .depo-arrow { display: none; }
+      .depo-wrap { padding: 0 16px; }
+    }
+  </style>
 </head>
 <body>
 
-    <!-- Header / Nav -->
-    <nav class="fixed w-full z-50 bg-white/80 backdrop-blur-xl border-b border-slate-200">
-        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-                <div class="w-10 h-10 bg-gradient-to-br from-cyan-500 to-blue-700 rounded-xl flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                    <i class="fas fa-bolt text-white"></i>
-                </div>
-                <span class="text-2xl font-black tracking-tighter uppercase text-slate-900">Volt<span class="text-cyan-600">Connect</span></span>
-            </div>
-            <div class="hidden md:flex space-x-10 text-xs font-bold uppercase tracking-widest opacity-80">
-                <a href="#problema" class="text-slate-600 hover:text-cyan-600 transition">Diagnóstico</a>
-                <a href="#como-funciona" class="text-slate-600 hover:text-cyan-600 transition">Como Funciona</a>
-                <a href="#faq" class="text-slate-600 hover:text-cyan-600 transition">FAQ</a>
-            </div>
-            <div class="flex items-center gap-3">
-                <a id="cta-nav-simular" href="#simulador" class="btn-modern px-6 py-3 rounded-xl text-xs font-black tracking-widest text-white">SIMULAR DESCONTO</a>
-                <a href="/crm" class="inline-flex bg-slate-100 hover:bg-slate-200 border border-slate-200 px-6 py-3 rounded-xl text-xs font-black tracking-widest text-slate-700 transition">ACESSAR CRM</a>
-            </div>
-        </div>
-    </nav>
-
-    <!-- 1️⃣ Hero Section -->
-    <header class="relative min-h-screen flex items-center pt-20 overflow-hidden bg-white">
-        <div class="absolute inset-0 hero-grid -z-10"></div>
-        <div class="absolute top-0 right-0 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-[120px] -z-10"></div>
-        
-        <div class="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center lg:items-start">
-            <div class="reveal">
-                <div class="inline-flex items-center space-x-2 bg-cyan-50 border border-cyan-100 px-4 py-2 rounded-full mb-8">
-                    <span class="w-2 h-2 rounded-full bg-cyan-500 animate-pulse"></span>
-                    <span class="text-[10px] font-bold text-cyan-600 uppercase tracking-[0.2em]">Energia por assinatura com suporte humano</span>
-                </div>
-                <h1 id="hero-headline" class="headline-safe text-6xl lg:text-8xl font-extrabold mb-6 tracking-tighter text-slate-900">
-                    Economize ate 30% na conta de luz <span class="text-gradient">sem investimento</span>.
-                </h1>
-                <p id="hero-subheadline" class="text-xl text-slate-500 mb-6 leading-relaxed max-w-2xl">
-                    Pessoa fisica e empresas com conta acima de R$ 200 podem reduzir custos com energia limpa, de forma simples e sem obras.
-                </p>
-                <p class="text-sm font-bold uppercase tracking-wider text-cyan-700 mb-10">Desconto previsivel | ativacao orientada | atendimento especialista</p>
-                
-                <div class="bg-emerald-50 border border-emerald-100 p-6 rounded-3xl inline-block mb-10 shadow-sm">
-                    <p class="text-[10px] uppercase font-bold text-emerald-600 tracking-widest mb-1 opacity-80">Economia gerada hoje para clientes:</p>
-                    <p class="text-4xl font-black counter-glow text-emerald-600 tracking-tighter">R$ <span id="realtimeCounter">14.250.320,00</span></p>
-                </div>
-
-                <div class="flex flex-col sm:flex-row gap-4">
-                    <a id="cta-hero-simular" href="#simulador" class="btn-modern px-10 py-5 rounded-2xl font-black text-lg text-center text-white">
-                        SIMULAR DESCONTO EM 1 MINUTO
-                    </a>
-                    <button id="cta-hero-whatsapp" onclick="window.location.href='https://wa.me/5573991528351'" class="bg-slate-100 hover:bg-slate-200 border border-slate-200 px-10 py-5 rounded-2xl font-bold text-lg transition flex items-center justify-center text-slate-800">
-                        <i class="fab fa-whatsapp mr-3 text-emerald-600"></i> Falar com Especialista
-                    </button>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-8 max-w-3xl">
-                    <div class="bg-white border border-slate-200 rounded-2xl px-4 py-3">
-                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Operacoes auditadas</p>
-                        <p class="text-lg font-black text-slate-900">327 unidades</p>
-                    </div>
-                    <div class="bg-white border border-slate-200 rounded-2xl px-4 py-3">
-                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Empresas atendidas</p>
-                        <p class="text-lg font-black text-slate-900">+340 CNPJs</p>
-                    </div>
-                    <div class="bg-white border border-slate-200 rounded-2xl px-4 py-3">
-                        <p class="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Prazo medio de ganho</p>
-                        <p class="text-lg font-black text-slate-900">30 a 90 dias</p>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="relative group reveal lg:-mt-6" style="animation-delay: 0.2s;">
-                <div class="img-container border border-slate-100 shadow-xl">
-                    <!-- Imagem 2 Enviada: Brasil de Fato - Usinas e Infraestrutura -->
-                    <img src="https://www.brasildefato.com.br/wp-content/uploads/2024/09/image_processing20240515-3791018-d59owi.webp" alt="Visão Geral de Energia Renovável" class="w-full h-[650px] object-cover transition-transform duration-1000 group-hover:scale-110">
-                    <div class="absolute inset-0 bg-gradient-to-t from-white via-transparent opacity-30"></div>
-                </div>
-                <div class="absolute -bottom-6 -left-6 bg-white p-6 rounded-3xl shadow-2xl border-l-4 border-l-cyan-500 animate-bounce-slow border border-slate-100">
-                    <div class="flex items-center space-x-4">
-                        <div class="w-12 h-12 bg-cyan-100 rounded-xl flex items-center justify-center">
-                            <i class="fas fa-wind text-cyan-600 text-xl"></i>
-                        </div>
-                        <div>
-                            <p class="text-xs font-bold text-cyan-600 uppercase tracking-tighter">Eficiência Renovável</p>
-                            <p class="text-xl font-black text-slate-900">+38% Geração</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </header>
-
-    <section class="py-8 bg-gradient-to-r from-cyan-50 via-white to-blue-50 border-y border-slate-100">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="grid sm:grid-cols-3 gap-3">
-                <div class="trust-chip rounded-2xl px-5 py-4 flex items-center gap-3">
-                    <i class="fas fa-user-check text-cyan-700"></i>
-                    <p class="text-sm font-semibold">Atendimento humano do inicio ao fim</p>
-                </div>
-                <div class="trust-chip rounded-2xl px-5 py-4 flex items-center gap-3">
-                    <i class="fas fa-house-circle-check text-cyan-700"></i>
-                    <p class="text-sm font-semibold">Sem obra e sem instalacao local</p>
-                </div>
-                <div class="trust-chip rounded-2xl px-5 py-4 flex items-center gap-3">
-                    <i class="fas fa-file-circle-check text-cyan-700"></i>
-                    <p class="text-sm font-semibold">Condicoes claras antes da adesao</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- 2️⃣ Problemas -->
-    <section id="problema" class="py-32 bg-slate-50 border-y border-slate-100">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="text-center mb-24">
-                <h2 class="text-4xl lg:text-5xl font-black mb-6 italic tracking-tighter uppercase text-slate-900">Vantagens da <span class="text-cyan-600">VoltConnect</span></h2>
-                <p class="text-slate-500 max-w-2xl mx-auto text-lg">Implementacao orientada para economia real, com transparencia e comunicacao simples para o cliente.</p>
-            </div>
-
-            <div class="grid md:grid-cols-3 gap-8">
-                <div class="bg-tech-card p-10 rounded-[40px] group">
-                    <div class="w-16 h-16 bg-emerald-50 flex items-center justify-center rounded-2xl mb-8 group-hover:bg-emerald-100 transition">
-                        <i class="fas fa-hand-holding-dollar text-emerald-600 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold mb-4 text-slate-900">Sem compra de equipamentos</h3>
-                    <p class="text-slate-500 leading-relaxed">Voce nao precisa investir em placas solares nem realizar instalacoes no local.</p>
-                </div>
-                <div class="bg-tech-card p-10 rounded-[40px] group">
-                    <div class="w-16 h-16 bg-cyan-50 flex items-center justify-center rounded-2xl mb-8 group-hover:bg-cyan-100 transition">
-                        <i class="fas fa-file-signature text-cyan-600 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold mb-4 text-slate-900">Adesao sem burocracia</h3>
-                    <p class="text-slate-500 leading-relaxed">Processo simples para ativar sua economia com suporte de ponta a ponta.</p>
-                </div>
-                <div class="bg-tech-card p-10 rounded-[40px] group">
-                    <div class="w-16 h-16 bg-amber-50 flex items-center justify-center rounded-2xl mb-8 group-hover:bg-amber-100 transition">
-                        <i class="fas fa-leaf text-amber-500 text-2xl"></i>
-                    </div>
-                    <h3 class="text-xl font-bold mb-4 text-slate-900">Economia com sustentabilidade</h3>
-                    <p class="text-slate-500 leading-relaxed">Energia proveniente de usinas solares com reducao recorrente na sua conta.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- 3️⃣ Solução -->
-    <section id="solucao" class="py-32 bg-white relative">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="lg:flex items-center gap-20">
-                <div class="lg:w-1/2 relative mb-16 lg:mb-0">
-                    <div class="img-container border border-slate-100 shadow-2xl">
-                        <!-- Imagem 1 Enviada: Usina Solar no Solo -->
-                        <img src="https://cdn.prod.website-files.com/668c4853c0375980f89ddae3/66f5a58b6fab4b05587fe0d4_img-thumbnail-aprenda-a-realizar-a-instalacao-de-usina-solar-no-solo.png" alt="Instalação de Usina Solar no Solo" class="w-full h-[500px] object-cover">
-                    </div>
-                    <div class="absolute -top-10 -right-10 w-40 h-40 bg-cyan-500/5 blur-3xl -z-10"></div>
-                </div>
-                <div class="lg:w-1/2">
-                    <h2 class="text-4xl lg:text-6xl font-black mb-8 italic tracking-tighter text-slate-900">Comece a economizar <br><span class="text-gradient">na sua conta de luz.</span></h2>
-                    
-                    <div class="space-y-6">
-                        <div class="bg-slate-50 border border-slate-100 p-8 rounded-3xl hover:bg-slate-100 transition-colors">
-                            <div class="flex items-center space-x-6">
-                                <div class="w-12 h-12 bg-white shadow-sm rounded-xl flex items-center justify-center">
-                                    <i class="fas fa-solar-panel text-cyan-600 text-xl"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-xl mb-1 text-slate-900">O que e energia solar por assinatura?</h4>
-                                    <p class="text-slate-500">Sua energia vem de usinas solares parceiras, gerando creditos que reduzem o valor da fatura mensal.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bg-slate-50 border border-slate-100 p-8 rounded-3xl hover:bg-slate-100 transition-colors">
-                            <div class="flex items-center space-x-6">
-                                <div class="w-12 h-12 bg-white shadow-sm rounded-xl flex items-center justify-center">
-                                    <i class="fas fa-bolt text-emerald-600 text-xl"></i>
-                                </div>
-                                <div>
-                                    <h4 class="font-bold text-xl mb-1 text-slate-900">Como a economia acontece?</h4>
-                                    <p class="text-slate-500">Com a compensacao dos creditos, sua conta mensal fica menor, sem mudanca de concessionaria e sem obra.</p>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="pt-2">
-                            <a id="cta-solucao-simular" href="#simulador" class="btn-modern inline-flex px-8 py-4 rounded-2xl font-black text-white">SIMULAR DESCONTO</a>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- 4️⃣ Como Funciona -->
-    <section id="como-funciona" class="py-28 bg-white border-y border-slate-100">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="text-center mb-16">
-                <p class="text-xs font-black uppercase tracking-widest text-cyan-600 mb-3">Processo simples em 3 passos</p>
-                <h2 class="text-4xl lg:text-5xl font-black tracking-tighter text-slate-900 mb-4">Como sua economia acontece</h2>
-                <p class="text-slate-500 text-lg max-w-3xl mx-auto">Do cadastro ate a ativacao dos creditos: tudo de forma leve, rapida e com orientacao especializada.</p>
-            </div>
-
-            <div class="grid md:grid-cols-3 gap-6 mb-12">
-                <article class="bg-slate-50 border border-slate-200 rounded-3xl p-8">
-                    <span class="inline-flex w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 font-black items-center justify-center mb-5">1</span>
-                    <h3 class="text-xl font-black text-slate-900 mb-3">Cadastro e analise</h3>
-                    <p class="text-slate-500">Voce informa seu consumo e validamos se seu perfil e elegivel para economia imediata.</p>
-                </article>
-                <article class="bg-slate-50 border border-slate-200 rounded-3xl p-8">
-                    <span class="inline-flex w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 font-black items-center justify-center mb-5">2</span>
-                    <h3 class="text-xl font-black text-slate-900 mb-3">Ativacao da assinatura</h3>
-                    <p class="text-slate-500">Fazemos a configuracao do contrato de forma transparente, sem compra de equipamentos.</p>
-                </article>
-                <article class="bg-slate-50 border border-slate-200 rounded-3xl p-8">
-                    <span class="inline-flex w-10 h-10 rounded-xl bg-cyan-100 text-cyan-700 font-black items-center justify-center mb-5">3</span>
-                    <h3 class="text-xl font-black text-slate-900 mb-3">Economia na fatura</h3>
-                    <p class="text-slate-500">Os creditos de energia passam a reduzir sua conta mensal com previsibilidade de custo.</p>
-                </article>
-            </div>
-
-            <div class="text-center">
-                <a id="cta-como-funciona-simular" href="#simulador" class="btn-modern inline-flex px-10 py-5 rounded-2xl font-black text-white text-lg tracking-wide">SIMULAR DESCONTO AGORA</a>
-            </div>
-        </div>
-    </section>
-
-    <!-- 5️⃣ Simulador -->
-    <section id="simulador" class="py-32 bg-slate-50 relative overflow-hidden border-y border-slate-100">
-        <div class="max-w-4xl mx-auto px-6 z-10 relative">
-            <div class="bg-white p-8 lg:p-16 rounded-[60px] border border-slate-200 shadow-2xl">
-                <div class="text-center mb-16">
-                    <h2 class="text-4xl lg:text-5xl font-black tracking-tighter uppercase mb-4 text-slate-900">Calculadora <span class="text-cyan-600">Audit IA</span></h2>
-                    <p class="text-slate-500">Veja o impacto imediato no seu fluxo de caixa.</p>
-                </div>
-
-                <form id="simForm" class="space-y-6">
-                    <div class="flex items-center justify-center gap-2 mb-2" aria-label="Etapas do simulador">
-                        <span id="sim-step-chip-1" class="step-chip active">1</span>
-                        <span class="text-slate-300">-</span>
-                        <span id="sim-step-chip-2" class="step-chip">2</span>
-                    </div>
-
-                    <div id="sim-step-1" class="space-y-6">
-                        <div class="grid md:grid-cols-2 gap-6">
-                            <input type="text" id="nome" required placeholder="Nome" class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
-                            <input type="tel" id="whats" required placeholder="WhatsApp" class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
-                        </div>
-                        <div class="relative">
-                            <label class="text-[10px] font-bold text-cyan-600 uppercase tracking-widest ml-1 mb-2 block">Gasto Mensal Estimado (R$)</label>
-                            <input type="number" id="valor" required placeholder="Ex: 5000" class="w-full bg-white border border-cyan-200 p-8 rounded-3xl text-4xl font-black text-cyan-600 outline-none transition focus:ring-4 focus:ring-cyan-500/10">
-                        </div>
-                        <button id="sim-next-step" type="button" class="w-full btn-modern py-6 rounded-3xl text-xl font-black text-white uppercase tracking-widest">
-                            CONTINUAR SIMULACAO
-                        </button>
-                    </div>
-
-                    <div id="sim-step-2" class="space-y-6 hidden">
-                        <div class="grid md:grid-cols-2 gap-6">
-                            <select id="segmento" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
-                                <option value="">Segmento da empresa</option>
-                                <option value="industria">Industria</option>
-                                <option value="varejo">Varejo</option>
-                                <option value="hotelaria">Hotelaria</option>
-                                <option value="servicos">Servicos</option>
-                            </select>
-                            <select id="tipoContrato" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
-                                <option value="">Tipo de contrato atual</option>
-                                <option value="convencional">Cativo convencional</option>
-                                <option value="tarifa-branca">Tarifa branca</option>
-                                <option value="livre">Mercado livre</option>
-                                <option value="nao-sei">Nao sei informar</option>
-                            </select>
-                        </div>
-                        <div class="grid md:grid-cols-2 gap-6">
-                            <select id="estado" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
-                                <option value="">Estado da operacao</option>
-                                <option value="BA">Bahia</option>
-                                <option value="SE">Sergipe</option>
-                                <option value="AL">Alagoas</option>
-                                <option value="PE">Pernambuco</option>
-                                <option value="outro">Outro estado</option>
-                            </select>
-                            <select id="faixaConsumo" required class="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl focus:border-cyan-500 outline-none transition text-slate-900">
-                                <option value="">Faixa media de consumo</option>
-                                <option value="ate-2000">Ate R$ 2.000</option>
-                                <option value="2000-10000">R$ 2.000 a R$ 10.000</option>
-                                <option value="10000-30000">R$ 10.000 a R$ 30.000</option>
-                                <option value="acima-30000">Acima de R$ 30.000</option>
-                            </select>
-                        </div>
-                        <div class="grid md:grid-cols-2 gap-4">
-                            <button id="sim-back-step" type="button" class="w-full bg-slate-100 border border-slate-200 py-5 rounded-2xl text-base font-black text-slate-700 uppercase tracking-wide">
-                                Voltar
-                            </button>
-                            <button type="submit" class="w-full btn-modern py-5 rounded-2xl text-base font-black text-white uppercase tracking-wide">
-                                CALCULAR ECONOMIA REAL
-                            </button>
-                        </div>
-                    </div>
-                </form>
-
-                <div id="resultadoSim" class="hidden mt-12 p-10 bg-gradient-to-br from-emerald-600 to-teal-800 rounded-[40px] text-white text-center shadow-2xl">
-                    <p class="text-xs font-bold uppercase tracking-widest mb-4 opacity-80">Potencial de Redução</p>
-                    <h3 id="resValor" class="text-7xl font-black mb-8 tracking-tighter">R$ 0,00</h3>
-                    <p class="text-lg font-light mb-4 italic">"Sua empresa poderia economizar <span id="resPorcentagem" class="font-bold underline decoration-cyan-300"></span> com nossa consultoria."</p>
-                    <p id="resFaixa" class="text-sm opacity-90 mb-2"></p>
-                    <p id="resPrazo" class="text-sm opacity-90 mb-8"></p>
-                    <button id="cta-resultado-whatsapp" onclick="enviarWhatsLead()" class="w-full bg-white text-emerald-700 py-5 rounded-2xl font-black flex items-center justify-center hover:scale-105 transition">
-                        <i class="fab fa-whatsapp mr-3 text-2xl"></i> RECEBER ANÁLISE COMPLETA
-                    </button>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- 6️⃣ Clientes e Testemunho -->
-    <section id="clientes" class="py-32 bg-white">
-        <div class="max-w-7xl mx-auto px-6">
-            <div class="text-center mb-14">
-                <h2 class="text-4xl font-extrabold mb-4 italic tracking-tight uppercase text-slate-900">Corporações que <span class="text-cyan-600">Confiam</span></h2>
-                <div class="inline-flex items-center space-x-2 bg-cyan-50 px-6 py-2 rounded-full border border-cyan-100">
-                    <i class="fas fa-award text-cyan-600"></i>
-                    <span class="text-cyan-600 font-bold text-xs tracking-widest uppercase">+300 Consultorias de Sucesso</span>
-                </div>
-            </div>
-
-            <div class="mb-16 bg-gradient-to-r from-slate-900 to-slate-800 rounded-[34px] p-8 md:p-10 text-white border border-slate-700">
-                <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-6">
-                    <div>
-                        <p class="text-[11px] uppercase tracking-widest font-bold text-cyan-300">Prova Social Auditavel</p>
-                        <h3 class="text-2xl md:text-3xl font-black tracking-tight">Numeros de Operacao (base consolidada dos ultimos 15 meses)</h3>
-                    </div>
-                    <p class="text-xs text-slate-300">Base: carteira auditada de Jan/2025 a Mar/2026, 327 CNPJs ativos.</p>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div class="bg-white/5 rounded-2xl border border-white/10 p-5">
-                        <p class="text-[10px] uppercase tracking-widest text-slate-300 font-bold">Total auditado no ultimo ano</p>
-                        <p class="text-2xl font-black mt-2">R$ 38,4 mil</p>
-                    </div>
-                    <div class="bg-white/5 rounded-2xl border border-white/10 p-5">
-                        <p class="text-[10px] uppercase tracking-widest text-slate-300 font-bold">Economia acumulada</p>
-                        <p class="text-2xl font-black mt-2 text-emerald-300">R$ 38,4 mil</p>
-                    </div>
-                    <div class="bg-white/5 rounded-2xl border border-white/10 p-5">
-                        <p class="text-[10px] uppercase tracking-widest text-slate-300 font-bold">Taxa media de reducao</p>
-                        <p class="text-2xl font-black mt-2">18,7%</p>
-                    </div>
-                    <div class="bg-white/5 rounded-2xl border border-white/10 p-5">
-                        <p class="text-[10px] uppercase tracking-widest text-slate-300 font-bold">Prazo medio de implantacao</p>
-                        <p class="text-2xl font-black mt-2">67 dias</p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Grade de Logos -->
-            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-6 mb-32">
-                <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <div class="logo-frame mb-4"><img loading="lazy" src="https://logo.clearbit.com/cartaodetodos.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=cartaodetodos.com.br&sz=128';" alt="Logo Cartao de Todos"></div>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Cartao de Todos</p>
-                </div>
-                <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <div class="logo-frame mb-4"><img loading="lazy" src="https://logo.clearbit.com/amorsaude.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=amorsaude.com.br&sz=128';" alt="Logo Amor Saude"></div>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Amor Saude</p>
-                </div>
-                <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <div class="logo-frame mb-4"><img loading="lazy" src="https://logo.clearbit.com/petdetodos.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=petdetodos.com.br&sz=128';" alt="Logo Pet de Todos"></div>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Pet de Todos</p>
-                </div>
-                <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <div class="logo-frame mb-4"><img loading="lazy" src="https://www.google.com/s2/favicons?domain=thebarracuda.com.br&sz=128" onerror="this.onerror=null;this.src='https://www.thebarracuda.com.br/favicon.ico';" alt="Logo Barracuda Hotel"></div>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">Barracuda Hotel & Villas</p>
-                </div>
-                <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <div class="logo-frame mb-4"><img loading="lazy" src="https://logo.clearbit.com/biolabfarma.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=biolabfarma.com.br&sz=128';" alt="Logo BioLab"></div>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">BioLab</p>
-                </div>
-                <div class="bg-slate-50 p-8 rounded-3xl text-center border border-slate-100 hover:border-cyan-400 transition group shadow-sm">
-                    <div class="logo-frame mb-4"><img loading="lazy" src="https://logo.clearbit.com/aeronew.com.br" onerror="this.onerror=null;this.src='https://www.google.com/s2/favicons?domain=aeronew.com.br&sz=128';" alt="Logo AeroNew"></div>
-                    <p class="text-[10px] font-black uppercase tracking-widest text-slate-400">AeroNew</p>
-                </div>
-            </div>
-            
-            <!-- Carrossel de Testemunhos -->
-            <div class="reveal mt-12 p-1 rounded-[45px] bg-gradient-to-r from-cyan-200 via-blue-200 to-emerald-200">
-                <div class="bg-white rounded-[44px] py-12 px-6 md:px-10 text-center relative overflow-hidden shadow-xl">
-                    <div class="absolute -top-20 -left-20 w-64 h-64 bg-cyan-500/5 blur-[100px] pointer-events-none"></div>
-
-                    <div id="testimonial-stage" class="testimonial-stage">
-                        <article class="testimonial-slide active" data-testimonial-slide>
-                            <i class="fas fa-quote-left text-6xl text-cyan-600/10 mb-8 block"></i>
-                            <p class="text-3xl md:text-4xl font-bold leading-tight max-w-4xl mx-auto italic text-slate-900">
-                                "Reduzimos custos de energia e telefonia com governanca. Em 5 meses, o comite financeiro passou a trabalhar com previsibilidade mensal."
-                            </p>
-                            <div class="mt-12 flex flex-col items-center justify-center">
-                                <div class="mb-4 inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-4 py-2">
-                                    <span class="text-[10px] uppercase tracking-widest font-bold text-emerald-700">Resultado auditado</span>
-                                    <span class="text-sm font-black text-emerald-700">-21,3% em 5 meses</span>
-                                </div>
-                                <div class="relative mb-4">
-                                    <div class="absolute -inset-1 bg-gradient-to-tr from-cyan-400 to-blue-600 rounded-full blur-sm opacity-30"></div>
-                                    <img src="https://i.pravatar.cc/150?u=ricardo-almeida-cfo" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Ricardo Almeida">
-                                </div>
-                                <div class="text-center">
-                                    <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Ricardo Almeida</p>
-                                    <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">CFO | Realezza Metalurgica | Camaçari-BA</p>
-                                </div>
-                            </div>
-                        </article>
-
-                        <article class="testimonial-slide" data-testimonial-slide>
-                            <i class="fas fa-quote-left text-6xl text-cyan-600/10 mb-8 block"></i>
-                            <p class="text-3xl md:text-4xl font-bold leading-tight max-w-4xl mx-auto italic text-slate-900">
-                                "A economia foi importante, mas o maior ganho foi previsibilidade no caixa e seguranca para aprovacao orcamentaria trimestral."
-                            </p>
-                            <div class="mt-12 flex flex-col items-center justify-center">
-                                <div class="mb-4 inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-4 py-2">
-                                    <span class="text-[10px] uppercase tracking-widest font-bold text-emerald-700">Resultado auditado</span>
-                                    <span class="text-sm font-black text-emerald-700">R$ 547 mil economizados em 12 meses</span>
-                                </div>
-                                <div class="relative mb-4">
-                                    <div class="absolute -inset-1 bg-gradient-to-tr from-cyan-400 to-blue-600 rounded-full blur-sm opacity-30"></div>
-                                    <img src="https://i.pravatar.cc/150?u=carla-menezes-diretora" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Carla Menezes">
-                                </div>
-                                <div class="text-center">
-                                    <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Carla Menezes</p>
-                                    <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">Diretora Administrativa | Atlas Logistica | Feira de Santana-BA</p>
-                                </div>
-                            </div>
-                        </article>
-
-                        <article class="testimonial-slide" data-testimonial-slide>
-                            <i class="fas fa-quote-left text-6xl text-cyan-600/10 mb-8 block"></i>
-                            <p class="text-3xl md:text-4xl font-bold leading-tight max-w-4xl mx-auto italic text-slate-900">
-                                "O time trouxe leitura tecnica e traduziu impacto financeiro para a diretoria. O efeito apareceu no DRE em menos de um trimestre."
-                            </p>
-                            <div class="mt-12 flex flex-col items-center justify-center">
-                                <div class="mb-4 inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-full px-4 py-2">
-                                    <span class="text-[10px] uppercase tracking-widest font-bold text-emerald-700">Resultado auditado</span>
-                                    <span class="text-sm font-black text-emerald-700">Payback em 73 dias</span>
-                                </div>
-                                <div class="relative mb-4">
-                                    <div class="absolute -inset-1 bg-gradient-to-tr from-cyan-400 to-blue-600 rounded-full blur-sm opacity-30"></div>
-                                    <img src="https://i.pravatar.cc/150?u=fernando-costa-controller" class="relative w-20 h-20 rounded-full border-2 border-white shadow-xl" alt="Fernando Costa">
-                                </div>
-                                <div class="text-center">
-                                    <p class="font-black text-slate-900 uppercase tracking-[0.2em] text-sm">Fernando Costa</p>
-                                    <p class="text-cyan-600 text-xs font-bold uppercase tracking-widest mt-1">Controller | Grupo Nortel Frotas | Vitoria da Conquista-BA</p>
-                                </div>
-                            </div>
-                        </article>
-                    </div>
-
-                    <div id="testimonial-dots" class="mt-8 flex items-center justify-center gap-2" aria-label="Navegacao de testemunhos">
-                        <button type="button" class="testimonial-dot active" data-testimonial-dot="0" aria-label="Testemunho 1"></button>
-                        <button type="button" class="testimonial-dot" data-testimonial-dot="1" aria-label="Testemunho 2"></button>
-                        <button type="button" class="testimonial-dot" data-testimonial-dot="2" aria-label="Testemunho 3"></button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- 7️⃣ FAQ -->
-    <section id="faq" class="py-28 bg-slate-50 border-y border-slate-100">
-        <div class="max-w-5xl mx-auto px-6">
-            <div class="text-center mb-12">
-                <p class="text-xs font-black uppercase tracking-widest text-cyan-600 mb-3">Perguntas frequentes</p>
-                <h2 class="text-4xl lg:text-5xl font-black tracking-tighter text-slate-900 mb-4">Tire suas duvidas antes de simular</h2>
-                <p class="text-slate-500 text-lg">As respostas abaixo cobrem as principais objeções de quem ainda nao conhece o modelo.</p>
-            </div>
-
-            <div class="space-y-4">
-                <details class="group bg-white border border-slate-200 rounded-2xl p-6" open>
-                    <summary class="cursor-pointer list-none flex items-center justify-between font-bold text-slate-900">
-                        O que e energia solar por assinatura?
-                        <span class="text-cyan-600 transition group-open:rotate-45">+</span>
-                    </summary>
-                    <p class="text-slate-500 mt-4 leading-relaxed">E um modelo no qual voce utiliza energia gerada em usinas solares parceiras e recebe creditos para reduzir o valor da sua conta de luz.</p>
-                </details>
-
-                <details class="group bg-white border border-slate-200 rounded-2xl p-6">
-                    <summary class="cursor-pointer list-none flex items-center justify-between font-bold text-slate-900">
-                        Como funciona a economia na conta de luz?
-                        <span class="text-cyan-600 transition group-open:rotate-45">+</span>
-                    </summary>
-                    <p class="text-slate-500 mt-4 leading-relaxed">A energia gerada vira creditos compensados na sua fatura. Na pratica, voce paga menos no total mensal, mantendo o mesmo fornecimento da concessionaria.</p>
-                </details>
-
-                <details class="group bg-white border border-slate-200 rounded-2xl p-6">
-                    <summary class="cursor-pointer list-none flex items-center justify-between font-bold text-slate-900">
-                        Preciso trocar de concessionaria para aderir?
-                        <span class="text-cyan-600 transition group-open:rotate-45">+</span>
-                    </summary>
-                    <p class="text-slate-500 mt-4 leading-relaxed">Nao. Sua unidade continua vinculada a mesma distribuidora. O processo e feito por compensacao de creditos, sem migracao de concessionaria.</p>
-                </details>
-
-                <details class="group bg-white border border-slate-200 rounded-2xl p-6">
-                    <summary class="cursor-pointer list-none flex items-center justify-between font-bold text-slate-900">
-                        Existe fidelidade ou taxa de cancelamento?
-                        <span class="text-cyan-600 transition group-open:rotate-45">+</span>
-                    </summary>
-                    <p class="text-slate-500 mt-4 leading-relaxed">As condicoes podem variar conforme perfil e regiao. Antes de ativar, voce recebe todas as regras com transparencia para decidir com seguranca.</p>
-                </details>
-
-                <details class="group bg-white border border-slate-200 rounded-2xl p-6">
-                    <summary class="cursor-pointer list-none flex items-center justify-between font-bold text-slate-900">
-                        Quem pode contratar energia por assinatura?
-                        <span class="text-cyan-600 transition group-open:rotate-45">+</span>
-                    </summary>
-                    <p class="text-slate-500 mt-4 leading-relaxed">Pessoa fisica e empresas com consumo minimo na faixa elegivel. Em geral, contas acima de R$ 200 ja possuem potencial de economia.</p>
-                </details>
-            </div>
-
-            <div class="text-center mt-10">
-                <a id="cta-faq-simular" href="#simulador" class="btn-modern inline-flex px-10 py-5 rounded-2xl font-black text-white text-lg tracking-wide">SIMULAR DESCONTO AGORA</a>
-            </div>
-        </div>
-    </section>
-
-    <section class="py-20 bg-slate-900 text-white">
-        <div class="max-w-6xl mx-auto px-6">
-            <div class="bg-gradient-to-r from-cyan-600 to-blue-700 rounded-[36px] p-10 md:p-14 shadow-2xl">
-                <p class="text-[11px] uppercase tracking-widest font-bold opacity-80 mb-3">Diagnostico financeiro especializado</p>
-                <h3 class="text-3xl md:text-5xl font-black tracking-tight mb-4">Quer saber o potencial real da sua operacao em 15 minutos?</h3>
-                <p class="text-cyan-50/90 max-w-3xl mb-8">Nossa equipe tecnica revisa seu perfil de consumo e te apresenta um plano claro de reducao, com atendimento humano do inicio ao fim.</p>
-                <div class="flex flex-col sm:flex-row gap-4">
-                    <a id="cta-final-diagnostico" href="#simulador" class="bg-white text-cyan-700 px-8 py-4 rounded-2xl font-black text-center">Simular Desconto em 1 Minuto</a>
-                    <a id="cta-final-whatsapp" href="https://wa.me/5573991528351" target="_blank" class="bg-slate-900/30 hover:bg-slate-900/40 border border-white/30 px-8 py-4 rounded-2xl font-bold text-center">Falar no WhatsApp</a>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Chat flutuante -->
-    <div id="chat-widget" class="chat-widget" aria-live="polite">
-        <div class="px-4 py-3 bg-slate-900 text-white flex items-center justify-between">
-            <div>
-                <p class="text-sm font-bold">Atendimento VoltConnect</p>
-                <p class="text-xs text-slate-300">Resposta em poucos minutos</p>
-            </div>
-            <button id="chat-close" type="button" class="text-slate-300 hover:text-white text-lg" aria-label="Fechar chat">&times;</button>
-        </div>
-        <div id="chat-messages" class="chat-messages"></div>
-        <div class="p-3 border-t border-slate-200 bg-white">
-            <button id="chat-whatsapp" type="button" class="w-full btn-modern text-white py-3 rounded-xl font-bold text-sm uppercase tracking-wide">
-                Falar com atendente humano no WhatsApp
-            </button>
-        </div>
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <div class="nav-inner">
+      <a href="#" class="logo">
+        <span class="logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>
+        Energia-Volt
+      </a>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="#beneficios">Benefícios</a></li>
+        <li><a href="#sobre">Sobre Nós</a></li>
+        <li><a href="#depoimentos">Depoimentos</a></li>
+        <li><a href="#faq">Perguntas</a></li>
+        <li><a href="javascript:void(0)" onclick="openForm('casa')" class="btn-cta">Quero Energia</a></li>
+      </ul>
+      <button class="hamburger" onclick="document.getElementById('navLinks').classList.toggle('mobile-open')" aria-label="Menu"><span></span><span></span><span></span></button>
     </div>
-    <button id="chat-fab" class="chat-fab" type="button" aria-label="Abrir chat">
-        <i class="fas fa-comments"></i>
-    </button>
+  </div>
+</nav>
 
-    <footer class="py-20 bg-slate-950 text-center">
-        <div class="flex items-center justify-center space-x-2 mb-8">
-            <div class="w-8 h-8 bg-cyan-600 rounded-lg flex items-center justify-center">
-                <i class="fas fa-bolt text-white text-xs"></i>
-            </div>
-            <span class="text-xl font-black uppercase text-white">VOLTCONNECT</span>
+<section class="hero" id="inicio">
+  <div class="container">
+    <div class="hero-content reveal">
+      <div class="hero-badge">⚡ Energia 100% Renovável</div>
+      <h1>A energia da <span class="highlight">prosperidade</span></h1>
+      <p>Limpa e sem limites, nossa energia muda a vida de milhares de clientes todos os dias. Escolha a Energia-Volt:</p>
+      <div class="hero-btns">
+        <button class="btn-green" onclick="openForm('casa')">Para sua Casa →</button>
+        <button class="btn-outline" onclick="openForm('empresa')">Para sua Empresa →</button>
+      </div>
+    </div>
+    <div class="hero-image reveal">
+      <img src="https://srna.co/wp-content/uploads/2024/07/banner-1.png" alt="Energia Renovável" />
+    </div>
+  </div>
+</section>
+
+<section class="benefits" id="beneficios">
+  <div class="container">
+    <div class="benefits-header reveal">
+      <div class="section-label">Vantagens</div>
+      <div class="section-title">Energia solar e eólica digital<br>para você e para seu negócio</div>
+    </div>
+    <div class="benefits-grid">
+      <div class="benefit-card reveal">
+        <div class="benefit-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="#00A86B" stroke-width="2" stroke-linecap="round"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 100 7h5a3.5 3.5 0 110 7H6"/></svg></div>
+        <h3>Otimize custos com energia</h3>
+        <p>Pagamos o primeiro mês* de energia para juntos começarmos uma jornada de prosperidade.</p>
+      </div>
+      <div class="benefit-card reveal">
+        <div class="benefit-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="#F5B731" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></div>
+        <h3>Energia 100% renovável</h3>
+        <p>Energia gerada 100% por fontes eólicas e solares sustentáveis que empodera você e sua empresa.</p>
+      </div>
+      <div class="benefit-card reveal">
+        <div class="benefit-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="#00A86B" stroke-width="2" stroke-linecap="round"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg></div>
+        <h3>Você na frente</h3>
+        <p>Via digital ou com nossos especialistas, somos pioneiros em conectar você com a melhor energia.</p>
+      </div>
+      <div class="benefit-card reveal">
+        <div class="benefit-icon yellow"><svg viewBox="0 0 24 24" fill="none" stroke="#F5B731" stroke-width="2" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        <h3>Direto da fonte</h3>
+        <p>Um dos maiores geradores de energia eólica e solar. Energia de regiões com sol e vento acima da média.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="numbers" id="sobre">
+  <div class="container">
+    <div class="reveal">
+      <div class="section-label">Sobre a Energia-Volt</div>
+      <div class="section-title">Energia renovável<br>que faz prosperar</div>
+      <div class="section-desc">Somos alimentados pela generosidade da natureza tornando o fornecimento de energia limpa e sustentável acessível a todos.</div>
+      <div class="numbers-btn"><a href="#depoimentos" class="btn-green">Conheça nossa comunidade →</a></div>
+    </div>
+    <div class="numbers-grid reveal">
+      <div class="number-card"><div class="number-value">4,2M</div><div class="number-desc">domicílios equivalentes abastecidos</div></div>
+      <div class="number-card"><div class="number-value">2,14M</div><div class="number-desc">ton. CO₂ evitadas desde 2017</div></div>
+      <div class="number-card"><div class="number-value">11×</div><div class="number-desc">crescimento de capacidade instalada</div></div>
+      <div class="number-card"><div class="number-value">17</div><div class="number-desc">plantas operacionais BR e EUA</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="testimonials" id="depoimentos">
+  <div class="testimonials-header reveal">
+    <div class="container">
+      <div class="section-label">Nossa comunidade de prosperidade</div>
+      <div class="section-title">Depoimentos de quem já economiza</div>
+      <div class="section-desc">De grandes empresas a pequenas comunidades, a energia limpa leva prosperidade para todos.</div>
+    </div>
+  </div>
+  <div class="depo-wrap">
+    <button class="depo-arrow depo-arrow-prev" onclick="depoMove(-1)" aria-label="Anterior">&#8249;</button>
+    <div class="depo-carousel" id="depoCarousel">
+      <div class="depo-card" onclick="openVideo(this.querySelector('.depo-media'))">
+        <div class="depo-media"><img src="https://srna.co/wp-content/uploads/2024/06/Depoimento_Cliente_thiago3.gif" alt="Thiago Gomes" loading="lazy" /></div>
+        <div class="depo-info">
+          <div class="depo-quote">"Estava procurando economizar e vi que não precisaria instalar placas solares."</div>
+          <div class="depo-name">Thiago Gomes</div>
+          <div class="depo-role">Cliente Residencial</div>
         </div>
-        <div class="mb-6 text-sm text-slate-400 flex flex-wrap justify-center gap-4">
-            <a href="/politica-de-privacidade" class="hover:text-cyan-400 transition">Politica de Privacidade</a>
-            <a href="/termos-de-uso" class="hover:text-cyan-400 transition">Termos de Uso</a>
-            <a href="/contato" class="hover:text-cyan-400 transition">Contato</a>
+      </div>
+      <div class="depo-card" onclick="openVideo(this.querySelector('.depo-media'))">
+        <div class="depo-media"><img src="https://srna.co/wp-content/uploads/2024/06/Depoimento_Cliente_Angeli.gif" alt="Angeli Bonfim" loading="lazy" /></div>
+        <div class="depo-info">
+          <div class="depo-quote">"O custo da energia em um salão é muito alto e surgiu como forma de reduzi-lo."</div>
+          <div class="depo-name">Angeli Bonfim</div>
+          <div class="depo-role">Proprietária – Fast Escova</div>
         </div>
-        <p class="text-slate-500 text-sm tracking-widest uppercase font-bold">© 2026 Consultoria Estratégica High-Tech</p>
-    </footer>
+      </div>
+      <div class="depo-card" onclick="openVideo(this.querySelector('.depo-media'))">
+        <div class="depo-media"><img src="https://srna.co/wp-content/uploads/2023/11/HOME_Eurofarma-Prosperidade-ALTA_9X16_2.gif" alt="Eurofarma" loading="lazy" /></div>
+        <div class="depo-info">
+          <div class="depo-quote">"Prosperidade é construir projetos perenes, de valor para a empresa e a sociedade."</div>
+          <div class="depo-name">Isamara Garcia Freitas</div>
+          <div class="depo-role">Gestão Ambiental – Eurofarma</div>
+        </div>
+      </div>
+      <div class="depo-card" onclick="openVideo(this.querySelector('.depo-media'))">
+        <div class="depo-media"><img src="https://srna.co/wp-content/uploads/2023/11/HOME_Croma-Prosperidade-ALTA_9X16.gif" alt="Croma" loading="lazy" /></div>
+        <div class="depo-info">
+          <div class="depo-quote">"Em média, hoje, temos uma economia significativa nos custos de energia."</div>
+          <div class="depo-name">Roberto Bertoli</div>
+          <div class="depo-role">Diretor Industrial – Croma</div>
+        </div>
+      </div>
+    </div>
+    <button class="depo-arrow depo-arrow-next" onclick="depoMove(1)" aria-label="Próximo">&#8250;</button>
+  </div>
+  <div class="depo-dots" id="depoDots"></div>
+</section>
 
-    <script>
-        const METRICS_KEY = 'voltconnect_metrics_v1';
+<section class="quotes-strip">
+  <div class="container">
+    <div class="quotes-grid">
+      <div class="quote-card reveal">
+        <div class="quote-icon">❝</div>
+        <blockquote>Reconhecemos nosso papel atuante neste desafio que é promover impactos socioambientais positivos. Este contrato representa um marco para o uso de energia limpa em quase 100% de nossas unidades produtivas.</blockquote>
+        <div class="quote-author"><div class="author-dot">OV</div><div class="author-info"><div class="name">Ornella Villardo</div><div class="title">Gerente de Sustentabilidade</div></div></div>
+      </div>
+      <div class="quote-card reveal">
+        <div class="quote-icon">❝</div>
+        <blockquote>Os preços sempre foram extremamente competitivos e tinham toda a parte da sustentabilidade e do atendimento, o que foi diferencial para a renovação do nosso contrato.</blockquote>
+        <div class="quote-author"><div class="author-dot">GS</div><div class="author-info"><div class="name">Guilherme Lopes Sobral</div><div class="title">Novos Negócios</div></div></div>
+      </div>
+      <div class="quote-card reveal">
+        <div class="quote-icon">❝</div>
+        <blockquote>Estamos falando de energia limpa, renovável e com custo competitivo. Conseguimos dar suporte ao crescimento das operações contribuindo com o meio ambiente.</blockquote>
+        <div class="quote-author"><div class="author-dot">IM</div><div class="author-info"><div class="name">Ilson Mateus</div><div class="title">Presidente</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
 
-        function getMetrics() {
-            try {
-                const raw = localStorage.getItem(METRICS_KEY);
-                if (!raw) return { heroA: 0, heroB: 0, step2: 0, submit: 0 };
-                const parsed = JSON.parse(raw);
-                return {
-                    heroA: Number(parsed.heroA) || 0,
-                    heroB: Number(parsed.heroB) || 0,
-                    step2: Number(parsed.step2) || 0,
-                    submit: Number(parsed.submit) || 0
-                };
-            } catch (err) {
-                return { heroA: 0, heroB: 0, step2: 0, submit: 0 };
-            }
-        }
+<section class="faq" id="faq">
+  <div class="container">
+    <div class="faq-header reveal">
+      <div class="section-label">Ficou alguma dúvida?</div>
+      <div class="section-title">Perguntas Frequentes</div>
+      <div class="section-desc">Tire suas dúvidas sobre energia renovável, economia e como funciona.</div>
+    </div>
+    <div class="faq-cats reveal">
+      <button class="faq-cat active" onclick="filterFaq('all',this)">Todas</button>
+      <button class="faq-cat" onclick="filterFaq('geral',this)">Geral</button>
+      <button class="faq-cat" onclick="filterFaq('empresa',this)">Empresa</button>
+      <button class="faq-cat" onclick="filterFaq('casa',this)">Residencial</button>
+      <button class="faq-cat" onclick="filterFaq('seguranca',this)">Segurança</button>
+    </div>
+    <div class="faq-list">
+      <div class="faq-item reveal" data-cat="geral"><button class="faq-q" onclick="toggleFaq(this)"><span>Quem é a Energia-Volt?</span><span class="faq-toggle">+</span></button><div class="faq-a"><div class="faq-a-inner">Somos uma das principais geradoras e comercializadoras de energia do mercado, produzindo energia equivalente para mais de 4,2 milhões de domicílios. Nos dedicamos a encontrar maneiras inovadoras para que clientes e comunidades alcancem maior prosperidade por meio da energia limpa e sustentável.</div></div></div>
+      <div class="faq-item reveal" data-cat="geral"><button class="faq-q" onclick="toggleFaq(this)"><span>Por que posso escolher meu fornecedor de energia?</span><span class="faq-toggle">+</span></button><div class="faq-a"><div class="faq-a-inner">Essa possibilidade se tornou viável por lei há poucos anos. Nosso papel é tornar esse processo fácil e seguro para todos. Crescer sem limites e estar em harmonia com o meio ambiente é algo possível para todos.</div></div></div>
+      <div class="faq-item reveal" data-cat="geral"><button class="faq-q" onclick="toggleFaq(this)"><span>Preciso instalar placas solares?</span><span class="faq-toggle">+</span></button><div class="faq-a"><div class="faq-a-inner">Não! Você contrata de forma digital ou via nossos especialistas, nós produzimos a energia em nossos parques de alta eficiência, e a distribuidora entrega na sua casa. Sem nenhum custo com instalação.</div></div></div>
+      <div class="faq-item reveal" data-cat="geral"><button class="faq-q" onclick="toggleFaq(this)"><span>Com quem falo se tiver um problema?</span><span class="faq-toggle">+</span></button><div class="faq-a"><div class="faq-a-inner">Você continua falando com a sua distribuidora para falta ou cortes. Para economia na conta de luz, entre em contato conosco.</div></div></div>
+      <div class="faq-item reveal" data-cat="geral"><button class="faq-q" onclick="toggleFaq(this)"><span>Posso ficar sem luz?</span><span class="faq-toggle">+</span></button><div class="faq-a"><div class="faq-a-inner">Não! Sua distribuidora continua responsável pelo fornecimento. Nosso trabalho é garantir que essa energia seja limpa e mais barata.</div></div></div>
+      <div class="faq-item reveal" data-cat="empresa"><button class="faq-q" onclick="toggleFaq(this)"><span>De quanto será a economia para minha empresa?</span><span class="faq-toggle">+</span></button><div class="faq-a"><div class="faq-a-inner">Pode chegar a até 35% para clientes de média ou alta tensão — equivalente a 4 meses do ano sem pagar pela energia.</div></div></div>
+      <div class="faq-item reveal" data-cat="empresa"><button class="faq-q" onclick="toggleFaq(this)"><span>O que é o Mercado Livre de Energia?</span><span class="faq-toggle">+</span></button><div class="faq-a"><div class="faq-a-inner">É um ambiente onde consumidores podem escolher de quem comprar energia e negociar quantidade, preço, prazo e pagamento.</div></div></div>
+      <div class="faq-item reveal" data-cat="casa"><button class="faq-q" onclick="toggleFaq(this)"><span>Quanto vou economizar na minha casa?</span><span class="faq-toggle">+</span></button><div class="faq-a"><div class="faq-a-inner">Para clientes residenciais, o desconto pode ser de até 21% no primeiro ano — equivalente a 2,5 meses de economia.</div></div></div>
+      <div class="faq-item reveal" data-cat="casa"><button class="faq-q" onclick="toggleFaq(this)"><span>Como será minha conta de energia depois?</span><span class="faq-toggle">+</span></button><div class="faq-a"><div class="faq-a-inner">Você receberá uma única fatura com os custos da distribuidora e o valor da Energia-Volt com o desconto aplicado.</div></div></div>
+      <div class="faq-item reveal" data-cat="seguranca"><button class="faq-q" onclick="toggleFaq(this)"><span>Como me proteger contra fraudes?</span><span class="faq-toggle">+</span></button><div class="faq-a"><div class="faq-a-inner">Nunca clique em links suspeitos. Verifique sempre o remetente. Não efetue pagamento por canais não oficiais da Energia-Volt.</div></div></div>
+    </div>
+  </div>
+</section>
 
-        function setMetrics(next) {
-            localStorage.setItem(METRICS_KEY, JSON.stringify(next));
-        }
+<section class="cta" id="contato">
+  <div class="container">
+    <div class="cta-box reveal">
+      <h2>Pronto para economizar<br>com energia limpa?</h2>
+      <p>Junte-se a milhares de clientes que já economizam com energia renovável. Sem placas solares, sem burocracia.</p>
+      <div class="cta-btns">
+        <button class="btn-white" onclick="openForm('casa')">Para sua Casa →</button>
+        <button class="btn-white-outline" onclick="openForm('empresa')">Para sua Empresa →</button>
+      </div>
+    </div>
+  </div>
+</section>
 
-        function bumpMetric(key) {
-            const metrics = getMetrics();
-            metrics[key] = (metrics[key] || 0) + 1;
-            setMetrics(metrics);
-        }
+<footer class="footer">
+  <div class="container">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href="#" class="logo"><span class="logo-icon"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></span>Energia-Volt</a>
+        <p>Energia limpa e acessível para todos. Transformando o futuro com energia renovável.</p>
+      </div>
+      <div class="footer-col"><h4>Empresa</h4><a href="#">Quem Somos</a><a href="#">Compromisso com o Futuro</a><a href="#">Carreiras</a></div>
+      <div class="footer-col"><h4>Soluções</h4><a href="javascript:void(0)" onclick="openForm('casa')">Para sua Casa</a><a href="javascript:void(0)" onclick="openForm('empresa')">Para sua Empresa</a><a href="#">Nossa Comunidade</a></div>
+      <div class="footer-col"><h4>Suporte</h4><a href="#faq">Perguntas Frequentes</a><a href="#">Fale Conosco</a><a href="#">Termos de Uso</a></div>
+    </div>
+    <div class="footer-bottom"><span>© 2026 Energia-Volt. Todos os direitos reservados.</span><span>Feito com ⚡ por Energia-Volt</span></div>
+  </div>
+</footer>
 
-        let totalSaved = 10001.00;
-        function updateCounter() {
-            totalSaved += (Math.random() * 12) + 5;
-            document.getElementById('realtimeCounter').innerText = totalSaved.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        }
-        setInterval(updateCounter, 1200);
+<!-- FORM MODAL -->
+<div class="modal-overlay" id="formModal">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeForm()">✕</button>
+    <h3>Quero energia limpa!</h3>
+    <span class="modal-type-label" id="formTypeLabel">Para sua casa</span>
+    <div id="contactForm">
+      <input type="hidden" id="formType" value="casa" />
+      <div class="form-group"><label>Nome completo *</label><input type="text" id="nome" placeholder="Seu nome" required /></div>
+      <div class="form-group"><label>E-mail *</label><input type="email" id="email" placeholder="seu@email.com" required /></div>
+      <div class="form-group"><label>Telefone / WhatsApp *</label><input type="tel" id="telefone" placeholder="(00) 00000-0000" required /></div>
+      <div class="form-group"><label>Cidade / Estado *</label><input type="text" id="cidade" placeholder="Ex: Salvador / BA" required /></div>
+      <div class="form-group" id="cnpjGroup" style="display:none"><label>CNPJ da Empresa</label><input type="text" id="cnpj" placeholder="00.000.000/0000-00" /></div>
+      <div class="form-group"><label>Valor médio da conta de luz (R$)</label><input type="text" id="consumo" placeholder="Ex: R$ 350,00" /></div>
+      <div class="form-group"><label>Mensagem (opcional)</label><textarea id="mensagem" placeholder="Alguma dúvida ou informação adicional?"></textarea></div>
+      <button type="button" onclick="sendWhatsApp()" class="btn-whatsapp">
+        <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Enviar pelo WhatsApp
+      </button>
+    </div>
+  </div>
+</div>
 
-        let leadData = {};
+<!-- VIDEO MODAL -->
+<div class="video-modal" id="videoModal" onclick="closeVideo(event)">
+  <div class="video-modal-inner"><button class="vm-close" onclick="closeVideo(event)">✕</button><img id="vmImg" src="" alt="Depoimento" /></div>
+</div>
 
-        (function initHeroABTest() {
-            const headlineEl = document.getElementById('hero-headline');
-            const subheadlineEl = document.getElementById('hero-subheadline');
-            const ctaEl = document.getElementById('cta-hero-simular');
-            const navCtaEl = document.getElementById('cta-nav-simular');
-            if (!headlineEl || !subheadlineEl || !ctaEl) return;
+<script>
+  window.addEventListener('scroll', () => document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 10));
 
-            const variants = [
-                {
-                    id: 'A',
-                    headline: 'Economize ate 30% na conta de luz <span class="text-gradient">sem investimento</span>.',
-                    subheadline: 'Pessoa fisica e empresas com conta acima de R$ 200 podem reduzir custos com energia limpa, de forma simples e sem obras.',
-                    cta: 'SIMULAR DESCONTO EM 1 MINUTO'
-                },
-                {
-                    id: 'B',
-                    headline: 'Reduza sua fatura de energia com <span class="text-gradient">adesao rapida</span>.',
-                    subheadline: 'Ativacao orientada, sem burocracia e sem compra de equipamentos para quem busca economia recorrente.',
-                    cta: 'VER MINHA ECONOMIA AGORA'
-                }
-            ];
+  function toggleFaq(btn) {
+    const item = btn.parentElement;
+    const wasOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+    if (!wasOpen) item.classList.add('open');
+  }
+  function filterFaq(cat, btn) {
+    document.querySelectorAll('.faq-cat').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.faq-item').forEach(item => {
+      item.style.display = (cat === 'all' || item.dataset.cat === cat) ? '' : 'none';
+    });
+  }
 
-            const savedVariant = localStorage.getItem('hero_ab_variant');
-            const variant = variants.find(v => v.id === savedVariant) || variants[Math.random() > 0.5 ? 1 : 0];
-            localStorage.setItem('hero_ab_variant', variant.id);
+  function openForm(type) {
+    document.getElementById('formType').value = type;
+    document.getElementById('formTypeLabel').textContent = type === 'empresa' ? 'Para sua empresa' : 'Para sua casa';
+    document.getElementById('cnpjGroup').style.display = type === 'empresa' ? '' : 'none';
+    document.getElementById('formModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeForm() {
+    document.getElementById('formModal').classList.remove('active');
+    document.body.style.overflow = '';
+  }
+  document.getElementById('formModal').addEventListener('click', function(e) { if (e.target === this) closeForm(); });
 
-            headlineEl.innerHTML = variant.headline;
-            subheadlineEl.textContent = variant.subheadline;
-            ctaEl.textContent = variant.cta;
+  function sendWhatsApp() {
+    const nome = document.getElementById('nome').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const telefone = document.getElementById('telefone').value.trim();
+    const cidade = document.getElementById('cidade').value.trim();
+    if (!nome || !email || !telefone || !cidade) { alert('Por favor, preencha todos os campos obrigatórios.'); return; }
+    const type = document.getElementById('formType').value;
+    const cnpj = document.getElementById('cnpj').value.trim();
+    const consumo = document.getElementById('consumo').value.trim();
+    const mensagem = document.getElementById('mensagem').value.trim();
 
-            if (navCtaEl) {
-                const navLabel = variant.id === 'A' ? 'SIMULAR DESCONTO' : 'VER ECONOMIA';
-                navCtaEl.textContent = navLabel;
-                navCtaEl.setAttribute('data-variant', variant.id);
-            }
+    let text = `*Nova solicitação - Energia-Volt*\n\n`;
+    text += `*Tipo:* ${type === 'empresa' ? 'Para Empresa' : 'Para Casa'}\n`;
+    text += `*Nome:* ${nome}\n`;
+    text += `*E-mail:* ${email}\n`;
+    text += `*Telefone:* ${telefone}\n`;
+    text += `*Cidade/Estado:* ${cidade}\n`;
+    if (type === 'empresa' && cnpj) text += `*CNPJ:* ${cnpj}\n`;
+    if (consumo) text += `*Valor médio da conta:* ${consumo}\n`;
+    if (mensagem) text += `*Mensagem:* ${mensagem}\n`;
 
-            bumpMetric(variant.id === 'A' ? 'heroA' : 'heroB');
+    window.open(`https://wa.me/5573991528351?text=${encodeURIComponent(text)}`, '_blank');
+    closeForm();
+  }
 
-            trackEvent('ab_variant_view', `hero_${variant.id}`);
-        })();
+  function openVideo(el) {
+    document.getElementById('vmImg').src = el.querySelector('img').src;
+    document.getElementById('videoModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeVideo(e) {
+    if (e.target === document.getElementById('videoModal') || e.target.classList.contains('vm-close')) {
+      document.getElementById('videoModal').classList.remove('active');
+      document.body.style.overflow = '';
+    }
+  }
 
-        function trackEvent(action, label) {
-            try {
-                if (typeof gtag === 'function') {
-                    gtag('event', action, {
-                        event_category: 'landing_cta',
-                        event_label: label
-                    });
-                }
-            } catch (err) {
-                console.warn('Tracking indisponivel:', err);
-            }
-        }
+  // Depo carousel
+  (function() {
+    var carousel = document.getElementById('depoCarousel');
+    var dotsEl = document.getElementById('depoDots');
+    if (!carousel || !dotsEl) return;
+    var cards = Array.from(carousel.querySelectorAll('.depo-card'));
+    var cur = 0, autoTm;
 
-        document.getElementById('simForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const step2 = document.getElementById('sim-step-2');
-            if (step2 && step2.classList.contains('hidden')) return;
-            const valor = parseFloat(document.getElementById('valor').value);
-            const nome = document.getElementById('nome').value;
-            const whats = document.getElementById('whats').value;
-            const segmento = document.getElementById('segmento').value;
-            const estado = document.getElementById('estado').value;
-            const faixaConsumo = document.getElementById('faixaConsumo').value;
-            const tipoContrato = document.getElementById('tipoContrato').value;
-            
-            let taxa = 0;
-            if (valor <= 1000) taxa = 0.18;
-            else if (valor <= 2000) taxa = 0.20;
-            else taxa = 0.22;
+    cards.forEach(function(_, i) {
+      var b = document.createElement('button');
+      b.className = 'depo-dot' + (i === 0 ? ' active' : '');
+      b.setAttribute('aria-label', 'Depoimento ' + (i + 1));
+      b.addEventListener('click', function() { goDepo(i); });
+      dotsEl.appendChild(b);
+    });
 
-            if (tipoContrato === 'convencional') taxa += 0.02;
-            if (faixaConsumo === 'acima-30000') taxa += 0.02;
-            if (segmento === 'hotelaria' || segmento === 'industria') taxa += 0.01;
-            taxa = Math.min(taxa, 0.32);
+    function setDot(i) {
+      dotsEl.querySelectorAll('.depo-dot').forEach(function(d, j) {
+        d.classList.toggle('active', j === i);
+      });
+      cur = i;
+    }
 
-            const economia = valor * taxa;
-            const economiaMin = economia * 0.85;
-            const economiaMax = economia * 1.15;
-            const prazo = (tipoContrato === 'livre') ? '30 a 60 dias' : '45 a 90 dias';
-            
-            leadData = {
-                nome,
-                whats,
-                original: valor,
-                economia: economia,
-                taxa: (taxa * 100).toFixed(0),
-                segmento,
-                estado,
-                faixaConsumo,
-                tipoContrato,
-                economiaMin,
-                economiaMax,
-                prazo
-            };
+    function goDepo(n) {
+      n = ((n % cards.length) + cards.length) % cards.length;
+      carousel.scrollTo({ left: cards[n].offsetLeft, behavior: 'smooth' });
+      setDot(n);
+      clearInterval(autoTm);
+      autoTm = setInterval(function() { goDepo(cur + 1); }, 4500);
+    }
 
-            document.getElementById('resPorcentagem').innerText = leadData.taxa + '%';
-            document.getElementById('resValor').innerText = `R$ ${economia.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
-            document.getElementById('resFaixa').innerText = `Faixa estimada: R$ ${economiaMin.toLocaleString('pt-BR', {minimumFractionDigits: 2})} a R$ ${economiaMax.toLocaleString('pt-BR', {minimumFractionDigits: 2})} por mes.`;
-            document.getElementById('resPrazo').innerText = `Prazo medio para captura de ganho: ${prazo}.`;
+    window.depoMove = function(dir) {
+      var cw = cards[0] ? cards[0].offsetWidth + 18 : 1;
+      var vc = Math.max(1, Math.round(carousel.offsetWidth / cw));
+      goDepo(cur + dir * vc);
+    };
 
-            trackEvent('simulador_submit', `segmento_${segmento || 'nao_informado'}`);
-            bumpMetric('submit');
-            
-            const res = document.getElementById('resultadoSim');
-            res.classList.remove('hidden');
-            setTimeout(() => {
-                res.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }, 100);
-        });
+    autoTm = setInterval(function() { goDepo(cur + 1); }, 4500);
+  })();
 
-        (function initSimuladorSteps() {
-            const nextBtn = document.getElementById('sim-next-step');
-            const backBtn = document.getElementById('sim-back-step');
-            const step1 = document.getElementById('sim-step-1');
-            const step2 = document.getElementById('sim-step-2');
-            const chip1 = document.getElementById('sim-step-chip-1');
-            const chip2 = document.getElementById('sim-step-chip-2');
-            const nome = document.getElementById('nome');
-            const whats = document.getElementById('whats');
-            const valor = document.getElementById('valor');
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach((entry, i) => {
+      if (entry.isIntersecting) { setTimeout(() => entry.target.classList.add('visible'), i * 60); obs.unobserve(entry.target); }
+    });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+</script>
 
-            if (!nextBtn || !backBtn || !step1 || !step2 || !chip1 || !chip2 || !nome || !whats || !valor) return;
-
-            const showStep = (stepNumber) => {
-                const isStepOne = stepNumber === 1;
-                step1.classList.toggle('hidden', !isStepOne);
-                step2.classList.toggle('hidden', isStepOne);
-                chip1.classList.toggle('active', isStepOne);
-                chip2.classList.toggle('active', !isStepOne);
-            };
-
-            nextBtn.addEventListener('click', () => {
-                const nomeOk = nome.value.trim().length >= 3;
-                const whatsOk = whats.value.trim().length >= 10;
-                const valorNum = parseFloat(valor.value);
-                const valorOk = Number.isFinite(valorNum) && valorNum > 0;
-
-                if (!nomeOk) {
-                    nome.focus();
-                    nome.reportValidity();
-                    return;
-                }
-                if (!whatsOk) {
-                    whats.focus();
-                    whats.setCustomValidity('Informe um WhatsApp valido com DDD.');
-                    whats.reportValidity();
-                    whats.setCustomValidity('');
-                    return;
-                }
-                if (!valorOk) {
-                    valor.focus();
-                    valor.setCustomValidity('Informe um valor mensal valido.');
-                    valor.reportValidity();
-                    valor.setCustomValidity('');
-                    return;
-                }
-
-                showStep(2);
-                trackEvent('simulador_step', 'step_2_opened');
-                bumpMetric('step2');
-            });
-
-            backBtn.addEventListener('click', () => showStep(1));
-
-            // Mascara simples e resiliente para WhatsApp brasileiro com DDD.
-            whats.addEventListener('input', () => {
-                const digits = whats.value.replace(/\D/g, '').slice(0, 11);
-                if (!digits) {
-                    whats.value = '';
-                    return;
-                }
-                if (digits.length <= 2) {
-                    whats.value = `(${digits}`;
-                    return;
-                }
-                if (digits.length <= 6) {
-                    whats.value = `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-                    return;
-                }
-                if (digits.length <= 10) {
-                    whats.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-                    return;
-                }
-                whats.value = `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-            });
-
-            showStep(1);
-        })();
-
-        (function initMobileConversionOrder() {
-            const simulador = document.getElementById('simulador');
-            const clientes = document.getElementById('clientes');
-            if (!simulador || !clientes) return;
-
-            const applyOrder = () => {
-                if (window.innerWidth < 1024 && simulador.compareDocumentPosition(clientes) & Node.DOCUMENT_POSITION_FOLLOWING) {
-                    clientes.parentNode.insertBefore(simulador, clientes);
-                }
-            };
-
-            applyOrder();
-            window.addEventListener('resize', applyOrder);
-        })();
-
-        function enviarWhatsLead() {
-            const msg = encodeURIComponent(
-                `⚡ *Relatório Gerado: VoltConnect IA*\n\n` +
-                `*Empresa:* ${leadData.nome}\n` +
-                `*WhatsApp:* ${leadData.whats}\n` +
-                `*Segmento:* ${leadData.segmento}\n` +
-                `*Estado:* ${leadData.estado}\n` +
-                `*Contrato Atual:* ${leadData.tipoContrato}\n` +
-                `*Gasto Atual:* R$ ${leadData.original}\n` +
-                `*Potencial de Redução:* ${leadData.taxa}% (R$ ${leadData.economia.toFixed(2)}/mês)\n\n` +
-                `_Gostaria de agendar a auditoria gratuita agora._`
-            );
-            trackEvent('whatsapp_click', 'resultado_simulador');
-            window.open(`https://wa.me/5573991528351?text=${msg}`);
-        }
-
-        [
-            ['cta-nav-simular', 'nav_simular'],
-            ['cta-hero-simular', 'hero_simular'],
-            ['cta-hero-whatsapp', 'hero_whatsapp'],
-            ['cta-solucao-simular', 'solucao_simular'],
-            ['cta-como-funciona-simular', 'como_funciona_simular'],
-            ['cta-resultado-whatsapp', 'resultado_whatsapp'],
-            ['cta-faq-simular', 'faq_simular'],
-            ['cta-final-diagnostico', 'final_diagnostico'],
-            ['cta-final-whatsapp', 'final_whatsapp']
-        ].forEach(([id, label]) => {
-            const el = document.getElementById(id);
-            if (el) {
-                el.addEventListener('click', () => trackEvent('cta_click', label));
-            }
-        });
-
-        (function initFloatingChat() {
-            const fab = document.getElementById('chat-fab');
-            const widget = document.getElementById('chat-widget');
-            const closeBtn = document.getElementById('chat-close');
-            const chatMessages = document.getElementById('chat-messages');
-            const waBtn = document.getElementById('chat-whatsapp');
-            if (!fab || !widget || !closeBtn || !chatMessages || !waBtn) return;
-
-            const botScript = [
-                'Ola! Eu sou a assistente da VoltConnect.',
-                'Posso te explicar em 1 minuto como reduzimos custos de energia e telefonia.',
-                'Se fizer sentido para voce, te encaminho agora para um atendente humano no WhatsApp.'
-            ];
-
-            let started = false;
-
-            const addBubble = (text, type) => {
-                const el = document.createElement('div');
-                el.className = `chat-bubble ${type}`;
-                el.textContent = text;
-                chatMessages.appendChild(el);
-                chatMessages.scrollTop = chatMessages.scrollHeight;
-            };
-
-            const startConversation = () => {
-                if (started) return;
-                started = true;
-                botScript.forEach((msg, i) => {
-                    setTimeout(() => addBubble(msg, 'bot'), 600 + i * 1700);
-                });
-            };
-
-            const openWidget = () => {
-                widget.classList.add('open');
-                startConversation();
-            };
-
-            const closeWidget = () => widget.classList.remove('open');
-
-            fab.addEventListener('click', () => {
-                if (widget.classList.contains('open')) closeWidget();
-                else openWidget();
-            });
-
-            closeBtn.addEventListener('click', closeWidget);
-
-            waBtn.addEventListener('click', () => {
-                addBubble('Quero falar com um atendente humano agora.', 'user');
-                const message = encodeURIComponent('Ola! Vim pelo chat da VoltConnect e gostaria de atendimento humano para analisar minha conta.');
-                window.open(`https://wa.me/5573991528351?text=${message}`, '_blank', 'noopener,noreferrer');
-            });
-
-            setTimeout(openWidget, 9000);
-        })();
-
-        (function initTestimonialCarousel() {
-            const stage = document.getElementById('testimonial-stage');
-            const dotsWrap = document.getElementById('testimonial-dots');
-            if (!stage || !dotsWrap) return;
-
-            const slides = Array.from(stage.querySelectorAll('[data-testimonial-slide]'));
-            const dots = Array.from(dotsWrap.querySelectorAll('[data-testimonial-dot]'));
-            if (!slides.length || slides.length !== dots.length) return;
-
-            let idx = 0;
-            let timer = null;
-
-            const show = (nextIdx) => {
-                idx = (nextIdx + slides.length) % slides.length;
-                slides.forEach((s, i) => s.classList.toggle('active', i === idx));
-                dots.forEach((d, i) => d.classList.toggle('active', i === idx));
-            };
-
-            const start = () => {
-                clearInterval(timer);
-                timer = setInterval(() => show(idx + 1), 10000);
-            };
-
-            dots.forEach((dot, i) => {
-                dot.addEventListener('click', () => {
-                    show(i);
-                    start();
-                });
-            });
-
-            stage.addEventListener('mouseenter', () => clearInterval(timer));
-            stage.addEventListener('mouseleave', start);
-
-            show(0);
-            start();
-        })();
-    </script>
 </body>
 </html>
