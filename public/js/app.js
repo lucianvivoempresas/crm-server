@@ -965,6 +965,20 @@ function setupEventListeners() {
     btnThemeToggle.onclick = toggleTheme;
   }
 
+  const btnPremium = document.getElementById('btn-premium');
+  if (btnPremium) {
+    btnPremium.onclick = () => {
+      window.location.href = '/premium';
+    };
+  }
+
+  const btnVersaoPadrao = document.getElementById('btn-versao-padrao');
+  if (btnVersaoPadrao) {
+    btnVersaoPadrao.onclick = () => {
+      window.location.href = '/crm';
+    };
+  }
+
   const elDashVendedor = document.getElementById('dashboard-vendedor-filter');
   if (elDashVendedor) {
     elDashVendedor.onchange = renderDashboard;
