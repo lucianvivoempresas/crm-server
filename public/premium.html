@@ -305,6 +305,245 @@
       </div>
     </section>
 
+    <!-- Seção Vendas Avançadas -->
+    <section id="tab-vendas" class="tab-content space-y-6 hidden">
+      <div class="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+        <div class="flex gap-3 flex-wrap">
+          <div class="relative">
+            <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></i>
+            <input type="text" id="search-vendas" placeholder="Buscar cliente..." class="pl-10 pr-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-yellow-500" />
+          </div>
+          <select id="filter-vendas-status" class="px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-yellow-500">
+            <option value="">Todos os Status</option>
+            <option value="Negociando">Negociando</option>
+            <option value="Aguardando Aceite">Aguardando Aceite</option>
+            <option value="Inputado">Inputado</option>
+            <option value="Concluído">Concluído</option>
+            <option value="Cancelado">Cancelado</option>
+          </select>
+          <select id="filter-vendas-vendedor" class="px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-yellow-500">
+            <option value="">Todos os Vendedores</option>
+          </select>
+          <input type="month" id="filter-vendas-month" class="px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-yellow-500" />
+        </div>
+        <div class="flex gap-2">
+          <button id="btn-export-vendas" class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-all flex items-center gap-2 border border-green-500/30"><i data-lucide="download" class="w-4 h-4"></i>Exportar</button>
+          <button id="btn-import-vendas" class="px-4 py-2 bg-indigo-500/20 text-indigo-300 rounded-lg hover:bg-indigo-500/30 transition-all flex items-center gap-2 border border-indigo-500/30" title="Importar vendas do Excel (.xlsx ou .csv)"><i data-lucide="upload" class="w-4 h-4"></i>Importar Vendas</button>
+          <button id="btn-import-clientes-vendas" class="px-4 py-2 bg-purple-500/20 text-purple-300 rounded-lg hover:bg-purple-500/30 transition-all flex items-center gap-2 border border-purple-500/30" title="Importar clientes de outro CRM (Excel .xlsx ou .csv)"><i data-lucide="upload" class="w-4 h-4"></i>Importar Clientes</button>
+          <input id="input-import-vendas" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+          <input id="input-import-clientes-vendas" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+          <button id="btn-nova-venda" class="px-6 py-2 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-lg font-medium hover:from-yellow-600 hover:to-orange-700 transition-all flex items-center gap-2 shadow-lg"><i data-lucide="plus" class="w-5 h-5"></i>Nova Venda Premium</button>
+        </div>
+      </div>
+      <div class="bg-slate-800/40 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wide">Acoes do Dia Premium</h3>
+          <span id="vendas-acoes-hoje-count" class="text-xs text-slate-400">0 pendencias</span>
+        </div>
+        <div id="vendas-acoes-hoje-list" class="space-y-2"></div>
+        <p id="vendas-acoes-hoje-empty" class="text-sm text-slate-400 hidden">Sem pendencias de contato para hoje.</p>
+      </div>
+      <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-slate-700/50">
+              <tr>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Cliente</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Produto</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Operadora</th>
+                <th id="vendas-col-vendedor" class="px-6 py-4 text-left text-sm font-semibold text-slate-300 hidden">Vendedor</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Prioridade</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Valor</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Comissão</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Status</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">SLA / Proxima Acao</th>
+                <th class="px-6 py-4 text-left text-sm font-semibold text-slate-300">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="vendas-table-body" class="divide-y divide-slate-700"></tbody>
+          </table>
+          <div id="vendas-table-empty" class="text-center text-slate-400 py-12 hidden">
+            <i data-lucide="zap-off" class="w-12 h-12 mx-auto mb-4 text-slate-500"></i><p>Nenhuma venda encontrada</p>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div class="bg-slate-800/40 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
+          <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wide mb-3">Pipeline de Conversao Premium</h3>
+          <div id="vendas-pipeline-list" class="space-y-2"></div>
+          <p id="vendas-pipeline-empty" class="text-sm text-slate-400 hidden">Sem dados de pipeline para o filtro atual.</p>
+        </div>
+        <div class="bg-slate-800/40 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
+          <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wide mb-3">Gargalos e Recuperacao com IA</h3>
+          <div id="vendas-gargalos-list" class="space-y-2 mb-4"></div>
+          <p id="vendas-gargalos-empty" class="text-sm text-slate-400 hidden">Nenhum gargalo critico detectado.</p>
+          <div>
+            <p class="text-xs text-slate-400 mb-2">Recuperar perdas por motivo</p>
+            <div id="vendas-recuperacao-list" class="flex flex-wrap gap-2"></div>
+          </div>
+        </div>
+      </div>
+      <div class="bg-slate-800/40 backdrop-blur-sm rounded-xl border border-slate-700 p-4">
+        <h3 class="text-sm font-semibold text-slate-200 uppercase tracking-wide mb-3">Produtividade por Vendedor Premium</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-slate-400 border-b border-slate-700">
+                <th class="text-left py-2 pr-3">Vendedor</th>
+                <th class="text-left py-2 pr-3">Abertas</th>
+                <th class="text-left py-2 pr-3">Concluidas</th>
+                <th class="text-left py-2 pr-3">Taxa Conversao</th>
+                <th class="text-left py-2 pr-3">Idade Media Abertas</th>
+              </tr>
+            </thead>
+            <tbody id="vendas-produtividade-body"></tbody>
+          </table>
+        </div>
+        <p id="vendas-produtividade-empty" class="text-sm text-slate-400 hidden">Sem dados para produtividade no filtro atual.</p>
+      </div>
+    </section>
+
+    <!-- Seção Clientes Premium -->
+    <section id="tab-clientes" class="tab-content space-y-6 hidden">
+      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 class="text-2xl font-bold text-white">Gerenciar Clientes Premium</h2>
+        <div class="flex gap-2">
+          <button id="btn-export-clientes" class="px-4 py-2 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30 transition-all flex items-center gap-2 border border-green-500/30"><i data-lucide="download" class="w-4 h-4"></i>Exportar</button>
+          <button id="btn-import-clientes" class="px-4 py-2 bg-purple-500/20 text-purple-300 rounded-lg hover:bg-purple-500/30 transition-all flex items-center gap-2 border border-purple-500/30" title="Importar clientes de outro CRM (Excel .xlsx ou .csv)"><i data-lucide="upload" class="w-4 h-4"></i>Importar Excel</button>
+          <button id="btn-dedupe-clientes" class="px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-all flex items-center gap-2 border border-red-500/30" title="Remover clientes duplicados"><i data-lucide="trash-2" class="w-4 h-4"></i>Remover Duplicados</button>
+          <input id="input-import-clientes" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+          <button id="btn-novo-cliente" class="px-6 py-2 bg-gradient-to-r from-yellow-500 to-orange-600 text-white rounded-lg font-medium hover:from-yellow-600 hover:to-orange-700 transition-all flex items-center gap-2 shadow-lg"><i data-lucide="plus" class="w-5 h-5"></i>Novo Cliente Premium</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 max-w-6xl">
+        <div class="relative">
+          <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></i>
+          <input type="text" id="search-clientes" list="lista-clientes-busca" placeholder="Pesquisar cliente por nome..." class="w-full pl-10 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-yellow-500" />
+          <datalist id="lista-clientes-busca"></datalist>
+        </div>
+        <div class="relative">
+          <i data-lucide="filter" class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"></i>
+          <input type="text" id="filter-clientes-oferta" list="lista-clientes-ofertas" placeholder="Filtrar por oferta da observação (ex: Renovação Móvel)" class="w-full pl-10 pr-4 py-3 bg-slate-700/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-yellow-500" />
+          <datalist id="lista-clientes-ofertas"></datalist>
+        </div>
+        <button id="btn-clear-clientes-filters" class="px-4 py-3 bg-slate-700/60 border border-slate-600 text-slate-200 rounded-lg hover:bg-slate-700 transition-all flex items-center justify-center gap-2">
+          <i data-lucide="x-circle" class="w-4 h-4"></i>Limpar Filtros
+        </button>
+        <button id="btn-clientes-enviar-campanha" class="px-4 py-3 bg-violet-500/20 border border-violet-500/40 text-violet-200 rounded-lg hover:bg-violet-500/30 transition-all flex items-center justify-center gap-2">
+          <i data-lucide="shuffle" class="w-4 h-4"></i>Enviar para Campanha Premium
+        </button>
+      </div>
+      <div id="clientes-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+      <div id="clientes-grid-controls" class="hidden mt-4"></div>
+      <div id="clientes-grid-empty" class="text-center text-slate-400 py-20 hidden">
+        <i data-lucide="users-round" class="w-16 h-16 mx-auto mb-4 text-slate-500"></i><p class="text-lg">Nenhum cliente cadastrado</p>
+      </div>
+    </section>
+
+    <!-- Seção Pós-Venda Pro -->
+    <section id="tab-posvenda" class="tab-content space-y-6 hidden">
+      <div class="flex items-center gap-3 mb-6">
+        <i data-lucide="bell-ring" class="w-8 h-8 text-yellow-400"></i>
+        <div><h2 class="text-2xl font-bold text-white">Lembretes de Pós-Venda Premium</h2><p class="text-slate-400">Acompanhe seus clientes em 7, 30 e 90 dias após a venda com IA</p></div>
+      </div>
+      <div id="posvenda-container" class="space-y-4"></div>
+      <div id="posvenda-empty" class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-12 border border-slate-700 text-center hidden">
+        <i data-lucide="calendar-check" class="w-16 h-16 text-slate-500 mx-auto mb-4"></i><p class="text-slate-400 text-lg">Nenhum lembrete pendente no momento</p>
+      </div>
+    </section>
+
+    <!-- Seção Marketing Inteligente -->
+    <section id="tab-marketing" class="tab-content space-y-6 hidden">
+      <div class="flex items-center gap-3 mb-6">
+        <i data-lucide="send" class="w-8 h-8 text-yellow-400"></i>
+        <div>
+          <h2 class="text-2xl font-bold text-white">Marketing Inteligente Premium</h2>
+          <p class="text-slate-400">Análises avançadas e segmentação inteligente de clientes</p>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
+        <h3 class="text-lg font-bold text-white mb-4">Segmentação Inteligente</h3>
+        <p class="text-slate-400">Funcionalidade premium para análise avançada de clientes e campanhas personalizadas.</p>
+        <div class="mt-4 text-center text-slate-500">
+          <i data-lucide="brain" class="w-12 h-12 mx-auto mb-2"></i>
+          <p>Recursos de IA para marketing em desenvolvimento</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção Campanhas Premium -->
+    <section id="tab-campanhas" class="tab-content space-y-6 hidden">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-bold text-white">Campanhas Premium por Vendedor</h2>
+          <p class="text-slate-400">Suba planilhas, distribua oportunidades e gerencie cada lead em popup com retorno estruturado e IA.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button id="btn-campanhas-open-create" class="px-4 py-2 bg-violet-500/20 text-violet-200 rounded-lg border border-violet-500/40 hover:bg-violet-500/30 transition-all flex items-center gap-2">
+            <i data-lucide="plus" class="w-4 h-4"></i>Criar Campanha Premium
+          </button>
+          <button id="btn-campanhas-refresh" class="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 transition-all flex items-center gap-2">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>Atualizar
+          </button>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-slate-800/60 rounded-xl border border-slate-700 p-4"><p class="text-xs text-slate-400 uppercase tracking-wider">Total Leads Premium</p><p id="campanhas-total-leads" class="text-2xl font-bold text-white mt-2">0</p></div>
+        <div class="bg-slate-800/60 rounded-xl border border-slate-700 p-4"><p class="text-xs text-slate-400 uppercase tracking-wider">Em Contato</p><p id="campanhas-em-contato" class="text-2xl font-bold text-cyan-300 mt-2">0</p></div>
+        <div class="bg-slate-800/60 rounded-xl border border-slate-700 p-4"><p class="text-xs text-slate-400 uppercase tracking-wider">Propostas</p><p id="campanhas-propostas" class="text-2xl font-bold text-amber-300 mt-2">0</p></div>
+        <div class="bg-slate-800/60 rounded-xl border border-slate-700 p-4"><p class="text-xs text-slate-400 uppercase tracking-wider">Ganhos</p><p id="campanhas-ganhos" class="text-2xl font-bold text-emerald-300 mt-2">0</p></div>
+      </div>
+
+      <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl border border-slate-700 p-6">
+        <h3 class="text-lg font-bold text-white mb-4">Gestão Avançada de Campanhas</h3>
+        <p class="text-slate-400">Funcionalidades premium para campanhas com IA integrada, análise preditiva e automação de follow-ups.</p>
+        <div class="mt-4 text-center text-slate-500">
+          <i data-lucide="zap" class="w-12 h-12 mx-auto mb-2"></i>
+          <p>Recursos avançados em desenvolvimento</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Seção Analytics -->
+    <section id="tab-analytics" class="tab-content space-y-6 hidden">
+      <div class="flex items-center gap-3 mb-6">
+        <i data-lucide="bar-chart-3" class="w-8 h-8 text-yellow-400"></i>
+        <div><h2 class="text-2xl font-bold text-white">Analytics Premium</h2><p class="text-slate-400">Relatórios avançados e insights com IA para tomada de decisões estratégicas</p></div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
+          <h3 class="text-lg font-bold text-white mb-4">Previsão de Vendas com IA</h3>
+          <div class="h-64 flex items-center justify-center">
+            <div class="text-center text-slate-500">
+              <i data-lucide="trending-up" class="w-16 h-16 mx-auto mb-4"></i>
+              <p>Modelo de IA analisando padrões históricos</p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
+          <h3 class="text-lg font-bold text-white mb-4">Análise de Conversão</h3>
+          <div class="h-64 flex items-center justify-center">
+            <div class="text-center text-slate-500">
+              <i data-lucide="pie-chart" class="w-16 h-16 mx-auto mb-4"></i>
+              <p>Insights sobre funis de vendas</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-800/50 backdrop-blur-sm rounded-xl p-6 border border-slate-700">
+        <h3 class="text-lg font-bold text-white mb-4">Relatórios Personalizados</h3>
+        <p class="text-slate-400">Gere relatórios customizados com filtros avançados e exportação em múltiplos formatos.</p>
+        <div class="mt-4 text-center text-slate-500">
+          <i data-lucide="file-bar-chart" class="w-12 h-12 mx-auto mb-2"></i>
+          <p>Funcionalidade premium em desenvolvimento</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Outras seções podem ser adicionadas aqui -->
 
   </main>
