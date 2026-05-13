@@ -131,6 +131,10 @@ app.get('/crm', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+app.get('/energia', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'energia.html'));
+});
+
 app.get('/premium', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'premium.html'));
 });
