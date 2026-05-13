@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a1628">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Energia-Volt | Calculadora de Desconto</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a1628;
+  --bg2:#0f1f3a;
+  --bg3:#162a4a;
+  --accent:#00ff88;
+  --accent2:#00cc6a;
+  --accent-glow:rgba(0,255,136,.15);
+  --gold:#ffd700;
+  --red:#ff4757;
+  --text:#e8edf5;
+  --text2:#8899b4;
+  --card:rgba(15,31,58,.85);
+  --border:rgba(0,255,136,.12);
+  --radius:16px;
+}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Outfit',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+.bg-grid{
+  position:fixed;inset:0;z-index:0;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 50% 0%,rgba(0,255,136,.06),transparent),
+    radial-gradient(ellipse 60% 50% at 80% 100%,rgba(0,100,255,.04),transparent),
+    linear-gradient(rgba(0,255,136,.03) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,255,136,.03) 1px,transparent 1px);
+  background-size:100% 100%,100% 100%,60px 60px,60px 60px;
+  pointer-events:none;
+}
+.app{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:24px 24px 40px;}
+@media (min-width: 992px) {
+  .main-grid{display:grid;grid-template-columns:1.35fr .95fr;gap:32px;align-items:start;}
+  .main-form{display:flex;flex-direction:column;gap:24px;}
+  .result-section{margin-top:0;}
+  .card{padding:32px 28px;}
+  .select-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .script-card{margin-top:0;}
+  .testimonials{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .btn-calculate{width:auto;min-width:260px;padding:18px 26px;}
+}
+.header{text-align:center;padding:32px 0 24px;position:relative;}
+.logo{
+  display:inline-flex;align-items:center;gap:10px;
+  font-size:1.6rem;font-weight:800;letter-spacing:-.02em;
+  background:linear-gradient(135deg,var(--accent),#00e5ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.logo svg{width:36px;height:36px;filter:drop-shadow(0 0 12px rgba(0,255,136,.4))}
+.tagline{
+  margin-top:8px;font-size:.85rem;color:var(--text2);
+  font-weight:400;letter-spacing:.04em;text-transform:uppercase;
+}
+.urgency{
+  background:linear-gradient(135deg,rgba(255,215,0,.1),rgba(255,71,87,.08));
+  border:1px solid rgba(255,215,0,.2);
+  border-radius:12px;padding:14px 18px;margin:0 0 24px;
+  display:flex;align-items:center;gap:12px;
+  animation:pulse-border 2s ease-in-out infinite;
+}
+@keyframes pulse-border{
+  0%,100%{border-color:rgba(255,215,0,.2)}
+  50%{border-color:rgba(255,215,0,.5)}
+}
+.urgency-icon{font-size:1.5rem;flex-shrink:0;animation:shake 3s ease-in-out infinite}
+@keyframes shake{
+  0%,90%,100%{transform:rotate(0)}
+  92%{transform:rotate(12deg)}
+  94%{transform:rotate(-10deg)}
+  96%{transform:rotate(8deg)}
+  98%{transform:rotate(-5deg)}
+}
+.urgency-text{font-size:.82rem;line-height:1.5;color:var(--gold);font-weight:500;}
+.urgency-text strong{color:#fff;font-weight:700;}
+.social-proof{
+  display:flex;gap:8px;margin-bottom:24px;overflow-x:auto;
+  scrollbar-width:none;-ms-overflow-style:none;padding:2px 0;
+}
+.social-proof::-webkit-scrollbar{display:none}
+.proof-chip{
+  flex-shrink:0;display:flex;align-items:center;gap:6px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:100px;padding:8px 14px;font-size:.75rem;color:var(--text2);
+  backdrop-filter:blur(10px);
+}
+.proof-chip .num{color:var(--accent);font-weight:700;font-family:'JetBrains Mono',monospace;}
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  padding:28px 22px;
+  backdrop-filter:blur(20px);
+  margin-bottom:20px;
+  position:relative;
+  overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),transparent);
+  opacity:.6;
+}
+.card-title{
+  font-size:1.05rem;font-weight:700;margin-bottom:20px;
+  display:flex;align-items:center;gap:10px;
+}
+.card-title .step{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:28px;height:28px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:var(--bg);font-size:.75rem;font-weight:800;flex-shrink:0;
+}
+.field{margin-bottom:18px;position:relative;}
+.field label{
+  display:block;font-size:.78rem;font-weight:600;color:var(--text2);
+  text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;
+}
+.field input,.field select{
+  width:100%;background:var(--bg);border:1.5px solid rgba(255,255,255,.08);
+  border-radius:12px;padding:14px 16px;color:var(--text);
+  font-family:'Outfit',sans-serif;font-size:1rem;font-weight:500;
+  transition:all .25s ease;outline:none;appearance:none;
+  -webkit-appearance:none;
+}
+.field input:focus,.field select:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-glow);
+}
+.field input::placeholder{color:rgba(255,255,255,.2);font-weight:400}
+.field .prefix{
+  position:absolute;left:16px;bottom:14px;
+  font-size:1rem;color:var(--text2);font-weight:600;pointer-events:none;
+}
+.field.has-prefix input{padding-left:42px;}
+.select-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.select-btn{
+  background:var(--bg);border:1.5px solid rgba(255,255,255,.08);
+  border-radius:12px;padding:12px 8px;text-align:center;cursor:pointer;
+  transition:all .25s ease;color:var(--text2);font-size:.78rem;font-weight:600;
+  display:flex;flex-direction:column;gap:4px;align-items:center;
+}
+.select-btn .fase-icon{font-size:1.3rem}
+.select-btn.active{
+  border-color:var(--accent);background:var(--accent-glow);color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-glow);
+}
+.select-btn:hover:not(.active){border-color:rgba(255,255,255,.15)}
+.result-section{display:none;animation:slideUp .5s cubic-bezier(.16,1,.3,1);}
+.result-section.visible{display:block}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.savings-display{
+  text-align:center;padding:28px 16px;
+  background:radial-gradient(ellipse at center,rgba(0,255,136,.08),transparent 70%);
+  border-radius:16px;margin-bottom:20px;position:relative;
+}
+.savings-label{font-size:.8rem;color:var(--text2);text-transform:uppercase;letter-spacing:.08em;font-weight:600;margin-bottom:4px;}
+.savings-amount{
+  font-size:3rem;font-weight:900;
+  font-family:'JetBrains Mono',monospace;
+  background:linear-gradient(135deg,var(--accent),#00e5ff);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;line-height:1.1;
+}
+.savings-yearly{
+  font-size:.9rem;color:var(--gold);font-weight:600;margin-top:8px;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+}
+.detail-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:12px 0;border-bottom:1px solid rgba(255,255,255,.04);
+  font-size:.88rem;
+}
+.detail-row:last-child{border:none}
+.detail-label{color:var(--text2);font-weight:400}
+.detail-value{font-weight:600;font-family:'JetBrains Mono',monospace;font-size:.85rem;}
+.detail-value.highlight{color:var(--accent)}
+.detail-value.discount{color:var(--gold)}
+.btn-calculate{
+  width:100%;padding:18px;border:none;border-radius:14px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:var(--bg);font-family:'Outfit',sans-serif;
+  font-size:1.05rem;font-weight:800;cursor:pointer;
+  transition:all .3s ease;position:relative;overflow:hidden;
+  text-transform:uppercase;letter-spacing:.04em;
+}
+.btn-calculate:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,255,136,.25)}
+.btn-calculate:active{transform:translateY(0)}
+.btn-whatsapp{
+  width:100%;padding:18px;border:none;border-radius:14px;
+  background:linear-gradient(135deg,#25D366,#128C7E);
+  color:#fff;font-family:'Outfit',sans-serif;
+  font-size:1.05rem;font-weight:700;cursor:pointer;
+  transition:all .3s ease;margin-top:12px;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  text-transform:uppercase;letter-spacing:.02em;
+}
+.btn-whatsapp:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(37,211,102,.3)}
+.btn-whatsapp svg{width:22px;height:22px}
+.guarantee{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:16px;border-radius:12px;margin-top:16px;
+  background:rgba(0,255,136,.04);border:1px solid rgba(0,255,136,.08);
+}
+.guarantee-icon{font-size:1.4rem;flex-shrink:0;margin-top:2px}
+.guarantee-text{font-size:.78rem;color:var(--text2);line-height:1.6}
+.guarantee-text strong{color:var(--text);font-weight:600}
+.testimonials{margin-top:24px}
+.testimonial{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:14px;padding:18px;margin-bottom:12px;
+  backdrop-filter:blur(10px);
+}
+.test-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.test-avatar{
+  width:36px;height:36px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),#0066ff);
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:.8rem;color:var(--bg);
+}
+.test-name{font-weight:600;font-size:.85rem;}
+.test-stars{color:var(--gold);font-size:.7rem;letter-spacing:2px}
+.test-text{font-size:.82rem;color:var(--text2);line-height:1.6;font-style:italic}
+.live-counter{
+  text-align:center;padding:14px;font-size:.8rem;color:var(--text2);
+  border-top:1px solid rgba(255,255,255,.04);margin-top:24px;
+}
+.live-counter .count{
+  color:var(--accent);font-weight:700;
+  font-family:'JetBrains Mono',monospace;
+}
+.field-error{
+  font-size:.72rem;color:var(--red);margin-top:4px;
+  display:none;font-weight:500;
+}
+.field.error input,.field.error select{border-color:var(--red)}
+.field.error .field-error{display:block}
+.script-card{
+  background:linear-gradient(135deg,rgba(0,255,136,.06),rgba(0,100,255,.04));
+  border:1px dashed rgba(0,255,136,.2);
+  border-radius:var(--radius);padding:22px;margin-top:20px;
+}
+.script-title{
+  font-size:.9rem;font-weight:700;margin-bottom:12px;
+  display:flex;align-items:center;gap:8px;color:var(--accent);
+}
+.script-text{font-size:.82rem;color:var(--text2);line-height:1.8;}
+.script-text .hl{
+  color:var(--text);font-weight:600;display:block;margin:6px 0;
+  padding-left:12px;border-left:2px solid var(--accent);
+}
+.btn-copy-script{
+  margin-top:14px;padding:10px 20px;border:1px solid var(--accent);
+  background:transparent;border-radius:10px;color:var(--accent);
+  font-family:'Outfit',sans-serif;font-size:.8rem;font-weight:600;
+  cursor:pointer;transition:all .25s;
+}
+.btn-copy-script:hover{background:var(--accent-glow)}
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="app">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">
+      <svg viewBox="0 0 36 36" fill="none"><circle cx="18" cy="18" r="17" stroke="#00ff88" stroke-width="2"/><path d="M18 8L22 18H14L18 28" stroke="#00ff88" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Energia-Volt
+    </div>
+    <div class="tagline">Energia mais barata por assinatura</div>
+  </div>
+
+  <!-- URGENCY -->
+  <div class="urgency">
+    <span class="urgency-icon">⚡</span>
+    <div class="urgency-text">
+      <strong>Vagas limitadas neste mês!</strong> Garanta agora até <strong>25% de desconto</strong> na sua conta de energia. Sem obras, sem investimento.
+    </div>
+  </div>
+
+  <!-- SOCIAL PROOF -->
+  <div class="social-proof">
+    <div class="proof-chip"><span class="num">2.847</span> clientes economizando</div>
+    <div class="proof-chip"><span class="num">R$ 1.2M</span> economizados/mês</div>
+    <div class="proof-chip"><span class="num">4.9</span> ⭐ avaliação</div>
+  </div>
+
+  <div class="main-grid">
+    <div class="main-form">
+      <!-- FORM: DADOS DO CLIENTE -->
+      <div class="card">
+        <div class="card-title"><span class="step">1</span> Dados do Cliente</div>
+    <div class="field" id="f-nome">
+      <label>Nome Completo</label>
+      <input type="text" id="nome" placeholder="Ex: João da Silva" autocomplete="name">
+      <div class="field-error">Informe o nome do cliente</div>
+    </div>
+    <div class="field" id="f-telefone">
+      <label>WhatsApp</label>
+      <input type="tel" id="telefone" placeholder="(00) 00000-0000" inputmode="tel">
+      <div class="field-error">Informe um telefone válido</div>
+    </div>
+  </div>
+
+  <!-- FORM: DADOS DA FATURA -->
+  <div class="card">
+    <div class="card-title"><span class="step">2</span> Dados da Fatura</div>
+    <div class="field has-prefix" id="f-fatura">
+      <label>Valor da Fatura Mensal</label>
+      <span class="prefix">R$</span>
+      <input type="text" id="fatura" placeholder="0,00" inputmode="decimal">
+      <div class="field-error">Informe o valor da fatura</div>
+    </div>
+    <div class="field has-prefix" id="f-tarifa">
+      <label>Valor da Tarifa (R$/kWh)</label>
+      <span class="prefix">R$</span>
+      <input type="text" id="tarifa" placeholder="0,00" inputmode="decimal">
+      <div class="field-error">Informe o valor da tarifa</div>
+    </div>
+    <div class="field" id="f-fornecimento">
+      <label>Tipo de Fornecimento</label>
+      <div class="select-grid">
+        <button class="select-btn" data-value="mono" onclick="selectFornecimento(this)">
+          <span class="fase-icon">①</span> Monofásico
+        </button>
+        <button class="select-btn" data-value="bi" onclick="selectFornecimento(this)">
+          <span class="fase-icon">②</span> Bifásico
+        </button>
+        <button class="select-btn" data-value="tri" onclick="selectFornecimento(this)">
+          <span class="fase-icon">③</span> Trifásico
+        </button>
+      </div>
+      <div class="field-error">Selecione o tipo de fornecimento</div>
+    </div>
+      </div>
+
+      <button class="btn-calculate" onclick="calcular()">⚡ Calcular Meu Desconto</button>
+    </div>
+
+    <!-- RESULTADO -->
+    <div class="result-section" id="resultado">
+    <div class="card" style="margin-top:20px">
+      <div class="card-title"><span class="step">✓</span> Proposta de Desconto</div>
+      <div class="savings-display">
+        <div class="savings-label">Sua economia mensal</div>
+        <div class="savings-amount" id="res-economia">R$ 0,00</div>
+        <div class="savings-yearly">🎯 <span id="res-anual">R$ 0,00</span> por ano!</div>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Valor da fatura</span>
+        <span class="detail-value" id="res-fatura">R$ 0,00</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Custo indedutível (disponib. + CIP)</span>
+        <span class="detail-value" id="res-custo">- R$ 0,00</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Base de cálculo</span>
+        <span class="detail-value highlight" id="res-base">R$ 0,00</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Desconto aplicado</span>
+        <span class="detail-value discount" id="res-percent">0%</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Novo valor estimado</span>
+        <span class="detail-value highlight" id="res-novo">R$ 0,00</span>
+      </div>
+
+      <button class="btn-whatsapp" onclick="enviarWhatsApp()">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Enviar Proposta via WhatsApp
+      </button>
+
+      <div class="guarantee">
+        <span class="guarantee-icon">🛡️</span>
+        <div class="guarantee-text">
+          <strong>100% sem risco.</strong> Sem necessidade de obras ou investimento. Desconto aplicado direto na sua conta. Cancele quando quiser.
+        </div>
+      </div>
+    </div>
+
+    <!-- SCRIPT DE VENDAS -->
+    <div class="script-card" id="script-vendas">
+      <div class="script-title">📋 Script de Abordagem</div>
+      <div class="script-text" id="script-content"></div>
+      <button class="btn-copy-script" onclick="copyScript()">📋 Copiar Script</button>
+    </div>
+    </div>
+  </div>
+
+  <!-- TESTIMONIALS -->
+  <div class="testimonials">
+    <div class="testimonial">
+      <div class="test-header">
+        <div class="test-avatar">M</div>
+        <div><div class="test-name">Marcos S.</div><div class="test-stars">★★★★★</div></div>
+      </div>
+      <div class="test-text">"Economizo mais de R$ 280 por mês sem ter mudado nada na minha casa. Simplesmente incrível!"</div>
+    </div>
+    <div class="testimonial">
+      <div class="test-header">
+        <div class="test-avatar">A</div>
+        <div><div class="test-name">Ana C. — Empresária</div><div class="test-stars">★★★★★</div></div>
+      </div>
+      <div class="test-text">"Na minha empresa a conta era de R$ 4.500. Hoje pago R$ 3.400. Melhor decisão que tomei esse ano."</div>
+    </div>
+  </div>
+
+  <div class="live-counter">
+    🟢 <span class="count" id="counter">47</span> pessoas calculando desconto agora
+  </div>
+</div>
+
+<script>
+let fornecimentoSelecionado = null;
+let dadosProposta = {};
+
+function selectFornecimento(btn) {
+  document.querySelectorAll('.select-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  fornecimentoSelecionado = btn.dataset.value;
+  document.getElementById('f-fornecimento').classList.remove('error');
+}
+
+// Mask telefone
+document.getElementById('telefone').addEventListener('input', function(e) {
+  let v = e.target.value.replace(/\D/g, '');
+  if (v.length > 11) v = v.slice(0, 11);
+  if (v.length > 6) v = '(' + v.slice(0,2) + ') ' + v.slice(2,7) + '-' + v.slice(7);
+  else if (v.length > 2) v = '(' + v.slice(0,2) + ') ' + v.slice(2);
+  else if (v.length > 0) v = '(' + v;
+  e.target.value = v;
+});
+
+// Mask currency
+function maskCurrency(el) {
+  el.addEventListener('input', function(e) {
+    let v = e.target.value.replace(/\D/g, '');
+    if (v.length === 0) { e.target.value = ''; return; }
+    v = (parseInt(v) / 100).toFixed(2);
+    e.target.value = v.replace('.', ',');
+  });
+}
+maskCurrency(document.getElementById('fatura'));
+maskCurrency(document.getElementById('tarifa'));
+
+function parseBR(s) {
+  if (!s) return 0;
+  return parseFloat(s.replace(/\./g, '').replace(',', '.')) || 0;
+}
+
+function fmtBR(v) {
+  return 'R$ ' + v.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+function validate() {
+  let ok = true;
+  const fields = [
+    { id: 'f-nome', check: () => document.getElementById('nome').value.trim().length >= 3 },
+    { id: 'f-telefone', check: () => document.getElementById('telefone').value.replace(/\D/g, '').length >= 10 },
+    { id: 'f-fatura', check: () => parseBR(document.getElementById('fatura').value) > 0 },
+    { id: 'f-tarifa', check: () => parseBR(document.getElementById('tarifa').value) > 0 },
+    { id: 'f-fornecimento', check: () => fornecimentoSelecionado !== null },
+  ];
+  fields.forEach(f => {
+    const el = document.getElementById(f.id);
+    if (!f.check()) { el.classList.add('error'); ok = false; }
+    else { el.classList.remove('error'); }
+  });
+  return ok;
+}
+
+function calcular() {
+  if (!validate()) return;
+
+  const nome = document.getElementById('nome').value.trim();
+  const telefone = document.getElementById('telefone').value.trim();
+  const fatura = parseBR(document.getElementById('fatura').value);
+  const tarifa = parseBR(document.getElementById('tarifa').value);
+
+  const custoDisp = { mono: 30, bi: 50, tri: 100 };
+  const nomesFase = { mono: 'Monofásico', bi: 'Bifásico', tri: 'Trifásico' };
+  const disponibilidade = custoDisp[fornecimentoSelecionado] * tarifa;
+  const cip = fatura * 0.05;
+  const base = fatura - disponibilidade - cip;
+
+  if (base <= 0) {
+    alert('O valor da fatura é insuficiente para gerar desconto após dedução dos custos fixos.');
+    return;
+  }
+
+  let desconto = 0;
+  if (base >= 300 && base <= 1500) desconto = 0.18;
+  else if (base > 1500 && base <= 3000) desconto = 0.20;
+  else if (base > 3000) desconto = 0.25;
+  else {
+    alert('Valor base de ' + fmtBR(base) + ' abaixo do mínimo de R$ 300,00 para aplicar desconto.');
+    return;
+  }
+
+  const valorEconomia = base * desconto;
+  const novoValor = fatura - valorEconomia;
+  const economiaAnual = valorEconomia * 12;
+
+  dadosProposta = {
+    nome, telefone, fatura, tarifa, disponibilidade, cip, base,
+    desconto, valorEconomia, novoValor, economiaAnual,
+    fase: nomesFase[fornecimentoSelecionado]
+  };
+
+  document.getElementById('res-economia').textContent = fmtBR(valorEconomia);
+  document.getElementById('res-anual').textContent = fmtBR(economiaAnual);
+  document.getElementById('res-fatura').textContent = fmtBR(fatura);
+  document.getElementById('res-custo').textContent = '- ' + fmtBR(disponibilidade + cip);
+  document.getElementById('res-base').textContent = fmtBR(base);
+  document.getElementById('res-percent').textContent = (desconto * 100).toFixed(0) + '%';
+  document.getElementById('res-novo').textContent = fmtBR(novoValor);
+
+  generateScript();
+
+  document.getElementById('resultado').classList.add('visible');
+  setTimeout(() => {
+    document.getElementById('resultado').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function generateScript() {
+  const d = dadosProposta;
+  const firstName = d.nome.split(' ')[0];
+  document.getElementById('script-content').innerHTML = 
+    '<span class="hl">Olá ' + firstName + ', tudo bem? Aqui é [SEU NOME] da Energia-Volt! ⚡</span>' +
+    '<br>Fiz uma simulação personalizada pra você e os números ficaram muito bons:<br><br>' +
+    '<span class="hl">📊 Sua fatura atual: ' + fmtBR(d.fatura) + '</span>' +
+    '<span class="hl">💰 Desconto de ' + (d.desconto*100).toFixed(0) + '%: economia de ' + fmtBR(d.valorEconomia) + '/mês</span>' +
+    '<span class="hl">🎯 Novo valor estimado: ' + fmtBR(d.novoValor) + '</span>' +
+    '<span class="hl">📅 Em 12 meses: ' + fmtBR(d.economiaAnual) + ' de economia!</span>' +
+    '<br>Isso sem precisar instalar nada, sem obra, sem investimento. O desconto vem direto na sua conta de luz.<br><br>' +
+    'É energia limpa, por assinatura — você só paga menos pelo que já consome.<br><br>' +
+    '<span class="hl">⏰ Essa condição de ' + (d.desconto*100).toFixed(0) + '% é válida para adesões nesta semana.</span>' +
+    '<br>Posso reservar sua vaga agora? Leva menos de 2 minutos! 🚀';
+}
+
+function copyScript() {
+  const text = document.getElementById('script-content').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.btn-copy-script');
+    btn.textContent = '✅ Copiado!';
+    setTimeout(() => btn.textContent = '📋 Copiar Script', 2000);
+  });
+}
+
+function enviarWhatsApp() {
+  const d = dadosProposta;
+  const firstName = d.nome.split(' ')[0];
+  const phone = d.telefone.replace(/\D/g, '');
+  const countryPhone = phone.startsWith('55') ? phone : '55' + phone;
+
+  const msg = encodeURIComponent(
+    '⚡ *PROPOSTA ENERGIA-VOLT* ⚡\n' +
+    '━━━━━━━━━━━━━━━━━\n\n' +
+    'Olá *' + firstName + '*! Preparei uma proposta exclusiva de desconto na sua conta de energia:\n\n' +
+    '📋 *Resumo da Proposta:*\n' +
+    '• Fatura atual: *' + fmtBR(d.fatura) + '*\n' +
+    '• Tipo: *' + d.fase + '*\n' +
+    '• Desconto: *' + (d.desconto*100).toFixed(0) + '%*\n\n' +
+    '💰 *Sua Economia:*\n' +
+    '• Mensal: *' + fmtBR(d.valorEconomia) + '*\n' +
+    '• Anual: *' + fmtBR(d.economiaAnual) + '*\n' +
+    '• Novo valor estimado: *' + fmtBR(d.novoValor) + '*\n\n' +
+    '✅ Sem obras | ✅ Sem investimento\n' +
+    '✅ Energia limpa | ✅ Cancele quando quiser\n\n' +
+    '⏰ Condição válida para adesões desta semana!\n\n' +
+    'Posso garantir sua vaga agora? 🚀'
+  );
+
+  window.open('https://wa.me/' + countryPhone + '?text=' + msg, '_blank');
+}
+
+// Live counter
+function updateCounter() {
+  document.getElementById('counter').textContent = 38 + Math.floor(Math.random() * 25);
+}
+setInterval(updateCounter, 8000);
+</script>
+</body>
+</html>

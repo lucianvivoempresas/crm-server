@@ -135,6 +135,10 @@ app.get('/energia', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'energia.html'));
 });
 
+app.get('/calculadora', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'calculadora.html'));
+});
+
 app.get('/premium', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'premium.html'));
 });
