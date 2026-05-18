@@ -963,6 +963,94 @@ app.get('/healthz', (req, res) => {
     res.status(200).json({ ok: true, timestamp: new Date().toISOString() });
 });
 
+// ============ ENDPOINTS PARA CRM ENERGIA (SEM AUTENTICAÇÃO) ============
+// Estas rotas DEVEM estar ANTES das rotas genéricas /api/:collection para não serem capturadas por elas
+
+/**
+ * GET /api/energia-data
+ * Carregar dados de energia do banco
+ */
+app.get('/api/energia-data', (req, res) => {
+    db.all(
+        "SELECT id, payload FROM documents WHERE collection = 'energia-data'",
+        [],
+        (err, rows) => {
+            if (err) {
+                console.error('❌ Erro ao buscar dados de energia:', err.message);
+                return res.status(500).json({ error: err.message });
+            }
+            const data = rows.map(row => {
+                try {
+                    const parsed = JSON.parse(row.payload);
+                    return { id: row.id, ...parsed };
+                } catch (e) {
+                    console.warn('⚠️ Erro ao parsear payload:', e.message);
+                    return null;
+                }
+            }).filter(Boolean);
+            res.json(data);
+        }
+    );
+});
+
+/**
+ * POST /api/energia-data
+ * Criar novo registro de dados de energia
+ */
+app.post('/api/energia-data', (req, res) => {
+    const payload = JSON.stringify(req.body);
+    db.run(
+        "INSERT INTO documents (collection, payload) VALUES (?, ?)",
+        ['energia-data', payload],
+        function(err) {
+            if (err) {
+                console.error('❌ Erro ao salvar dados de energia:', err.message);
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ id: this.lastID });
+        }
+    );
+});
+
+/**
+ * PUT /api/energia-data/:id
+ * Atualizar dados de energia existentes
+ */
+app.put('/api/energia-data/:id', (req, res) => {
+    const id = req.params.id;
+    const payload = JSON.stringify(req.body);
+    db.run(
+        "UPDATE documents SET payload = ? WHERE collection = 'energia-data' AND id = ?",
+        [payload, id],
+        function(err) {
+            if (err) {
+                console.error('❌ Erro ao atualizar dados de energia:', err.message);
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ success: true });
+        }
+    );
+});
+
+/**
+ * DELETE /api/energia-data/:id
+ * Deletar dados de energia
+ */
+app.delete('/api/energia-data/:id', (req, res) => {
+    const id = req.params.id;
+    db.run(
+        "DELETE FROM documents WHERE collection = 'energia-data' AND id = ?",
+        [id],
+        function(err) {
+            if (err) {
+                console.error('❌ Erro ao deletar dados de energia:', err.message);
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ success: true });
+        }
+    );
+});
+
 // ROTA: Adicionar um novo dado
 app.post('/api/:collection', requireAuth, (req, res) => {
     const collection = req.params.collection;

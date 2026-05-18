@@ -443,6 +443,9 @@
         <div class="text-xs font-semibold text-slate-900 truncate" id="user-name">—</div>
         <div class="text-[11px] text-slate-500 flex items-center gap-1.5"><span class="user-chip" id="user-role">—</span></div>
       </div>
+      <button id="btn-sync-server" onclick="(async ()=>{ UI.toast('Iniciando sincronização...'); try{ await Store.sync(); UI.toast('Sincronização finalizada'); }catch(e){ UI.toast('Falha na sincronização','error'); } })()" title="Sincronizar com servidor" class="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 6V3L8 7l4 4V8c2.76 0 5 2.24 5 5 0 1.63-.77 3.08-1.97 4.01l1.45 1.45C19.11 17.13 20 15.14 20 13c0-3.87-3.13-7-7-7zM6.97 7.99C5.86 9.16 5.2 10.94 5.2 13c0 3.87 3.13 7 7 7v3l4-4-4-4v3c-2.76 0-5-2.24-5-5 0-1.63.77-3.08 1.97-4.01L6.97 7.99z"/></svg>
+      </button>
       <button onclick="MeuTelegram.abrir()" title="Meu Telegram" class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
         <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.64 12c-.88-.25-.89-.86.2-1.3l15.97-6.16c.73-.33 1.43.18 1.15 1.3l-2.72 12.81c-.19.91-.74 1.13-1.5.71L12.6 16.3l-1.99 1.93c-.23.23-.42.42-.83.42z"/></svg>
       </button>
@@ -1558,16 +1561,50 @@
 
 <script>
 //============================================================================
-// STORAGE
+// STORAGE - Sincronizado com Banco de Dados do Servidor
 //============================================================================
 const Store = {
   KEY: 'crm_energia_v1',
+  SERVER_COLLECTION: 'energia-data',
   data: { clientes: [], produtos: [], vendas: [], vendedores: [], followups: [], pagamentos: [], metas: [], config: {}, usuarios: [], oportunidades: [] },
-  load() {
+  serverDocId: null,
+  isSyncing: false,
+
+  async load() {
+    try {
+      // Tenta carregar do servidor
+      const response = await fetch(`/api/energia-data`, {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+          this.data = data[0];
+          this.serverDocId = data[0].id;
+          this._ensureDefaults();
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Falha ao carregar do servidor:', e.message);
+    }
+
+    // Fallback: carrega de localStorage
     try {
       const raw = localStorage.getItem(this.KEY);
       if (raw) this.data = JSON.parse(raw);
     } catch (e) { console.error(e); }
+    
+    this._ensureDefaults();
+
+    // Se havia dados em localStorage e não no servidor, migra para o servidor
+    if (localStorage.getItem(this.KEY)) {
+      setTimeout(() => this.save(), 500);
+    }
+  },
+
+  _ensureDefaults() {
     this.data.clientes = this.data.clientes || [];
     this.data.produtos = this.data.produtos || [];
     this.data.vendas = this.data.vendas || [];
@@ -1577,6 +1614,7 @@ const Store = {
     this.data.metas = this.data.metas || [];
     this.data.usuarios = this.data.usuarios || [];
     this.data.oportunidades = this.data.oportunidades || [];
+    
     if (this.data.config.slaMinutos == null) this.data.config.slaMinutos = 60;
     if (!this.data.config.telegram) this.data.config.telegram = {
       token: '8840501061:AAHtaqg7F2oOGefcndAZWe_pxfBaTivcpgs',
@@ -1597,10 +1635,76 @@ const Store = {
     if (!this.data.config.diasInatividade) this.data.config.diasInatividade = 90;
     this.data.clientes.forEach(c => { if (!Array.isArray(c.notas)) c.notas = []; });
   },
-  save() {
-    try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); return true; }
-    catch { UI.toast('Armazenamento cheio. Considere remover documentos antigos.', 'error'); return false; }
+
+  _getToken() {
+    // Endpoints de energia não requerem token
+    return '';
   },
+
+  save() {
+    // Sempre salva em localStorage primeiro (rápido). Não sincroniza automaticamente.
+    try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) {
+      if (typeof UI !== 'undefined') {
+        UI.toast('Armazenamento cheio. Considere remover documentos antigos.', 'error');
+      }
+      return false;
+    }
+    return true;
+  },
+
+  // Método público para sincronizar manualmente com o servidor
+  async sync() {
+    try {
+      await this._syncToServer();
+    } catch (e) {
+      console.error('Erro durante sync manual:', e);
+      throw e;
+    }
+  },
+
+  async _syncToServer() {
+    if (this.isSyncing) return;
+    this.isSyncing = true;
+
+    try {
+      // Se temos um ID de documento no servidor, atualiza
+      if (this.serverDocId) {
+        const response = await fetch(`/api/energia-data/${this.serverDocId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(this.data)
+        });
+        if (response.ok) {
+          console.log('✅ Dados de energia sincronizados com servidor');
+        } else {
+          console.warn('⚠️ Erro ao sincronizar: ' + response.status);
+        }
+      } else {
+        // Cria novo documento no servidor
+        const response = await fetch(`/api/energia-data`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(this.data)
+        });
+        if (response.ok) {
+          const result = await response.json();
+          this.serverDocId = result.id;
+          console.log('✅ Dados de energia salvos no servidor com ID:', result.id);
+        } else {
+          console.warn('⚠️ Erro ao salvar: ' + response.status);
+        }
+      }
+    } catch (e) {
+      console.error('❌ Erro ao sincronizar com servidor:', e.message);
+    } finally {
+      this.isSyncing = false;
+    }
+  },
+
   uuid() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 9); }
 };
 
@@ -3917,7 +4021,7 @@ const Auth = {
   },
   // Verifica sessão na inicialização
   async iniciar() {
-    Store.load();
+    await Store.load();
     if (Store.data.usuarios.length === 0) {
       this.mostrarSetup();
       return;
