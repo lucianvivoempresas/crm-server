@@ -2606,6 +2606,38 @@ const Vendas = {
     const red = this.reducaoAplicada(v);
     return (v.comissao || 0) * (1 - red / 100);
   },
+  telefoneWhatsApp(telefone) {
+    const digitos = String(telefone || '').replace(/\D/g, '');
+    if (!digitos) return '';
+    if (digitos.startsWith('55') && digitos.length >= 12) return digitos;
+    return `55${digitos}`;
+  },
+  enviarStatusWhatsApp(id) {
+    const v = Store.data.vendas.find(x => x.id === id);
+    if (!v) return UI.toast('Venda nao encontrada', 'error');
+    const ven = v.vendedorId ? Store.data.vendedores.find(x => x.id === v.vendedorId) : null;
+    if (!ven) return UI.toast('Venda sem vendedor vinculado', 'error');
+    const telefone = this.telefoneWhatsApp(ven.telefone);
+    if (!telefone) return UI.toast('Vendedor sem telefone cadastrado', 'error');
+
+    const c = Store.data.clientes.find(x => x.id === v.clienteId);
+    const p = Store.data.produtos.find(x => x.id === v.produtoId);
+    const status = Telegram?.STATUS_LABEL?.[v.status] || v.status || '-';
+    const linhas = [
+      `Status do pedido atualizado`,
+      ``,
+      `Cliente: ${c?.nome || '-'}`,
+      `Produto: ${p?.nome || '-'}`,
+      `Status: ${status}`,
+      `Valor: ${Format.brl(v.valor)}`,
+      `Data: ${Format.date(v.data)}`
+    ];
+    if (v.observacoes) linhas.push(`Observacao: ${v.observacoes}`);
+    const empresa = Store.data.config?.empresaNome || 'CRM Energia';
+    linhas.push('', empresa);
+
+    window.open(`https://wa.me/${telefone}?text=${encodeURIComponent(linhas.join('\n'))}`, '_blank');
+  },
   render() {
     const lista = document.getElementById('vendas-lista');
     let dados = typeof Auth !== 'undefined' ? Auth.filtrarVendas([...Store.data.vendas]) : [...Store.data.vendas];
@@ -2647,7 +2679,8 @@ const Vendas = {
           <td class="text-center"><span class="chip ${this.statusChip(v.status)}">${v.status}</span></td>
           <td class="whitespace-nowrap text-right">
             ${ehMaster
-              ? `<button onclick="Vendas.editar('${v.id}')" class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">${ICONS.edit}</button>
+              ? `<button onclick="Vendas.enviarStatusWhatsApp('${v.id}')" title="Enviar status ao vendedor via WhatsApp" class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"><svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448L.057 24z"/></svg></button>
+                 <button onclick="Vendas.editar('${v.id}')" class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">${ICONS.edit}</button>
                  <button onclick="Vendas.excluir('${v.id}')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">${ICONS.trash}</button>`
               : `<button onclick="Vendas.verDetalhes('${v.id}')" class="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg" title="Ver detalhes">${ICONS.eye}</button>`}
           </td>
@@ -4681,8 +4714,8 @@ const Telegram = {
     // Todos os masters
     Store.data.usuarios.filter(x => x.tipo === 'master' && x.ativo !== false && x.chatIdTelegram)
       .forEach(x => ids.add(String(x.chatIdTelegram)));
-    // Fallback: chatId global
-    if (ids.size === 0 && c.chatId) ids.add(String(c.chatId));
+    // Chat global/master tambem recebe as notificacoes, mesmo quando ha vendedor vinculado.
+    if (c.chatId) ids.add(String(c.chatId));
     return Array.from(ids);
   },
   async enviarParaVenda(v, texto) {
