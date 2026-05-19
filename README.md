@@ -132,6 +132,20 @@ npm run import-backup -- "./path/to/crm-energia-backup-2026-05-18.json" --clear
 
 O script insere cada top-level array do JSON como uma `collection` dentro da tabela `documents`.
 
+### Import via API (upload)
+
+Também é possível importar diretamente via API (recomendado para servidores sem SSH). Endpoint protegido — requer usuário `master`:
+
+```
+POST /api/import-backup?clear=true
+Content-Type: application/json
+Authorization: Bearer <TOKEN_MASTER>
+
+<body: backup JSON>
+```
+
+Resposta JSON com `success: true` em caso de sucesso.
+
 
 ### Vendas
 ```bash

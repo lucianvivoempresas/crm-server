@@ -1117,6 +1117,54 @@ app.delete('/api/:collection/:id', requireAuth, (req, res) => {
     });
 });
 
+/**
+ * POST /api/import-backup
+ * Importa um backup JSON enviado no corpo da requisição.
+ * Protegido: requer token e perfil `master`.
+ * Query param: ?clear=true  -> apaga coleções existentes antes de inserir
+ */
+app.post('/api/import-backup', requireAuth, requireMaster, async (req, res) => {
+    try {
+        const clear = String(req.query.clear || '').toLowerCase() === 'true';
+        const payload = req.body;
+
+        if (!payload || typeof payload !== 'object') {
+            return res.status(400).json({ success: false, error: 'Corpo inválido: JSON esperado.' });
+        }
+
+        // Proteção: limitar número de coleções e total aproximado de registros
+        const collections = Object.keys(payload).filter(k => Array.isArray(payload[k]));
+        if (collections.length === 0) return res.status(400).json({ success: false, error: 'Nenhuma coleção encontrada no JSON.' });
+
+        let totalRows = 0;
+        for (const c of collections) totalRows += (payload[c] || []).length;
+        if (totalRows > 50000) return res.status(400).json({ success: false, error: 'Backup muito grande.' });
+
+        db.serialize(() => {
+            db.run('BEGIN TRANSACTION');
+
+            const insertStmt = db.prepare('INSERT INTO documents (collection, payload) VALUES (?, ?)');
+
+            for (const col of collections) {
+                const rows = payload[col] || [];
+                if (clear) db.run('DELETE FROM documents WHERE collection = ?', [col]);
+                for (const item of rows) {
+                    insertStmt.run(col, JSON.stringify(item));
+                }
+            }
+
+            insertStmt.finalize();
+            db.run('COMMIT');
+        });
+
+        return res.json({ success: true, importedCollections: Object.keys(payload).length });
+    } catch (err) {
+        try { db.run('ROLLBACK'); } catch (e) {}
+        console.error('Erro import-backup:', err.message || err);
+        return res.status(500).json({ success: false, error: err.message || String(err) });
+    }
+});
+
 // ROTA: Buscar dados de CNPJ (contorna CORS)
 app.get('/api-cnpj/buscar/:cnpj', requireAuth, async (req, res) => {
     const cnpj = req.params.cnpj.replace(/\D/g, '');
