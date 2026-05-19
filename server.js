@@ -155,10 +155,23 @@ app.get('/contato', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'contato.html'));
 });
 
+const DB_PATH = path.join(__dirname, 'crm_database.sqlite');
+
 // Inicializa o banco SQLite (criará um arquivo crm_database.sqlite na mesma pasta)
-const db = new sqlite3.Database('./crm_database.sqlite', (err) => {
-    if (err) console.error('Erro ao abrir o banco de dados', err.message);
-    else console.log('Conectado ao banco SQLite com sucesso!');
+const db = new sqlite3.Database(DB_PATH, (err) => {
+    if (err) {
+        console.error('Erro ao abrir o banco de dados', err.message);
+        return;
+    }
+
+    console.log(`Conectado ao banco SQLite com sucesso: ${DB_PATH}`);
+    db.get('PRAGMA quick_check', [], (checkErr, row) => {
+        if (checkErr) {
+            console.error('Erro ao verificar integridade do banco SQLite:', checkErr.message);
+            return;
+        }
+        console.log('Integridade SQLite:', row?.quick_check || 'sem resultado');
+    });
 });
 
 function dbRunAsync(sql, params = []) {
