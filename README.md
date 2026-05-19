@@ -119,6 +119,20 @@ PUT    /api/clientes/:id          # Atualiza cliente
 DELETE /api/clientes/:id          # Deleta cliente
 ```
 
+## 💾 Importar backup JSON
+
+Se você tem um arquivo JSON de backup (como `crm-energia-backup-2026-05-18.json`), existe um utilitário para importar diretamente para o banco SQLite (`documents` table).
+
+1. Coloque o arquivo de backup no servidor dentro do repositório.
+2. Rode (opcional `--clear` remove a coleção existente antes de inserir):
+
+```bash
+npm run import-backup -- "./path/to/crm-energia-backup-2026-05-18.json" --clear
+```
+
+O script insere cada top-level array do JSON como uma `collection` dentro da tabela `documents`.
+
+
 ### Vendas
 ```bash
 GET    /api/vendas                # Lista todas as vendas

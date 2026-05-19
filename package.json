@@ -8,6 +8,7 @@
     "pm2:reload": "pm2 reload ecosystem.config.cjs --update-env",
     "pm2:logs": "pm2 logs crm-server",
     "build:leads-snapshot": "node scripts/build-leads-snapshot.js",
+    "import-backup": "node scripts/import-backup.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
