@@ -946,18 +946,79 @@ app.get('/api/energia-data', (req, res) => {
                 console.error('❌ Erro ao buscar dados de energia:', err.message);
                 return res.status(500).json({ error: err.message });
             }
-            const data = rows.map(row => {
+
+            const parsedRows = rows
+                .map(row => {
+                    try {
+                        const payload = JSON.parse(row.payload);
+                        return { id: row.id, payload };
+                    } catch (e) {
+                        console.warn('⚠️ Erro ao parsear payload:', e.message);
+                        return null;
+                    }
+                })
+                .filter(Boolean);
+
+            const chunkRows = parsedRows.filter(row => row.payload && row.payload.chunked === true && typeof row.payload.chunkIndex === 'number' && typeof row.payload.data === 'string');
+            if (chunkRows.length > 0) {
+                const ordered = chunkRows.sort((a, b) => a.payload.chunkIndex - b.payload.chunkIndex);
+                const fullString = ordered.map(r => r.payload.data).join('');
                 try {
-                    const parsed = JSON.parse(row.payload);
-                    return { id: row.id, ...parsed };
+                    const parsed = JSON.parse(fullString);
+                    return res.json([{ id: ordered[0].id, ...parsed }]);
                 } catch (e) {
-                    console.warn('⚠️ Erro ao parsear payload:', e.message);
-                    return null;
+                    console.error('❌ Erro ao montar chunks de energia-data:', e.message);
+                    return res.status(500).json({ error: 'Erro ao montar chunks de energia-data.' });
                 }
-            }).filter(Boolean);
+            }
+
+            const data = parsedRows
+                .map(row => ({ id: row.id, ...row.payload }))
+                .filter(Boolean);
             res.json(data);
         }
     );
+});
+
+/**
+ * POST /api/energia-data/chunks
+ * Salva dados de energia em múltiplos pedaços menores para evitar limites de upload.
+ */
+app.post('/api/energia-data/chunks', (req, res) => {
+    const { chunkIndex, data, clear } = req.body;
+
+    if (typeof chunkIndex !== 'number' || typeof data !== 'string') {
+        return res.status(400).json({ error: 'chunkIndex e data são obrigatórios.' });
+    }
+
+    db.serialize(() => {
+        if (clear) {
+            db.run("DELETE FROM documents WHERE collection = 'energia-data'", (deleteErr) => {
+                if (deleteErr) {
+                    console.error('❌ Erro ao limpar energia-data antes de salvar chunks:', deleteErr.message);
+                    return res.status(500).json({ error: deleteErr.message });
+                }
+                insertChunk();
+            });
+        } else {
+            insertChunk();
+        }
+
+        function insertChunk() {
+            const payload = JSON.stringify({ chunked: true, chunkIndex, data });
+            db.run(
+                "INSERT INTO documents (collection, payload) VALUES (?, ?)",
+                ['energia-data', payload],
+                function(err) {
+                    if (err) {
+                        console.error('❌ Erro ao salvar chunk de energia-data:', err.message);
+                        return res.status(500).json({ error: err.message });
+                    }
+                    res.json({ id: this.lastID, chunkIndex });
+                }
+            );
+        }
+    });
 });
 
 /**
@@ -967,17 +1028,29 @@ app.get('/api/energia-data', (req, res) => {
 app.post('/api/energia-data', (req, res) => {
     console.log('📡 [energia] POST /api/energia-data recebido — headers:', JSON.stringify(req.headers));
     const payload = JSON.stringify(req.body);
-    db.run(
-        "INSERT INTO documents (collection, payload) VALUES (?, ?)",
-        ['energia-data', payload],
-        function(err) {
-            if (err) {
-                console.error('❌ Erro ao salvar dados de energia:', err.message);
-                return res.status(500).json({ error: err.message });
+    db.serialize(() => {
+        db.run(
+            "DELETE FROM documents WHERE collection = 'energia-data' AND payload LIKE '%\"chunked\":true%'",
+            (deleteErr) => {
+                if (deleteErr) {
+                    console.error('❌ Erro ao limpar chunks antigos antes de salvar energia-data:', deleteErr.message);
+                    return res.status(500).json({ error: deleteErr.message });
+                }
+
+                db.run(
+                    "INSERT INTO documents (collection, payload) VALUES (?, ?)",
+                    ['energia-data', payload],
+                    function(err) {
+                        if (err) {
+                            console.error('❌ Erro ao salvar dados de energia:', err.message);
+                            return res.status(500).json({ error: err.message });
+                        }
+                        res.json({ id: this.lastID });
+                    }
+                );
             }
-            res.json({ id: this.lastID });
-        }
-    );
+        );
+    });
 });
 
 /**
@@ -988,17 +1061,29 @@ app.put('/api/energia-data/:id', (req, res) => {
     console.log(`📡 [energia] PUT /api/energia-data/${req.params.id} recebido — headers:`, JSON.stringify(req.headers));
     const id = req.params.id;
     const payload = JSON.stringify(req.body);
-    db.run(
-        "UPDATE documents SET payload = ? WHERE collection = 'energia-data' AND id = ?",
-        [payload, id],
-        function(err) {
-            if (err) {
-                console.error('❌ Erro ao atualizar dados de energia:', err.message);
-                return res.status(500).json({ error: err.message });
+    db.serialize(() => {
+        db.run(
+            "DELETE FROM documents WHERE collection = 'energia-data' AND payload LIKE '%\"chunked\":true%'",
+            (deleteErr) => {
+                if (deleteErr) {
+                    console.error('❌ Erro ao limpar chunks antigos antes de atualizar energia-data:', deleteErr.message);
+                    return res.status(500).json({ error: deleteErr.message });
+                }
+
+                db.run(
+                    "UPDATE documents SET payload = ? WHERE collection = 'energia-data' AND id = ?",
+                    [payload, id],
+                    function(err) {
+                        if (err) {
+                            console.error('❌ Erro ao atualizar dados de energia:', err.message);
+                            return res.status(500).json({ error: err.message });
+                        }
+                        res.json({ success: true });
+                    }
+                );
             }
-            res.json({ success: true });
-        }
-    );
+        );
+    });
 });
 
 /**
