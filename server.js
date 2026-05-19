@@ -156,6 +156,7 @@ app.get('/contato', (req, res) => {
 });
 
 const DB_PATH = path.join(__dirname, 'crm_database.sqlite');
+const ENERGIA_DB_PATH = path.join(__dirname, 'energia_database.sqlite');
 
 // Inicializa o banco SQLite (criará um arquivo crm_database.sqlite na mesma pasta)
 const db = new sqlite3.Database(DB_PATH, (err) => {
@@ -171,6 +172,38 @@ const db = new sqlite3.Database(DB_PATH, (err) => {
             return;
         }
         console.log('Integridade SQLite:', row?.quick_check || 'sem resultado');
+    });
+});
+
+// Banco isolado para o CRM Energia. Isso evita que uma corrupcao no banco principal
+// derrube a tela /energia, que usa uma estrutura de documentos independente.
+const energiaDb = new sqlite3.Database(ENERGIA_DB_PATH, (err) => {
+    if (err) {
+        console.error('Erro ao abrir o banco de energia', err.message);
+        return;
+    }
+
+    console.log(`Conectado ao banco SQLite de energia: ${ENERGIA_DB_PATH}`);
+});
+
+energiaDb.serialize(() => {
+    energiaDb.run(`CREATE TABLE IF NOT EXISTS documents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        collection TEXT,
+        payload TEXT
+    )`, (err) => {
+        if (err) {
+            console.error('Erro ao criar tabela documents do banco de energia:', err.message);
+            return;
+        }
+
+        energiaDb.get('PRAGMA quick_check', [], (checkErr, row) => {
+            if (checkErr) {
+                console.error('Erro ao verificar integridade do banco de energia:', checkErr.message);
+                return;
+            }
+            console.log('Integridade SQLite energia:', row?.quick_check || 'sem resultado');
+        });
     });
 });
 
@@ -951,7 +984,7 @@ app.post('/api/clientes/bulk-upsert', requireAuth, (req, res) => {
  */
 app.get('/api/energia-data', (req, res) => {
     console.log('📡 [energia] GET /api/energia-data recebido');
-    db.all(
+    energiaDb.all(
         "SELECT id, payload FROM documents WHERE collection = 'energia-data'",
         [],
         (err, rows) => {
@@ -1004,9 +1037,9 @@ app.post('/api/energia-data/chunks', (req, res) => {
         return res.status(400).json({ error: 'chunkIndex e data são obrigatórios.' });
     }
 
-    db.serialize(() => {
+    energiaDb.serialize(() => {
         if (clear) {
-            db.run("DELETE FROM documents WHERE collection = 'energia-data'", (deleteErr) => {
+            energiaDb.run("DELETE FROM documents WHERE collection = 'energia-data'", (deleteErr) => {
                 if (deleteErr) {
                     console.error('❌ Erro ao limpar energia-data antes de salvar chunks:', deleteErr.message);
                     return res.status(500).json({ error: deleteErr.message });
@@ -1019,7 +1052,7 @@ app.post('/api/energia-data/chunks', (req, res) => {
 
         function insertChunk() {
             const payload = JSON.stringify({ chunked: true, chunkIndex, data });
-            db.run(
+            energiaDb.run(
                 "INSERT INTO documents (collection, payload) VALUES (?, ?)",
                 ['energia-data', payload],
                 function(err) {
@@ -1041,8 +1074,8 @@ app.post('/api/energia-data/chunks', (req, res) => {
 app.post('/api/energia-data', (req, res) => {
     console.log('📡 [energia] POST /api/energia-data recebido — headers:', JSON.stringify(req.headers));
     const payload = JSON.stringify(req.body);
-    db.serialize(() => {
-        db.run(
+    energiaDb.serialize(() => {
+        energiaDb.run(
             "DELETE FROM documents WHERE collection = 'energia-data' AND payload LIKE '%\"chunked\":true%'",
             (deleteErr) => {
                 if (deleteErr) {
@@ -1050,7 +1083,7 @@ app.post('/api/energia-data', (req, res) => {
                     return res.status(500).json({ error: deleteErr.message });
                 }
 
-                db.run(
+                energiaDb.run(
                     "INSERT INTO documents (collection, payload) VALUES (?, ?)",
                     ['energia-data', payload],
                     function(err) {
@@ -1074,8 +1107,8 @@ app.put('/api/energia-data/:id', (req, res) => {
     console.log(`📡 [energia] PUT /api/energia-data/${req.params.id} recebido — headers:`, JSON.stringify(req.headers));
     const id = req.params.id;
     const payload = JSON.stringify(req.body);
-    db.serialize(() => {
-        db.run(
+    energiaDb.serialize(() => {
+        energiaDb.run(
             "DELETE FROM documents WHERE collection = 'energia-data' AND payload LIKE '%\"chunked\":true%'",
             (deleteErr) => {
                 if (deleteErr) {
@@ -1083,7 +1116,7 @@ app.put('/api/energia-data/:id', (req, res) => {
                     return res.status(500).json({ error: deleteErr.message });
                 }
 
-                db.run(
+                energiaDb.run(
                     "UPDATE documents SET payload = ? WHERE collection = 'energia-data' AND id = ?",
                     [payload, id],
                     function(err) {
@@ -1105,7 +1138,7 @@ app.put('/api/energia-data/:id', (req, res) => {
  */
 app.delete('/api/energia-data/:id', (req, res) => {
     const id = req.params.id;
-    db.run(
+    energiaDb.run(
         "DELETE FROM documents WHERE collection = 'energia-data' AND id = ?",
         [id],
         function(err) {
