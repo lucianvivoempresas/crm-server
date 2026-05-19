@@ -929,40 +929,6 @@ app.post('/api/clientes/bulk-upsert', requireAuth, (req, res) => {
     });
 });
 
-app.get('/api/:collection', requireAuth, (req, res) => {
-    const collection = req.params.collection;
-    const userId = req.auth.userId;
-    const perfil = req.auth.perfil;
-
-    // base da query
-    let sql = "SELECT id, payload FROM documents WHERE collection = ?";
-    const params = [collection];
-
-    // para algumas coleções aplicamos filtro de vendedor
-    if (isSellerScopedCollection(collection) && userId && perfil !== 'master') {
-        // Aceita formato atual e legados de identificação de vendedor.
-        sql += ` AND ${SELLER_ID_SQL_EXPR} = ?`;
-        params.push(userId);
-    }
-
-    db.all(sql, params, (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        // Remonta o objeto exatamente como seu frontend espera sem derrubar a API em payload inválido.
-        const data = rows
-            .map(row => {
-                const parsed = parsePayloadSeguro(row.payload, collection, row.id);
-                return parsed ? { id: row.id, ...parsed } : null;
-            })
-            .filter(Boolean);
-        res.json(data);
-    });
-});
-
-// Healthcheck para PM2/Nginx monitorarem disponibilidade da API
-app.get('/healthz', (req, res) => {
-    res.status(200).json({ ok: true, timestamp: new Date().toISOString() });
-});
-
 // ============ ENDPOINTS PARA CRM ENERGIA (SEM AUTENTICAÇÃO) ============
 // Estas rotas DEVEM estar ANTES das rotas genéricas /api/:collection para não serem capturadas por elas
 
@@ -971,7 +937,7 @@ app.get('/healthz', (req, res) => {
  * Carregar dados de energia do banco
  */
 app.get('/api/energia-data', (req, res) => {
-    console.log('📡 [energia] GET /api/energia-data recebido')
+    console.log('📡 [energia] GET /api/energia-data recebido');
     db.all(
         "SELECT id, payload FROM documents WHERE collection = 'energia-data'",
         [],
@@ -1052,6 +1018,40 @@ app.delete('/api/energia-data/:id', (req, res) => {
             res.json({ success: true });
         }
     );
+});
+
+app.get('/api/:collection', requireAuth, (req, res) => {
+    const collection = req.params.collection;
+    const userId = req.auth.userId;
+    const perfil = req.auth.perfil;
+
+    // base da query
+    let sql = "SELECT id, payload FROM documents WHERE collection = ?";
+    const params = [collection];
+
+    // para algumas coleções aplicamos filtro de vendedor
+    if (isSellerScopedCollection(collection) && userId && perfil !== 'master') {
+        // Aceita formato atual e legados de identificação de vendedor.
+        sql += ` AND ${SELLER_ID_SQL_EXPR} = ?`;
+        params.push(userId);
+    }
+
+    db.all(sql, params, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        // Remonta o objeto exatamente como seu frontend espera sem derrubar a API em payload inválido.
+        const data = rows
+            .map(row => {
+                const parsed = parsePayloadSeguro(row.payload, collection, row.id);
+                return parsed ? { id: row.id, ...parsed } : null;
+            })
+            .filter(Boolean);
+        res.json(data);
+    });
+});
+
+// Healthcheck para PM2/Nginx monitorarem disponibilidade da API
+app.get('/healthz', (req, res) => {
+    res.status(200).json({ ok: true, timestamp: new Date().toISOString() });
 });
 
 // ROTA: Adicionar um novo dado

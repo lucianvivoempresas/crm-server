@@ -1575,39 +1575,26 @@ const Store = {
   },
 
   async load() {
+    // Remove qualquer cache local anterior: o servidor é a fonte de verdade.
+    this.clearLocalCache();
+
     try {
-      // Tenta carregar do servidor
       const response = await fetch(`/api/energia-data`, {
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store'
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (Array.isArray(data) && data.length > 0) {
-          this.data = data[0];
-          this.serverDocId = data[0].id;
-          this._ensureDefaults();
-          this.clearLocalCache();
-          return;
-        }
-
-        // Servidor respondeu com sucesso, mas sem dados. Limpa cache local antigo.
-        this.clearLocalCache();
-        this._ensureDefaults();
-        return;
+      if (!response.ok) {
+        throw new Error('Servidor retornou ' + response.status);
       }
 
-      console.warn('⚠️ Servidor retornou erro ao carregar dados:', response.status);
+      const data = await response.json();
+      if (Array.isArray(data) && data.length > 0) {
+        this.data = data[0];
+        this.serverDocId = data[0].id;
+      }
     } catch (e) {
-      console.warn('⚠️ Falha ao carregar do servidor:', e.message);
-    }
-
-    // Se não conseguiu carregar do servidor, tenta fallback local apenas como último recurso.
-    try {
-      const raw = localStorage.getItem(this.KEY);
-      if (raw) this.data = JSON.parse(raw);
-    } catch (e) {
-      console.error(e);
+      console.error('⚠️ Falha ao carregar do servidor:', e.message || e);
     }
 
     this._ensureDefaults();
@@ -1651,27 +1638,12 @@ const Store = {
   },
 
   save() {
-    // Prioriza salvar no servidor. Executa em background para não bloquear a UI.
-    // Se o servidor falhar, mantém uma cópia em localStorage como fallback.
-    try {
-      this._syncToServer().then(success => {
-        if (success) {
-          try { localStorage.removeItem(this.KEY); } catch (e) {}
-        } else {
-          try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) {
-            if (typeof UI !== 'undefined') UI.toast('Armazenamento cheio. Considere remover documentos antigos.', 'error');
-          }
-        }
-      }).catch(err => {
-        try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) {
-          if (typeof UI !== 'undefined') UI.toast('Armazenamento cheio. Considere remover documentos antigos.', 'error');
-        }
-      });
-    } catch (e) {
-      try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (ee) {}
-      return false;
-    }
-    // Retornamos true imediatamente (não bloqueante). UI continuará responsiva.
+    // Salva apenas no servidor; não há fallback em localStorage.
+    this._syncToServer().then(success => {
+      if (!success && typeof UI !== 'undefined') {
+        UI.toast('Falha ao salvar no servidor. Verifique a conexão.', 'error');
+      }
+    });
     return true;
   },
 
@@ -2195,14 +2167,14 @@ const Clientes = {
   },
   removerArquivo(i) { this.arquivosTemp.splice(i, 1); this.renderArquivos(); },
   salvar() {
-    const id = document.getElementById('cliente-id').value;
-    const tipo = document.getElementById('cliente-tipo').value;
-    const documento = document.getElementById('cliente-documento').value.replace(/\D/g, '');
-    const nome = document.getElementById('cliente-nome').value.trim();
-    if (!nome) return UI.toast('O nome é obrigatório', 'error');
-    if (!documento) return UI.toast(`O ${tipo.toUpperCase()} é obrigatório`, 'error');
-    if (tipo === 'cpf' && !Validate.cpf(documento)) return UI.toast('CPF inválido', 'error');
-    if (tipo === 'cnpj' && !Validate.cnpj(documento)) return UI.toast('CNPJ inválido', 'error');
+    // Salva somente no servidor. O localStorage não deve ser usado como fonte principal.
+    this._syncToServer().then(success => {
+      if (!success && typeof UI !== 'undefined') {
+        UI.toast('Falha ao salvar no servidor. Verifique a conexão.', 'error');
+      }
+    });
+
+    return true;
     const dup = Store.data.clientes.find(c => c.documento === documento && c.id !== id);
     if (dup) return UI.toast(`Já existe um cliente com este ${tipo.toUpperCase()}`, 'error');
     const existente = id ? Store.data.clientes.find(c => c.id === id) : null;
