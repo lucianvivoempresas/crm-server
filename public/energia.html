@@ -1642,13 +1642,27 @@ const Store = {
   },
 
   save() {
-    // Sempre salva em localStorage primeiro (rápido). Não sincroniza automaticamente.
-    try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) {
-      if (typeof UI !== 'undefined') {
-        UI.toast('Armazenamento cheio. Considere remover documentos antigos.', 'error');
-      }
+    // Prioriza salvar no servidor. Executa em background para não bloquear a UI.
+    // Se o servidor falhar, mantém uma cópia em localStorage como fallback.
+    try {
+      this._syncToServer().then(success => {
+        if (success) {
+          try { localStorage.removeItem(this.KEY); } catch (e) {}
+        } else {
+          try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) {
+            if (typeof UI !== 'undefined') UI.toast('Armazenamento cheio. Considere remover documentos antigos.', 'error');
+          }
+        }
+      }).catch(err => {
+        try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) {
+          if (typeof UI !== 'undefined') UI.toast('Armazenamento cheio. Considere remover documentos antigos.', 'error');
+        }
+      });
+    } catch (e) {
+      try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (ee) {}
       return false;
     }
+    // Retornamos true imediatamente (não bloqueante). UI continuará responsiva.
     return true;
   },
 
@@ -1678,8 +1692,10 @@ const Store = {
         });
         if (response.ok) {
           console.log('✅ Dados de energia sincronizados com servidor');
+          return true;
         } else {
           console.warn('⚠️ Erro ao sincronizar: ' + response.status);
+          return false;
         }
       } else {
         // Cria novo documento no servidor
@@ -1694,12 +1710,15 @@ const Store = {
           const result = await response.json();
           this.serverDocId = result.id;
           console.log('✅ Dados de energia salvos no servidor com ID:', result.id);
+          return true;
         } else {
           console.warn('⚠️ Erro ao salvar: ' + response.status);
+          return false;
         }
       }
     } catch (e) {
       console.error('❌ Erro ao sincronizar com servidor:', e.message);
+      return false;
     } finally {
       this.isSyncing = false;
     }
