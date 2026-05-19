@@ -971,6 +971,7 @@ app.get('/healthz', (req, res) => {
  * Carregar dados de energia do banco
  */
 app.get('/api/energia-data', (req, res) => {
+    console.log('📡 [energia] GET /api/energia-data recebido')
     db.all(
         "SELECT id, payload FROM documents WHERE collection = 'energia-data'",
         [],
@@ -998,6 +999,7 @@ app.get('/api/energia-data', (req, res) => {
  * Criar novo registro de dados de energia
  */
 app.post('/api/energia-data', (req, res) => {
+    console.log('📡 [energia] POST /api/energia-data recebido — headers:', JSON.stringify(req.headers));
     const payload = JSON.stringify(req.body);
     db.run(
         "INSERT INTO documents (collection, payload) VALUES (?, ?)",
@@ -1017,6 +1019,7 @@ app.post('/api/energia-data', (req, res) => {
  * Atualizar dados de energia existentes
  */
 app.put('/api/energia-data/:id', (req, res) => {
+    console.log(`📡 [energia] PUT /api/energia-data/${req.params.id} recebido — headers:`, JSON.stringify(req.headers));
     const id = req.params.id;
     const payload = JSON.stringify(req.body);
     db.run(
