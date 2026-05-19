@@ -1823,7 +1823,7 @@ const Validate = {
 //============================================================================
 const PAGE_CONFIG = {
   dashboard: { titulo: 'Dashboard', subtitulo: 'Visão geral do seu negócio', actions: [] },
-  clientes: { titulo: 'Clientes', subtitulo: 'Cadastro e gestão de clientes', actions: [{ label: 'Novo Cliente', action: 'Clientes.openModal()', primary: true, icon: 'plus' }] },
+  clientes: { titulo: 'Clientes', subtitulo: 'Cadastro e gestão de clientes', actions: [{ label: 'Novo Cliente', action: 'Clientes.openModal()', primary: true, icon: 'plus', masterOnly: true }] },
   pipeline: { titulo: 'Pipeline de Oportunidades', subtitulo: 'Forecast ponderado e funil de conversão', actions: [{ label: 'Nova Oportunidade', action: 'Pipeline.openModal()', primary: true, icon: 'plus' }] },
   vendas: { titulo: 'Vendas', subtitulo: 'Registro de vendas e cálculo de comissões', actions: [{ label: 'Nova Venda', action: 'Vendas.openModal()', primary: true, icon: 'plus', masterOnly: true }] },
   vendedores: { titulo: 'Vendedores', subtitulo: 'Sua equipe de vendas', actions: [{ label: 'Novo Vendedor', action: 'Vendedores.openModal()', primary: true, icon: 'plus' }] },
@@ -2094,10 +2094,24 @@ const Dashboard = {
 const Clientes = {
   arquivosTemp: [],
   filtroAtual: '',
+  idsVisiveis() {
+    if (typeof Auth === 'undefined' || Auth.isMaster()) return null;
+    const vendas = Auth.filtrarVendas(Store.data.vendas);
+    return new Set(vendas.map(v => v.clienteId).filter(Boolean));
+  },
+  dadosVisiveis() {
+    const ids = this.idsVisiveis();
+    if (!ids) return Store.data.clientes;
+    return Store.data.clientes.filter(c => ids.has(c.id));
+  },
+  podeAcessar(id) {
+    const ids = this.idsVisiveis();
+    return !ids || ids.has(id);
+  },
   render() {
     const lista = document.getElementById('clientes-lista');
     const t = this.filtroAtual.toLowerCase().trim();
-    let dados = Store.data.clientes;
+    let dados = this.dadosVisiveis();
     if (t) dados = dados.filter(c =>
       (c.nome || '').toLowerCase().includes(t) ||
       (c.documento || '').replace(/\D/g, '').includes(t.replace(/\D/g, '')) ||
@@ -2111,10 +2125,17 @@ const Clientes = {
         'Nenhum cliente cadastrado', 'Comece adicionando seu primeiro cliente.', 'Cadastrar Cliente', 'Clientes.openModal()');
       return;
     }
-    if (dados.length === 0) { lista.innerHTML = '<div class="text-center py-12 text-sm text-slate-500">Nenhum cliente encontrado</div>'; return; }
+    if (dados.length === 0) {
+      const msg = typeof Auth !== 'undefined' && Auth.isVendedor()
+        ? 'Nenhum cliente vinculado às suas vendas'
+        : 'Nenhum cliente encontrado';
+      lista.innerHTML = `<div class="text-center py-12 text-sm text-slate-500">${msg}</div>`;
+      return;
+    }
     dados = [...dados].sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
     lista.innerHTML = `<div class="divide-y divide-slate-100">${dados.map(c => {
-      const vendas = Store.data.vendas.filter(v => v.clienteId === c.id);
+      const vendasBase = typeof Auth !== 'undefined' ? Auth.filtrarVendas(Store.data.vendas) : Store.data.vendas;
+      const vendas = vendasBase.filter(v => v.clienteId === c.id);
       const fat = vendas.filter(v => v.status === 'fechada').reduce((s, v) => s + (v.valor || 0), 0);
       return `<div class="px-5 py-4 flex items-center gap-4 hover:bg-slate-50/50">
         <div class="avatar avatar-md">${Format.initials(c.nome)}</div>
@@ -2140,6 +2161,7 @@ const Clientes = {
     }).join('')}</div>`;
   },
   openModal(id = null) {
+    if (id && !this.podeAcessar(id)) return UI.toast('Cliente não disponível para este vendedor', 'error');
     this.arquivosTemp = [];
     document.getElementById('cliente-id').value = '';
     document.getElementById('form-cliente').reset();
@@ -2165,7 +2187,7 @@ const Clientes = {
     }
     // Popular select de "indicado por"
     const idAtual = document.getElementById('cliente-id').value;
-    const otros = Store.data.clientes.filter(x => x.id !== idAtual).sort((a, b) => a.nome.localeCompare(b.nome));
+    const otros = this.dadosVisiveis().filter(x => x.id !== idAtual).sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('cliente-indicado-por').innerHTML = '<option value="">— Selecione —</option>' +
       otros.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
     if (id) {
@@ -2247,6 +2269,7 @@ const Clientes = {
   },
   editar(id) { this.openModal(id); },
   excluir(id) {
+    if (!this.podeAcessar(id)) return UI.toast('Cliente não disponível para este vendedor', 'error');
     const c = Store.data.clientes.find(x => x.id === id); if (!c) return;
     const temV = Store.data.vendas.some(v => v.clienteId === id);
     const msg = temV ? `O cliente "${c.nome}" possui vendas registradas. Excluir o cliente também removerá essas vendas. Continuar?` : `Excluir o cliente "${c.nome}"?`;
@@ -2258,8 +2281,10 @@ const Clientes = {
     });
   },
   view(id) {
+    if (!this.podeAcessar(id)) return UI.toast('Cliente não disponível para este vendedor', 'error');
     const c = Store.data.clientes.find(x => x.id === id); if (!c) return;
-    const vc = Store.data.vendas.filter(v => v.clienteId === id);
+    const vendasBase = typeof Auth !== 'undefined' ? Auth.filtrarVendas(Store.data.vendas) : Store.data.vendas;
+    const vc = vendasBase.filter(v => v.clienteId === id);
     const fat = vc.filter(v => v.status === 'fechada').reduce((s, v) => s + (v.valor || 0), 0);
     const fus = Store.data.followups.filter(f => f.clienteId === id);
     const arquivosHtml = (c.arquivos || []).length === 0
@@ -3001,7 +3026,7 @@ const Followups = {
     document.getElementById('followup-tipo').value = 'ligacao';
     document.getElementById('followup-prioridade').value = 'media';
     document.getElementById('followup-desc').value = '';
-    const cs = [...Store.data.clientes].sort((a, b) => a.nome.localeCompare(b.nome));
+    const cs = Clientes.dadosVisiveis().sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('followup-cliente').innerHTML = '<option value="">Sem cliente</option>' + cs.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
     const vs = Store.data.vendedores.filter(v => v.ativo !== false).sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('followup-vendedor').innerHTML = '<option value="">Sem vendedor</option>' + vs.map(v => `<option value="${v.id}">${v.nome}</option>`).join('');
@@ -3066,7 +3091,7 @@ const Followups = {
 //============================================================================
 const Relatorios = {
   init() {
-    const cs = [...Store.data.clientes].sort((a, b) => a.nome.localeCompare(b.nome));
+    const cs = Clientes.dadosVisiveis().sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('rel-cliente').innerHTML = '<option value="">Todos</option>' + cs.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
     const ps = [...Store.data.produtos].sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('rel-produto').innerHTML = '<option value="">Todos</option>' + ps.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
@@ -3397,9 +3422,9 @@ const Comissoes = {
 const Insights = {
   gerar() {
     const out = [];
-    const vendas = Store.data.vendas;
+    const vendas = typeof Auth !== 'undefined' ? Auth.filtrarVendas(Store.data.vendas) : Store.data.vendas;
     const fechadas = vendas.filter(v => v.status === 'fechada');
-    const clientes = Store.data.clientes;
+    const clientes = typeof Clientes !== 'undefined' ? Clientes.dadosVisiveis() : Store.data.clientes;
     if (clientes.length === 0 || fechadas.length === 0) return out;
 
     // Top cliente por faturamento
@@ -3903,8 +3928,11 @@ const AcoesHoje = {
   gerar() {
     const out = [];
     const hoje = new Date().toISOString().slice(0, 10);
+    const clientesVisiveis = typeof Clientes !== 'undefined' ? Clientes.dadosVisiveis() : Store.data.clientes;
+    const vendasVisiveis = typeof Auth !== 'undefined' ? Auth.filtrarVendas(Store.data.vendas) : Store.data.vendas;
+    const clienteVisivel = id => clientesVisiveis.some(c => c.id === id);
     // 1. Follow-ups vencidos
-    const fuAtras = Followups.filtrar('atrasados');
+    const fuAtras = Followups.filtrar('atrasados').filter(f => !f.clienteId || clienteVisivel(f.clienteId));
     fuAtras.slice(0, 5).forEach(f => {
       const c = f.clienteId ? Store.data.clientes.find(x => x.id === f.clienteId) : null;
       out.push({
@@ -3919,7 +3947,7 @@ const AcoesHoje = {
       });
     });
     // 2. Follow-ups de hoje
-    Followups.filtrar('hoje').slice(0, 5).forEach(f => {
+    Followups.filtrar('hoje').filter(f => !f.clienteId || clienteVisivel(f.clienteId)).slice(0, 5).forEach(f => {
       const c = f.clienteId ? Store.data.clientes.find(x => x.id === f.clienteId) : null;
       out.push({
         prioridade: 'media',
@@ -3936,8 +3964,8 @@ const AcoesHoje = {
     const diasInat = Store.data.config.diasInatividade || 90;
     const limite = new Date(); limite.setDate(limite.getDate() - diasInat);
     const limIso = limite.toISOString().slice(0, 10);
-    const inativos = Store.data.clientes.filter(c => {
-      const vc = Store.data.vendas.filter(v => v.clienteId === c.id && v.status === 'fechada');
+    const inativos = clientesVisiveis.filter(c => {
+      const vc = vendasVisiveis.filter(v => v.clienteId === c.id && v.status === 'fechada');
       if (vc.length === 0) return false;
       const ultima = vc.map(v => v.data).sort().pop();
       return ultima < limIso;
@@ -3958,7 +3986,7 @@ const AcoesHoje = {
     const em14 = new Date(); em14.setDate(em14.getDate() + 14);
     const em14Iso = em14.toISOString().slice(0, 10);
     const proximasRenov = [];
-    Store.data.vendas.filter(v => v.status === 'fechada').forEach(v => {
+    vendasVisiveis.filter(v => v.status === 'fechada').forEach(v => {
       const p = Store.data.produtos.find(x => x.id === v.produtoId);
       if (!p || !p.recorrencia) return;
       const passo = ({ mensal: 1, bimestral: 2, trimestral: 3, semestral: 6, anual: 12 })[p.recorrencia] || 0;
@@ -3988,7 +4016,7 @@ const AcoesHoje = {
       });
     });
     // 5. Clientes com vendas pendentes (sem fechar nem cancelar)
-    Store.data.vendas.filter(v => v.status === 'pendente').slice(0, 3).forEach(v => {
+    vendasVisiveis.filter(v => v.status === 'pendente').slice(0, 3).forEach(v => {
       const c = Store.data.clientes.find(x => x.id === v.clienteId);
       const p = Store.data.produtos.find(x => x.id === v.produtoId);
       if (!c) return;
@@ -4441,7 +4469,7 @@ const Pipeline = {
   },
   openModal(id = null) {
     if (Store.data.clientes.length === 0) { UI.toast('Cadastre ao menos um cliente', 'error'); UI.switchTab('clientes'); return; }
-    const cs = [...Store.data.clientes].sort((a, b) => a.nome.localeCompare(b.nome));
+    const cs = Clientes.dadosVisiveis().sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('opo-cliente').innerHTML = '<option value="">Selecione...</option>' + cs.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
     const vs = Store.data.vendedores.filter(v => v.ativo !== false).sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('opo-vendedor').innerHTML = '<option value="">— Sem vendedor —</option>' + vs.map(v => `<option value="${v.id}">${v.nome}</option>`).join('');
@@ -4592,7 +4620,8 @@ const SLA = {
   pendentes() {
     const limite = (Store.data.config.slaMinutos || 60);
     const agora = Date.now();
-    return Store.data.clientes
+    const clientesBase = typeof Clientes !== 'undefined' ? Clientes.dadosVisiveis() : Store.data.clientes;
+    return clientesBase
       .filter(c => !c.primeiroContato)
       .map(c => {
         const criado = new Date(c.criadoEm || agora).getTime();
