@@ -2217,14 +2217,13 @@ const Clientes = {
   },
   removerArquivo(i) { this.arquivosTemp.splice(i, 1); this.renderArquivos(); },
   salvar() {
-    // Salva somente no servidor. O localStorage não deve ser usado como fonte principal.
-    this._syncToServer().then(success => {
-      if (!success && typeof UI !== 'undefined') {
-        UI.toast('Falha ao salvar no servidor. Verifique a conexão.', 'error');
-      }
-    });
-
-    return true;
+    const id = document.getElementById('cliente-id').value;
+    const tipo = document.getElementById('cliente-tipo').value;
+    const documento = document.getElementById('cliente-documento').value.replace(/\D/g, '');
+    const nome = document.getElementById('cliente-nome').value.trim();
+    if (!nome) return UI.toast('Nome é obrigatório', 'error');
+    const docLen = tipo === 'cnpj' ? 14 : 11;
+    if (documento.length !== docLen) return UI.toast(`${tipo.toUpperCase()} inválido`, 'error');
     const dup = Store.data.clientes.find(c => c.documento === documento && c.id !== id);
     if (dup) return UI.toast(`Já existe um cliente com este ${tipo.toUpperCase()}`, 'error');
     const existente = id ? Store.data.clientes.find(c => c.id === id) : null;
@@ -4865,6 +4864,54 @@ const ConfigTelegram = {
     };
     Store.save();
     UI.toast('Configuração Telegram salva');
+  }
+};
+
+const MeuTelegram = {
+  usuarioAtual() {
+    if (!Auth.current) return null;
+    return Store.data.usuarios.find(u => u.id === Auth.current.id) || Auth.current;
+  },
+  abrir() {
+    const u = this.usuarioAtual();
+    if (!u) return UI.toast('Faça login novamente para configurar o Telegram', 'error');
+    document.getElementById('meu-tg-chatid').value = u.chatIdTelegram || '';
+    UI.openModal('modal-meu-telegram');
+  },
+  salvar() {
+    const u = this.usuarioAtual();
+    if (!u) return UI.toast('Usuário não encontrado', 'error');
+    const chatId = document.getElementById('meu-tg-chatid').value.trim();
+    u.chatIdTelegram = chatId || null;
+    if (Auth.current) Auth.current.chatIdTelegram = u.chatIdTelegram;
+    Store.save();
+    UI.closeModal('modal-meu-telegram');
+    UI.toast('Telegram salvo');
+  },
+  async testar() {
+    const chatId = document.getElementById('meu-tg-chatid').value.trim();
+    if (!chatId) return UI.toast('Informe seu Chat ID', 'error');
+    const r = await Telegram._postTo(chatId, `✅ <b>Teste de conexão</b>\n\nSeu Telegram pessoal está configurado no CRM Energia.`);
+    if (r.ok) UI.toast('Mensagem de teste enviada!');
+    else UI.toast('Erro: ' + (r.description || r.error || 'desconhecido'), 'error');
+  },
+  async detectar() {
+    const c = Telegram.cfg();
+    if (!c.token) return UI.toast('Token do bot não configurado', 'error');
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${c.token}/getUpdates`);
+      const j = await r.json();
+      if (!j.ok) return UI.toast('Erro: ' + j.description, 'error');
+      const updates = j.result || [];
+      if (updates.length === 0) return UI.toast('Envie qualquer mensagem ao bot e clique novamente', 'info');
+      const u = updates[updates.length - 1];
+      const chatId = u.message?.chat?.id || u.edited_message?.chat?.id || u.channel_post?.chat?.id || u.my_chat_member?.chat?.id;
+      if (!chatId) return UI.toast('Não foi possível detectar o chat ID', 'error');
+      document.getElementById('meu-tg-chatid').value = chatId;
+      UI.toast('Chat ID detectado: ' + chatId);
+    } catch (e) {
+      UI.toast('Erro: ' + e.message, 'error');
+    }
   }
 };
 //============================================================================
