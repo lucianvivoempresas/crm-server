@@ -275,7 +275,7 @@
 <body>
 
 <!-- Tela de Login / Setup -->
-<div id="login-screen" class="fixed inset-0 z-[200] flex items-center justify-center p-4" style="background: linear-gradient(135deg, #064e3b 0%, #0f172a 100%); display: none">
+<div id="login-screen" class="fixed inset-0 z-[200] flex items-center justify-center p-4" style="background: linear-gradient(135deg, #064e3b 0%, #0f172a 100%); display: flex">
   <div class="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
     <div class="px-8 py-6 text-center border-b border-slate-200" style="background: linear-gradient(180deg, white 0%, #f8fafc 100%)">
       <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-lg shadow-emerald-500/30 mb-3">
@@ -4104,22 +4104,33 @@ const Auth = {
     crypto.getRandomValues(arr);
     return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
   },
+  normalizarTipo(u) {
+    const tipo = String(u?.tipo || '').trim().toLowerCase();
+    if (tipo === 'master') return 'master';
+    if (tipo === 'vendedor' || u?.vendedorId) return 'vendedor';
+    return 'vendedor';
+  },
   // Verifica sessão na inicialização
   async iniciar() {
-    await Store.load();
-    if (Store.data.usuarios.length === 0) {
-      this.mostrarSetup();
-      return;
+    try {
+      await Store.load();
+      if (Store.data.usuarios.length === 0) {
+        this.mostrarSetup();
+        return;
+      }
+      const sessRaw = sessionStorage.getItem(this.SESSION_KEY);
+      if (sessRaw) {
+        try {
+          const s = JSON.parse(sessRaw);
+          const u = Store.data.usuarios.find(x => x.id === s.id);
+          if (u && u.ativo !== false) { this.aposLogin(u); return; }
+        } catch {}
+      }
+      this.mostrarLogin();
+    } catch (e) {
+      console.error('Erro ao iniciar autenticacao:', e);
+      this.mostrarLogin();
     }
-    const sessRaw = sessionStorage.getItem(this.SESSION_KEY);
-    if (sessRaw) {
-      try {
-        const s = JSON.parse(sessRaw);
-        const u = Store.data.usuarios.find(x => x.id === s.id);
-        if (u && u.ativo !== false) { this.aposLogin(u); return; }
-      } catch {}
-    }
-    this.mostrarLogin();
   },
   mostrarLogin() {
     document.getElementById('login-screen').style.display = 'flex';
@@ -4172,6 +4183,7 @@ const Auth = {
     this.aposLogin(u);
   },
   aposLogin(u) {
+    u.tipo = this.normalizarTipo(u);
     this.current = u;
     sessionStorage.setItem(this.SESSION_KEY, JSON.stringify({ id: u.id }));
     document.body.classList.remove('role-master', 'role-vendedor');
@@ -4180,9 +4192,14 @@ const Auth = {
     document.getElementById('user-name').textContent = u.nome;
     document.getElementById('user-role').textContent = u.tipo;
     this.esconderLogin();
-    UI.switchTab('dashboard');
-    UI.updateBadges();
-    UI.toast(`Bem-vindo, ${u.nome.split(/\s+/)[0]}!`);
+    try {
+      UI.switchTab('dashboard');
+      UI.updateBadges();
+      UI.toast(`Bem-vindo, ${u.nome.split(/\s+/)[0]}!`);
+    } catch (e) {
+      console.error('Erro ao renderizar apos login:', e);
+      UI.toast('Login realizado, mas houve falha ao montar o dashboard.', 'error');
+    }
   },
   sair() {
     UI.confirm('Sair do sistema', 'Deseja realmente encerrar a sessão?', () => {
@@ -4192,8 +4209,8 @@ const Auth = {
       this.mostrarLogin();
     });
   },
-  isMaster() { return this.current && this.current.tipo === 'master'; },
-  isVendedor() { return this.current && this.current.tipo === 'vendedor'; },
+  isMaster() { return this.current && this.normalizarTipo(this.current) === 'master'; },
+  isVendedor() { return this.current && this.normalizarTipo(this.current) === 'vendedor'; },
   vendedorIdAtual() { return this.current ? this.current.vendedorId : null; },
   // Filtros utilitários
   filtrarVendas(vs) {
