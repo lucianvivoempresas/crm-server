@@ -2844,7 +2844,7 @@ const Vendas = {
         if (!id) Telegram.notificarVenda(v, 'nova');
         else {
           if (statusAntigo !== v.status) Telegram.notificarVenda(v, 'status');
-          else if (obsAntiga !== (v.observacoes || '')) Telegram.notificarVenda(v, 'obs');
+          if (obsAntiga !== (v.observacoes || '')) Telegram.notificarVenda(v, 'obs');
         }
       }
     }
