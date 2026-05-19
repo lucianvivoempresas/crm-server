@@ -1662,18 +1662,14 @@ const Store = {
     this.isSyncing = true;
 
     try {
-      const payload = JSON.stringify(this.data);
-      if (payload.length > 100000) {
-        return await this._syncToServerChunked(payload);
-      }
-
+      // Se temos um ID de documento no servidor, atualiza
       if (this.serverDocId) {
         const response = await fetch(`/api/energia-data/${this.serverDocId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: payload
+          body: JSON.stringify(this.data)
         });
         if (response.ok) {
           console.log('✅ Dados de energia sincronizados com servidor');
@@ -1684,12 +1680,13 @@ const Store = {
           return false;
         }
       } else {
+        // Cria novo documento no servidor
         const response = await fetch(`/api/energia-data`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: payload
+          body: JSON.stringify(this.data)
         });
         if (response.ok) {
           const result = await response.json();
@@ -1703,47 +1700,10 @@ const Store = {
         }
       }
     } catch (e) {
-      console.error('❌ Erro ao sincronizar com servidor:', e.message || e);
+      console.error('❌ Erro ao sincronizar com servidor:', e.message);
       return false;
     } finally {
       this.isSyncing = false;
-    }
-  },
-
-  async _syncToServerChunked(payload) {
-    try {
-      const chunkSize = 100000;
-      const chunks = [];
-      for (let i = 0; i < payload.length; i += chunkSize) {
-        chunks.push(payload.slice(i, i + chunkSize));
-      }
-
-      for (let index = 0; index < chunks.length; index += 1) {
-        const response = await fetch('/api/energia-data/chunks', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            chunkIndex: index,
-            data: chunks[index],
-            clear: index === 0
-          })
-        });
-
-        if (!response.ok) {
-          console.warn('⚠️ Erro ao salvar chunk', index, response.status);
-          return false;
-        }
-      }
-
-      this.serverDocId = null;
-      this.clearLocalCache();
-      console.log('✅ Dados de energia sincronizados em chunks no servidor');
-      return true;
-    } catch (e) {
-      console.error('❌ Erro ao salvar chunks no servidor:', e.message || e);
-      return false;
     }
   },
 
