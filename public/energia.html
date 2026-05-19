@@ -1590,8 +1590,16 @@ const Store = {
 
       const data = await response.json();
       if (Array.isArray(data) && data.length > 0) {
-        this.data = data[0];
-        this.serverDocId = data[0].id;
+        // Selecionar somente documentos válidos (com a estrutura esperada);
+        // ignora documentos legacy/teste como {"test": true} que poluam o GET.
+        const validos = data.filter(d => d && (Array.isArray(d.clientes) || Array.isArray(d.produtos) || Array.isArray(d.vendas) || Array.isArray(d.usuarios)));
+        const escolhido = validos.length > 0 ? validos[validos.length - 1] : null;
+        if (escolhido) {
+          this.data = escolhido;
+          this.serverDocId = escolhido.id;
+        } else {
+          console.warn('⚠️ Nenhum documento energia-data válido encontrado no servidor; usando defaults.');
+        }
       }
     } catch (e) {
       console.error('⚠️ Falha ao carregar do servidor:', e.message || e);
@@ -1601,6 +1609,7 @@ const Store = {
   },
 
   _ensureDefaults() {
+    if (!this.data || typeof this.data !== 'object') this.data = {};
     this.data.clientes = this.data.clientes || [];
     this.data.produtos = this.data.produtos || [];
     this.data.vendas = this.data.vendas || [];
@@ -1610,7 +1619,8 @@ const Store = {
     this.data.metas = this.data.metas || [];
     this.data.usuarios = this.data.usuarios || [];
     this.data.oportunidades = this.data.oportunidades || [];
-    
+    if (!this.data.config || typeof this.data.config !== 'object') this.data.config = {};
+
     if (this.data.config.slaMinutos == null) this.data.config.slaMinutos = 60;
     if (!this.data.config.telegram) this.data.config.telegram = {
       token: '8840501061:AAHtaqg7F2oOGefcndAZWe_pxfBaTivcpgs',
