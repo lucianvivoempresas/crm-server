@@ -4772,36 +4772,109 @@ const ConfigTelegram = {
 //============================================================================
 const Backup = {
   exportar() {
-    const blob = new Blob([JSON.stringify(Store.data, null, 2)], { type: 'application/json' });
+    const data = Backup._buildExportData(Store.data);
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `crm-energia-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+    a.href = url;
+    a.download = `crm-energia-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
     URL.revokeObjectURL(url);
     UI.toast('Backup exportado!');
   },
+
   importar(event) {
-    const file = event.target.files[0]; if (!file) return;
-    UI.confirm('Importar Backup', 'Isso vai substituir todos os dados atuais. Continuar?', () => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        try {
-          const data = JSON.parse(e.target.result);
-          if (!data.clientes || !data.produtos || !data.vendas) { UI.toast('Backup inválido', 'error'); return; }
-          ['vendedores','followups','pagamentos','metas','usuarios','oportunidades'].forEach(k => data[k] = data[k] || []);
-          data.config = data.config || {};
-          data.clientes.forEach(c => { if (!Array.isArray(c.notas)) c.notas = []; });
-          Store.data = data; Store.save();
-          UI.toast('Backup importado!'); location.reload();
-        } catch { UI.toast('Erro ao ler arquivo', 'error'); }
-      };
-      reader.readAsText(file);
-    });
+    const file = event.target?.files?.[0];
+    if (!file) return;
     event.target.value = '';
+
+    UI.confirm('Importar Backup', 'Isso vai substituir todos os dados atuais. Continuar?', async () => {
+      try {
+        const text = await Backup._readFile(file);
+        const rawData = JSON.parse(text);
+        const data = Backup._normalizeImportPayload(rawData);
+        if (!data) return;
+
+        Store.data = data;
+        Store._ensureDefaults();
+
+        const success = await Store.sync();
+        if (!success) {
+          UI.toast('Falha ao salvar no servidor. Verifique a conexão.', 'error');
+          return;
+        }
+
+        UI.toast('Backup importado com sucesso!');
+        location.reload();
+      } catch (err) {
+        UI.toast(`Erro ao importar backup: ${err.message || err}`, 'error');
+      }
+    });
   },
+
   limpar() {
     UI.confirm('Limpar Todos os Dados', 'Isso apagará TUDO inclusive usuários. Continuar?', () => {
-      localStorage.removeItem(Store.KEY); sessionStorage.clear(); location.reload();
+      localStorage.removeItem(Store.KEY);
+      sessionStorage.clear();
+      location.reload();
     });
+  },
+
+  _buildExportData(source) {
+    return {
+      clientes: Array.isArray(source.clientes) ? source.clientes : [],
+      produtos: Array.isArray(source.produtos) ? source.produtos : [],
+      vendas: Array.isArray(source.vendas) ? source.vendas : [],
+      vendedores: Array.isArray(source.vendedores) ? source.vendedores : [],
+      followups: Array.isArray(source.followups) ? source.followups : [],
+      pagamentos: Array.isArray(source.pagamentos) ? source.pagamentos : [],
+      metas: Array.isArray(source.metas) ? source.metas : [],
+      usuarios: Array.isArray(source.usuarios) ? source.usuarios : [],
+      oportunidades: Array.isArray(source.oportunidades) ? source.oportunidades : [],
+      config: typeof source.config === 'object' && source.config !== null ? source.config : {}
+    };
+  },
+
+  _readFile(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
+      reader.readAsText(file, 'UTF-8');
+    });
+  },
+
+  _normalizeImportPayload(payload) {
+    if (!payload || typeof payload !== 'object') {
+      UI.toast('Backup inválido: JSON esperado.', 'error');
+      return null;
+    }
+
+    const data = payload.data && typeof payload.data === 'object' ? payload.data : payload;
+
+    if (!Array.isArray(data.clientes) || !Array.isArray(data.produtos) || !Array.isArray(data.vendas)) {
+      UI.toast('Backup inválido: faltam coleções obrigatórias.', 'error');
+      return null;
+    }
+
+    const normalized = {
+      clientes: Array.isArray(data.clientes) ? data.clientes : [],
+      produtos: Array.isArray(data.produtos) ? data.produtos : [],
+      vendas: Array.isArray(data.vendas) ? data.vendas : [],
+      vendedores: Array.isArray(data.vendedores) ? data.vendedores : [],
+      followups: Array.isArray(data.followups) ? data.followups : [],
+      pagamentos: Array.isArray(data.pagamentos) ? data.pagamentos : [],
+      metas: Array.isArray(data.metas) ? data.metas : [],
+      usuarios: Array.isArray(data.usuarios) ? data.usuarios : [],
+      oportunidades: Array.isArray(data.oportunidades) ? data.oportunidades : [],
+      config: typeof data.config === 'object' && data.config !== null ? data.config : {}
+    };
+
+    normalized.clientes.forEach(c => {
+      if (!Array.isArray(c.notas)) c.notas = [];
+    });
+
+    return normalized;
   }
 };
 
