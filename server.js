@@ -157,55 +157,151 @@ app.get('/contato', (req, res) => {
 
 const DB_PATH = path.join(__dirname, 'crm_database.sqlite');
 const ENERGIA_DB_PATH = path.join(__dirname, 'energia_database.sqlite');
+const DB_BACKUP_DIR = path.join(__dirname, 'database-backups');
 
-// Inicializa o banco SQLite (criará um arquivo crm_database.sqlite na mesma pasta)
-const db = new sqlite3.Database(DB_PATH, (err) => {
-    if (err) {
-        console.error('Erro ao abrir o banco de dados', err.message);
-        return;
-    }
-
-    console.log(`Conectado ao banco SQLite com sucesso: ${DB_PATH}`);
-    db.get('PRAGMA quick_check', [], (checkErr, row) => {
-        if (checkErr) {
-            console.error('Erro ao verificar integridade do banco SQLite:', checkErr.message);
-            return;
+function ensureBackupDirectory() {
+    try {
+        fs.mkdirSync(DB_BACKUP_DIR, { recursive: true });
+    } catch (err) {
+        if (err.code !== 'EEXIST') {
+            console.warn('⚠️ Falha ao criar diretório de backups de banco de dados:', err.message);
         }
-        console.log('Integridade SQLite:', row?.quick_check || 'sem resultado');
+    }
+}
+
+function backupDatabaseFile(filePath, label, reason) {
+    if (!fs.existsSync(filePath)) return;
+    ensureBackupDirectory();
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '').replace(/T/, '_').replace(/Z$/, '');
+    const backupName = `${path.basename(filePath)}.${label.replace(/\s+/g, '_').toLowerCase()}.${timestamp}.bak`;
+    const backupPath = path.join(DB_BACKUP_DIR, backupName);
+
+    try {
+        fs.copyFileSync(filePath, backupPath);
+        console.log(`✅ Backup do ${label} criado em: ${backupPath}`);
+        console.log(`ℹ️ O arquivo antigo será recriado para evitar incompatibilidade.`);
+    } catch (copyErr) {
+        console.warn(`⚠️ Falha ao criar backup do ${label}:`, copyErr.message);
+    }
+}
+
+function openDatabaseWithRecovery(dbPath, label) {
+    return new Promise((resolve, reject) => {
+        let attemptedRecovery = false;
+
+        const openAttempt = () => {
+            const dbInstance = new sqlite3.Database(dbPath, (err) => {
+                if (err) {
+                    console.error(`❌ Erro ao abrir o banco ${label}:`, err.message);
+
+                    if (!attemptedRecovery && fs.existsSync(dbPath)) {
+                        attemptedRecovery = true;
+                        backupDatabaseFile(dbPath, label, err.message);
+
+                        try {
+                            fs.unlinkSync(dbPath);
+                            console.log(`ℹ️ Arquivo corrompido removido: ${dbPath}`);
+                        } catch (removeErr) {
+                            console.error(`❌ Falha ao remover arquivo corrompido ${dbPath}:`, removeErr.message);
+                            return reject(err);
+                        }
+
+                        return openAttempt();
+                    }
+
+                    return reject(err);
+                }
+
+                dbInstance.get('PRAGMA quick_check', [], (checkErr, row) => {
+                    const integrityOk = !checkErr && row && row.quick_check === 'ok';
+                    if (!integrityOk) {
+                        const reason = checkErr ? checkErr.message : `PRAGMA quick_check retornou ${String(row?.quick_check)}`;
+                        console.warn(`⚠️ ${label} inválido ou corrompido: ${reason}`);
+
+                        if (!attemptedRecovery && fs.existsSync(dbPath)) {
+                            attemptedRecovery = true;
+                            backupDatabaseFile(dbPath, label, reason);
+                            return dbInstance.close(() => {
+                                try {
+                                    fs.unlinkSync(dbPath);
+                                    console.log(`ℹ️ Arquivo inválido removido: ${dbPath}`);
+                                } catch (removeErr) {
+                                    console.error(`❌ Falha ao remover arquivo inválido ${dbPath}:`, removeErr.message);
+                                    return reject(checkErr || new Error(reason));
+                                }
+                                openAttempt();
+                            });
+                        }
+
+                        return reject(checkErr || new Error(reason));
+                    }
+
+                    console.log(`Conectado ao banco SQLite com sucesso: ${dbPath}`);
+                    resolve(dbInstance);
+                });
+            });
+        };
+
+        openAttempt();
     });
-});
+}
 
-// Banco isolado para o CRM Energia. Isso evita que uma corrupcao no banco principal
-// derrube a tela /energia, que usa uma estrutura de documentos independente.
-const energiaDb = new sqlite3.Database(ENERGIA_DB_PATH, (err) => {
-    if (err) {
-        console.error('Erro ao abrir o banco de energia', err.message);
-        return;
-    }
+let db;
+let energiaDb;
 
-    console.log(`Conectado ao banco SQLite de energia: ${ENERGIA_DB_PATH}`);
-});
-
-energiaDb.serialize(() => {
-    energiaDb.run(`CREATE TABLE IF NOT EXISTS documents (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        collection TEXT,
-        payload TEXT
-    )`, (err) => {
-        if (err) {
-            console.error('Erro ao criar tabela documents do banco de energia:', err.message);
-            return;
-        }
-
-        energiaDb.get('PRAGMA quick_check', [], (checkErr, row) => {
-            if (checkErr) {
-                console.error('Erro ao verificar integridade do banco de energia:', checkErr.message);
-                return;
-            }
-            console.log('Integridade SQLite energia:', row?.quick_check || 'sem resultado');
+const dbReady = openDatabaseWithRecovery(DB_PATH, 'CRM principal')
+    .then((database) => {
+        db = database;
+        return new Promise((resolve) => {
+            db.get('PRAGMA quick_check', [], (checkErr, row) => {
+                if (checkErr) {
+                    console.error('Erro ao verificar integridade do banco SQLite:', checkErr.message);
+                } else {
+                    console.log('Integridade SQLite:', row?.quick_check || 'sem resultado');
+                }
+                resolve();
+            });
         });
+    })
+    .catch((err) => {
+        console.error('❌ Falha ao inicializar o banco principal:', err.message);
+        throw err;
     });
-});
+
+const energiaDbReady = openDatabaseWithRecovery(ENERGIA_DB_PATH, 'CRM Energia')
+    .then((database) => {
+        energiaDb = database;
+        console.log(`Conectado ao banco SQLite de energia: ${ENERGIA_DB_PATH}`);
+
+        return new Promise((resolve) => {
+            energiaDb.serialize(() => {
+                energiaDb.run(`CREATE TABLE IF NOT EXISTS documents (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    collection TEXT,
+                    payload TEXT
+                )`, (err) => {
+                    if (err) {
+                        console.error('Erro ao criar tabela documents do banco de energia:', err.message);
+                        return resolve();
+                    }
+
+                    energiaDb.get('PRAGMA quick_check', [], (checkErr, row) => {
+                        if (checkErr) {
+                            console.error('Erro ao verificar integridade do banco de energia:', checkErr.message);
+                        } else {
+                            console.log('Integridade SQLite energia:', row?.quick_check || 'sem resultado');
+                        }
+                        resolve();
+                    });
+                });
+            });
+        });
+    })
+    .catch((err) => {
+        console.error('❌ Falha ao inicializar o banco de energia:', err.message);
+        throw err;
+    });
 
 function dbRunAsync(sql, params = []) {
     return new Promise((resolve, reject) => {
@@ -1588,12 +1684,27 @@ app.get('/api/marketing/campanha/:id', requireAuth, (req, res) => {
 });
 
 
-const PORT = Number(process.env.PORT) || 3000;
-const server = app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 CRM Servidor rodando em http://localhost:${PORT}`);
-    console.log(`📡 Acesse remotamente via: https://loconecta.com.br (com Nginx como proxy)`);
-    console.log(`💡 Certifique-se de que Nginx está configurado apontando para localhost:${PORT}`);
-});
+let server;
+
+function startServer() {
+    const PORT = Number(process.env.PORT) || 3000;
+    server = app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 CRM Servidor rodando em http://localhost:${PORT}`);
+        console.log(`📡 Acesse remotamente via: https://loconecta.com.br (com Nginx como proxy)`);
+        console.log(`💡 Certifique-se de que Nginx está configurado apontando para localhost:${PORT}`);
+    });
+}
+
+Promise.all([dbReady, energiaDbReady])
+    .then(() => {
+        console.log('✅ Todos os bancos de dados foram inicializados com sucesso.');
+        startServer();
+    })
+    .catch((err) => {
+        console.error('❌ Não foi possível inicializar todos os bancos de dados:', err.message || err);
+        console.error('⚠️ O servidor ainda será iniciado, mas algumas funcionalidades podem não funcionar corretamente.');
+        startServer();
+    });
 
 process.on('unhandledRejection', (reason) => {
     console.error('❌ Unhandled Rejection:', reason);
@@ -1607,10 +1718,14 @@ process.on('uncaughtException', (err) => {
 
 function gracefulShutdown(signal) {
     console.log(`⚠️ Recebido ${signal}. Encerrando servidor...`);
-    server.close(() => {
-        console.log('✅ Servidor encerrado com sucesso.');
+    if (server) {
+        server.close(() => {
+            console.log('✅ Servidor encerrado com sucesso.');
+            process.exit(0);
+        });
+    } else {
         process.exit(0);
-    });
+    }
 }
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));

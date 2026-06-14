@@ -283,6 +283,7 @@
       </div>
       <h1 class="text-xl font-bold text-slate-900 tracking-tight">CRM Energia</h1>
       <p class="text-xs text-slate-500" id="login-subtitle">Acesso ao sistema</p>
+      <p id="login-notice" class="text-xs text-amber-700 mt-2 hidden"></p>
     </div>
 
     <!-- Formulário de login -->
@@ -320,7 +321,7 @@
         <label class="label">Confirme a senha</label>
         <input id="setup-pwd2" type="password" class="input" placeholder="repetir" autocomplete="new-password" />
       </div>
-      <button onclick="Auth.criarMaster()" class="btn-primary w-full justify-center">Criar Conta Master</button>
+      <button id="setup-create-btn" onclick="Auth.criarMaster()" class="btn-primary w-full justify-center">Criar Conta Master</button>
       <p id="setup-erro" class="text-xs text-red-600 text-center mt-3 hidden"></p>
     </div>
   </div>
@@ -1568,15 +1569,44 @@ const Store = {
   SERVER_COLLECTION: 'energia-data',
   data: { clientes: [], produtos: [], vendas: [], vendedores: [], followups: [], pagamentos: [], metas: [], config: {}, usuarios: [], oportunidades: [] },
   serverDocId: null,
+  serverOnline: false,
   isSyncing: false,
+  syncFailureReported: false,
+
+  _loadCachedData() {
+    try {
+      const raw = localStorage.getItem(this.KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          data: parsed.data || null,
+          serverDocId: parsed.serverDocId || null
+        };
+      }
+    } catch (e) {
+      console.warn('⚠️ Falha ao carregar cache local:', e.message || e);
+    }
+    return null;
+  },
+
+  _saveLocalCache() {
+    try {
+      localStorage.setItem(this.KEY, JSON.stringify({
+        data: this.data,
+        serverDocId: this.serverDocId
+      }));
+    } catch (e) {
+      console.warn('⚠️ Falha ao salvar cache local:', e.message || e);
+    }
+  },
 
   clearLocalCache() {
     try { localStorage.removeItem(this.KEY); } catch (e) {}
   },
 
   async load() {
-    // Remove qualquer cache local anterior: o servidor é a fonte de verdade.
-    this.clearLocalCache();
+    const cached = this._loadCachedData();
 
     try {
       const response = await fetch(`/api/energia-data`, {
@@ -1588,6 +1618,8 @@ const Store = {
         throw new Error('Servidor retornou ' + response.status);
       }
 
+      this.serverOnline = true;
+      this.syncFailureReported = false;
       const data = await response.json();
       if (Array.isArray(data) && data.length > 0) {
         // Selecionar somente documentos válidos (com a estrutura esperada);
@@ -1597,15 +1629,61 @@ const Store = {
         if (escolhido) {
           this.data = escolhido;
           this.serverDocId = escolhido.id;
+          this._saveLocalCache();
         } else {
           console.warn('⚠️ Nenhum documento energia-data válido encontrado no servidor; usando defaults.');
+          if (cached && cached.data) {
+            if (typeof UI !== 'undefined') {
+              UI.toast('Servidor de energia retornou dados inválidos. Usando cache local.', 'warning');
+            }
+            this.data = cached.data;
+            this.serverDocId = cached.serverDocId;
+          }
         }
+      } else if (cached && cached.data) {
+        if (typeof UI !== 'undefined') {
+          UI.toast('Servidor de energia indisponível. Usando dados locais salvos.', 'warning');
+        }
+        this.data = cached.data;
+        this.serverDocId = cached.serverDocId;
       }
     } catch (e) {
       console.error('⚠️ Falha ao carregar do servidor:', e.message || e);
+      this.serverOnline = false;
+      if (cached && cached.data) {
+        if (typeof UI !== 'undefined') {
+          UI.toast('Servidor de energia indisponível. Usando dados locais salvos.', 'warning');
+        }
+        this.data = cached.data;
+        this.serverDocId = cached.serverDocId;
+      }
     }
 
     this._ensureDefaults();
+  },
+
+  _showLoginNotice(message) {
+    const notice = document.getElementById('login-notice');
+    if (!notice) return;
+    if (!message) {
+      notice.textContent = '';
+      notice.classList.add('hidden');
+      return;
+    }
+    notice.textContent = message;
+    notice.classList.remove('hidden');
+  },
+
+  _updateSetupButton() {
+    const btn = document.getElementById('setup-create-btn');
+    if (!btn) return;
+    if (Store.serverOnline) {
+      btn.disabled = false;
+      btn.classList.remove('opacity-40', 'cursor-not-allowed');
+    } else {
+      btn.disabled = true;
+      btn.classList.add('opacity-40', 'cursor-not-allowed');
+    }
   },
 
   _ensureDefaults() {
@@ -1647,11 +1725,24 @@ const Store = {
     return '';
   },
 
+  _markServerOffline(message) {
+    this.serverOnline = false;
+    if (!this.syncFailureReported && typeof UI !== 'undefined') {
+      UI.toast(message || 'Servidor indisponível. Dados salvos localmente.', 'warning');
+      this.syncFailureReported = true;
+    }
+  },
+
   save() {
-    // Salva apenas no servidor; não há fallback em localStorage.
+    this._saveLocalCache();
+    if (!this.serverOnline) {
+      this._markServerOffline('Sem conexão com servidor. Dados salvos localmente.');
+      return true;
+    }
+
     this._syncToServer().then(success => {
-      if (!success && typeof UI !== 'undefined') {
-        UI.toast('Falha ao salvar no servidor. Verifique a conexão.', 'error');
+      if (!success) {
+        this._markServerOffline('Servidor indisponível. Dados salvos localmente.');
       }
     });
     return true;
@@ -1674,7 +1765,11 @@ const Store = {
     try {
       const payload = JSON.stringify(this.data);
       if (payload.length > 100000) {
-        return await this._syncToServerChunked(payload);
+        const chunkedSuccess = await this._syncToServerChunked(payload);
+        if (!chunkedSuccess) {
+          this._saveLocalCache();
+        }
+        return chunkedSuccess;
       }
 
       if (this.serverDocId) {
@@ -1687,10 +1782,13 @@ const Store = {
         });
         if (response.ok) {
           console.log('✅ Dados de energia sincronizados com servidor');
+          this.serverOnline = true;
+          this.syncFailureReported = false;
           this.clearLocalCache();
           return true;
         } else {
           console.warn('⚠️ Erro ao sincronizar: ' + response.status);
+          this._saveLocalCache();
           return false;
         }
       } else {
@@ -1703,17 +1801,21 @@ const Store = {
         });
         if (response.ok) {
           const result = await response.json();
+          this.serverOnline = true;
+          this.syncFailureReported = false;
           this.serverDocId = result.id;
           this.clearLocalCache();
           console.log('✅ Dados de energia salvos no servidor com ID:', result.id);
           return true;
         } else {
           console.warn('⚠️ Erro ao salvar: ' + response.status);
+          this._saveLocalCache();
           return false;
         }
       }
     } catch (e) {
       console.error('❌ Erro ao sincronizar com servidor:', e.message || e);
+      this._saveLocalCache();
       return false;
     } finally {
       this.isSyncing = false;
@@ -1743,16 +1845,20 @@ const Store = {
 
         if (!response.ok) {
           console.warn('⚠️ Erro ao salvar chunk', index, response.status);
+          this._saveLocalCache();
           return false;
         }
       }
 
+      this.serverOnline = true;
+      this.syncFailureReported = false;
       this.serverDocId = null;
       this.clearLocalCache();
       console.log('✅ Dados de energia sincronizados em chunks no servidor');
       return true;
     } catch (e) {
       console.error('❌ Erro ao salvar chunks no servidor:', e.message || e);
+      this._saveLocalCache();
       return false;
     }
   },
@@ -1852,25 +1958,35 @@ const UI = {
       else b.classList.remove('active');
     });
     document.querySelectorAll('.panel').forEach(p => p.classList.add('hidden'));
-    document.getElementById('panel-' + tab).classList.remove('hidden');
-    const cfg = PAGE_CONFIG[tab];
-    document.getElementById('page-title').textContent = cfg.titulo;
-    document.getElementById('page-subtitle').textContent = cfg.subtitulo;
-    const ehMasterAct = typeof Auth === 'undefined' || Auth.isMaster();
-    document.getElementById('page-actions').innerHTML = cfg.actions
-      .filter(a => !a.masterOnly || ehMasterAct)
-      .map(a => `<button onclick="${a.action}" class="${a.primary ? 'btn-primary' : 'btn-secondary'}">${ICONS[a.icon] || ''}${a.label}</button>`)
-      .join('');
+    const panel = document.getElementById('panel-' + tab);
+    if (panel) panel.classList.remove('hidden');
+    const cfg = PAGE_CONFIG[tab] || { titulo: '', subtitulo: '', actions: [] };
+    const titleEl = document.getElementById('page-title');
+    if (titleEl) titleEl.textContent = cfg.titulo;
+    const subtitleEl = document.getElementById('page-subtitle');
+    if (subtitleEl) subtitleEl.textContent = cfg.subtitulo;
+    const actionsEl = document.getElementById('page-actions');
+    if (actionsEl) {
+      actionsEl.innerHTML = cfg.actions
+        .filter(a => !a.masterOnly || (typeof Auth === 'undefined' || Auth.isMaster()))
+        .map(a => `<button onclick="${a.action}" class="${a.primary ? 'btn-primary' : 'btn-secondary'}">${ICONS[a.icon] || ''}${a.label}</button>`)
+        .join('');
+    }
 
-    if (tab === 'dashboard') Dashboard.render();
-    if (tab === 'clientes') Clientes.render();
-    if (tab === 'pipeline') Pipeline.render();
-    if (tab === 'vendas') Vendas.render();
-    if (tab === 'vendedores') Vendedores.render();
-    if (tab === 'followups') Followups.render();
-    if (tab === 'comissoes') Comissoes.init();
-    if (tab === 'relatorios') Relatorios.init();
-    if (tab === 'config') { Produtos.render(); if (typeof ConfigAuto !== 'undefined') ConfigAuto.carregar(); if (typeof Usuarios !== 'undefined') Usuarios.render(); if (typeof ConfigTelegram !== 'undefined') ConfigTelegram.carregar(); }
+    if (tab === 'dashboard' && typeof Dashboard !== 'undefined') Dashboard.render();
+    if (tab === 'clientes' && typeof Clientes !== 'undefined') Clientes.render();
+    if (tab === 'pipeline' && typeof Pipeline !== 'undefined') Pipeline.render();
+    if (tab === 'vendas' && typeof Vendas !== 'undefined') Vendas.render();
+    if (tab === 'vendedores' && typeof Vendedores !== 'undefined') Vendedores.render();
+    if (tab === 'followups' && typeof Followups !== 'undefined') Followups.render();
+    if (tab === 'comissoes' && typeof Comissoes !== 'undefined') Comissoes.init();
+    if (tab === 'relatorios' && typeof Relatorios !== 'undefined') Relatorios.init();
+    if (tab === 'config') {
+      if (typeof Produtos !== 'undefined') Produtos.render();
+      if (typeof ConfigAuto !== 'undefined') ConfigAuto.carregar();
+      if (typeof Usuarios !== 'undefined') Usuarios.render();
+      if (typeof ConfigTelegram !== 'undefined') ConfigTelegram.carregar();
+    }
     this.toggleSidebar(false);
   },
   toggleSidebar(force) {
@@ -1916,18 +2032,24 @@ const UI = {
     </div>`;
   },
   updateBadges() {
-    document.getElementById('badge-clientes').textContent = Store.data.clientes.length;
-    document.getElementById('badge-vendas').textContent = Store.data.vendas.length;
+    const badgeClientes = document.getElementById('badge-clientes');
+    if (badgeClientes) badgeClientes.textContent = Store.data.clientes.length;
+    const badgeVendas = document.getElementById('badge-vendas');
+    if (badgeVendas) badgeVendas.textContent = Store.data.vendas.length;
     // Pipeline badge
     if (typeof Pipeline !== 'undefined') {
       const ab = Pipeline.abertas().length;
       const b = document.getElementById('badge-pipeline');
       if (b) { b.textContent = ab; b.classList.toggle('hidden', ab === 0); }
     }
-    const fuPend = Followups.contar('hoje') + Followups.contar('atrasados');
-    const badgeFu = document.getElementById('badge-followups');
-    badgeFu.textContent = fuPend;
-    badgeFu.classList.toggle('hidden', fuPend === 0);
+    if (typeof Followups !== 'undefined') {
+      const fuPend = Followups.contar('hoje') + Followups.contar('atrasados');
+      const badgeFu = document.getElementById('badge-followups');
+      if (badgeFu) {
+        badgeFu.textContent = fuPend;
+        badgeFu.classList.toggle('hidden', fuPend === 0);
+      }
+    }
     // Badge de comissões do mês corrente
     if (typeof Comissoes !== 'undefined') {
       const hoje = new Date();
@@ -1947,61 +2069,73 @@ const UI = {
 //============================================================================
 const Dashboard = {
   render() {
+    const safeText = (id, value) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    };
+    const safeHtml = (id, html) => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = html;
+    };
     const ehMaster = typeof Auth === 'undefined' || Auth.isMaster();
     const vendasBase = typeof Auth !== 'undefined' ? Auth.filtrarVendas(Store.data.vendas) : Store.data.vendas;
     const clientes = ehMaster ? Store.data.clientes.length : new Set(vendasBase.map(v => v.clienteId)).size;
     const vendasFech = vendasBase.filter(v => v.status === 'fechada');
     const fat = vendasFech.reduce((s, v) => s + (v.valor || 0), 0);
-    const com = vendasFech.reduce((s, v) => s + Vendas.comissaoLiquida(v), 0);
+    const com = vendasFech.reduce((s, v) => s + (typeof Vendas !== 'undefined' ? Vendas.comissaoLiquida(v) : 0), 0);
     const ticket = vendasFech.length > 0 ? fat / vendasFech.length : 0;
 
-    document.getElementById('stat-clientes').textContent = clientes;
-    document.getElementById('stat-clientes-sub').textContent = clientes === 0 ? 'comece cadastrando' : 'cadastrados';
-    document.getElementById('stat-vendas-qtd').textContent = vendasFech.length;
-    document.getElementById('stat-vendas-sub').textContent = `${Store.data.vendas.length} totais · ${vendasFech.length} fechadas`;
-    document.getElementById('stat-faturamento').textContent = Format.brlCompact(fat);
-    document.getElementById('stat-comissoes').textContent = Format.brlCompact(com);
-    document.getElementById('stat-ticket').textContent = `ticket médio: ${Format.brlCompact(ticket)}`;
+    safeText('stat-clientes', clientes);
+    safeText('stat-clientes-sub', clientes === 0 ? 'comece cadastrando' : 'cadastrados');
+    safeText('stat-vendas-qtd', vendasFech.length);
+    safeText('stat-vendas-sub', `${Store.data.vendas.length} totais · ${vendasFech.length} fechadas`);
+    safeText('stat-faturamento', Format.brlCompact(fat));
+    safeText('stat-comissoes', Format.brlCompact(com));
+    safeText('stat-ticket', `ticket médio: ${Format.brlCompact(ticket)}`);
 
     // Follow-ups
     const fuList = document.getElementById('dashboard-followups-list');
-    const fuHoje = Followups.filtrar('hoje');
-    const fuAtras = Followups.filtrar('atrasados');
+    const fuHoje = typeof Followups !== 'undefined' ? Followups.filtrar('hoje') : [];
+    const fuAtras = typeof Followups !== 'undefined' ? Followups.filtrar('atrasados') : [];
     const fus = [...fuAtras, ...fuHoje].slice(0, 6);
-    document.getElementById('dashboard-followups-sub').textContent = fus.length === 0 ? 'Tudo em dia!' : `${fuAtras.length} atrasados · ${fuHoje.length} hoje`;
-    if (fus.length === 0) {
-      fuList.innerHTML = `<div class="px-5 py-8 text-center">
-        <div class="w-12 h-12 mx-auto bg-emerald-50 rounded-full flex items-center justify-center mb-2">
-          <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-        </div>
-        <p class="text-sm text-slate-500">Nenhum follow-up pendente</p>
-      </div>`;
-    } else {
-      fuList.innerHTML = fus.map(f => Followups.renderItem(f, true)).join('');
+    safeText('dashboard-followups-sub', fus.length === 0 ? 'Tudo em dia!' : `${fuAtras.length} atrasados · ${fuHoje.length} hoje`);
+    if (fuList) {
+      if (fus.length === 0) {
+        fuList.innerHTML = `<div class="px-5 py-8 text-center">
+          <div class="w-12 h-12 mx-auto bg-emerald-50 rounded-full flex items-center justify-center mb-2">
+            <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+          </div>
+          <p class="text-sm text-slate-500">Nenhum follow-up pendente</p>
+        </div>`;
+      } else {
+        fuList.innerHTML = fus.map(f => Followups.renderItem(f, true)).join('');
+      }
     }
 
     // Últimas vendas (filtradas por role)
     const ultimas = [...vendasBase].sort((a, b) => (b.data || '').localeCompare(a.data || '')).slice(0, 5);
     const vEl = document.getElementById('dashboard-vendas-list');
-    if (ultimas.length === 0) {
-      vEl.innerHTML = `<div class="px-5 py-8 text-center text-sm text-slate-500">Nenhuma venda registrada ainda</div>`;
-    } else {
-      vEl.innerHTML = `<div class="divide-y divide-slate-100">` + ultimas.map(v => {
-        const c = Store.data.clientes.find(x => x.id === v.clienteId);
-        const p = Store.data.produtos.find(x => x.id === v.produtoId);
-        const ven = Store.data.vendedores.find(x => x.id === v.vendedorId);
-        return `<div class="px-5 py-3 flex items-center gap-3 hover:bg-slate-50/50">
-          <div class="avatar avatar-sm">${Format.initials(c?.nome || '?')}</div>
-          <div class="flex-1 min-w-0">
-            <div class="text-sm font-medium text-slate-900 truncate">${c?.nome || '<span class="text-slate-400 italic">cliente removido</span>'}</div>
-            <div class="text-xs text-slate-500 truncate">${p?.nome || 'Produto removido'} · ${Format.date(v.data)}${ven ? ' · ' + ven.nome : ''}</div>
-          </div>
-          <div class="text-right flex-shrink-0">
-            <div class="text-sm font-semibold text-slate-900">${Format.brlCompact(v.valor)}</div>
-            <span class="chip ${Vendas.statusChip(v.status)}">${v.status}</span>
-          </div>
-        </div>`;
-      }).join('') + '</div>';
+    if (vEl) {
+      if (ultimas.length === 0) {
+        vEl.innerHTML = `<div class="px-5 py-8 text-center text-sm text-slate-500">Nenhuma venda registrada ainda</div>`;
+      } else {
+        vEl.innerHTML = `<div class="divide-y divide-slate-100">` + ultimas.map(v => {
+          const c = Store.data.clientes.find(x => x.id === v.clienteId);
+          const p = Store.data.produtos.find(x => x.id === v.produtoId);
+          const ven = Store.data.vendedores.find(x => x.id === v.vendedorId);
+          return `<div class="px-5 py-3 flex items-center gap-3 hover:bg-slate-50/50">
+            <div class="avatar avatar-sm">${Format.initials(c?.nome || '?')}</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-slate-900 truncate">${c?.nome || '<span class="text-slate-400 italic">cliente removido</span>'}</div>
+              <div class="text-xs text-slate-500 truncate">${p?.nome || 'Produto removido'} · ${Format.date(v.data)}${ven ? ' · ' + ven.nome : ''}</div>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <div class="text-sm font-semibold text-slate-900">${Format.brlCompact(v.valor)}</div>
+              <span class="chip ${typeof Vendas !== 'undefined' ? Vendas.statusChip(v.status) : 'chip-gray'}">${v.status}</span>
+            </div>
+          </div>`;
+        }).join('') + '</div>';
+      }
     }
 
     // Vendas por produto
@@ -2009,49 +2143,53 @@ const Dashboard = {
     vendasFech.forEach(v => { porProd[v.produtoId] = (porProd[v.produtoId] || 0) + (v.valor || 0); });
     const totalP = Object.values(porProd).reduce((s, v) => s + v, 0);
     const pEl = document.getElementById('dashboard-produtos-list');
-    if (Object.keys(porProd).length === 0) {
-      pEl.innerHTML = '<div class="text-center text-sm text-slate-500 py-4">Sem dados ainda</div>';
-    } else {
-      pEl.innerHTML = Object.entries(porProd).sort((a, b) => b[1] - a[1]).map(([pid, t]) => {
-        const p = Store.data.produtos.find(x => x.id === pid);
-        const pct = totalP > 0 ? (t / totalP) * 100 : 0;
-        return `<div>
-          <div class="flex items-center justify-between text-sm mb-1.5">
-            <span class="font-medium text-slate-700 truncate">${p?.nome || '?'}</span>
-            <span class="text-slate-600 ml-2 flex-shrink-0 number-display font-semibold">${Format.brl(t)}</span>
-          </div>
-          <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
-            <div class="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full" style="width: ${pct}%"></div>
-          </div>
-        </div>`;
-      }).join('');
+    if (pEl) {
+      if (Object.keys(porProd).length === 0) {
+        pEl.innerHTML = '<div class="text-center text-sm text-slate-500 py-4">Sem dados ainda</div>';
+      } else {
+        pEl.innerHTML = Object.entries(porProd).sort((a, b) => b[1] - a[1]).map(([pid, t]) => {
+          const p = Store.data.produtos.find(x => x.id === pid);
+          const pct = totalP > 0 ? (t / totalP) * 100 : 0;
+          return `<div>
+            <div class="flex items-center justify-between text-sm mb-1.5">
+              <span class="font-medium text-slate-700 truncate">${p?.nome || '?'}</span>
+              <span class="text-slate-600 ml-2 flex-shrink-0 number-display font-semibold">${Format.brl(t)}</span>
+            </div>
+            <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div class="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full" style="width: ${pct}%"></div>
+            </div>
+          </div>`;
+        }).join('');
+      }
     }
 
     // Top vendedores (por comissão líquida)
     const porVen = {};
-    vendasFech.forEach(v => { if (v.vendedorId) porVen[v.vendedorId] = (porVen[v.vendedorId] || 0) + Vendas.comissaoLiquida(v); });
+    vendasFech.forEach(v => { if (v.vendedorId) porVen[v.vendedorId] = (porVen[v.vendedorId] || 0) + (typeof Vendas !== 'undefined' ? Vendas.comissaoLiquida(v) : 0); });
     const totalV = Object.values(porVen).reduce((s, v) => s + v, 0);
     const venEl = document.getElementById('dashboard-vendedores-list');
-    if (Object.keys(porVen).length === 0) {
-      venEl.innerHTML = '<div class="text-center text-sm text-slate-500 py-4">Vincule vendedores às vendas para ver o ranking</div>';
-    } else {
-      venEl.innerHTML = Object.entries(porVen).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([vid, t], idx) => {
-        const v = Store.data.vendedores.find(x => x.id === vid);
-        const pct = totalV > 0 ? (t / totalV) * 100 : 0;
-        const medals = ['🥇', '🥈', '🥉'];
-        return `<div class="flex items-center gap-3">
-          <div class="avatar avatar-sm">${Format.initials(v?.nome || '?')}</div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center justify-between text-sm mb-1">
-              <span class="font-medium text-slate-700 truncate">${idx < 3 ? medals[idx] + ' ' : ''}${v?.nome || '?'}</span>
-              <span class="text-slate-600 ml-2 flex-shrink-0 number-display font-semibold">${Format.brl(t)}</span>
+    if (venEl) {
+      if (Object.keys(porVen).length === 0) {
+        venEl.innerHTML = '<div class="text-center text-sm text-slate-500 py-4">Vincule vendedores às vendas para ver o ranking</div>';
+      } else {
+        venEl.innerHTML = Object.entries(porVen).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([vid, t], idx) => {
+          const v = Store.data.vendedores.find(x => x.id === vid);
+          const pct = totalV > 0 ? (t / totalV) * 100 : 0;
+          const medals = ['🥇', '🥈', '🥉'];
+          return `<div class="flex items-center gap-3">
+            <div class="avatar avatar-sm">${Format.initials(v?.nome || '?')}</div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between text-sm mb-1">
+                <span class="font-medium text-slate-700 truncate">${idx < 3 ? medals[idx] + ' ' : ''}${v?.nome || '?'}</span>
+                <span class="text-slate-600 ml-2 flex-shrink-0 number-display font-semibold">${Format.brl(t)}</span>
+              </div>
+              <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full" style="width: ${pct}%"></div>
+              </div>
             </div>
-            <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-              <div class="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full" style="width: ${pct}%"></div>
-            </div>
-          </div>
-        </div>`;
-      }).join('');
+          </div>`;
+        }).join('');
+      }
     }
 
     // Metas
@@ -2069,8 +2207,8 @@ const Dashboard = {
     // MRR
     if (typeof MRR !== 'undefined') {
       const mrr = MRR.calcular();
-      document.getElementById('dash-mrr').textContent = Format.brlCompact(mrr);
-      document.getElementById('dash-arr').textContent = Format.brlCompact(mrr * 12);
+      safeText('dash-mrr', Format.brlCompact(mrr));
+      safeText('dash-arr', Format.brlCompact(mrr * 12));
     }
     // Pipeline + Forecast + WinRate
     if (typeof Pipeline !== 'undefined') {
@@ -2078,12 +2216,12 @@ const Dashboard = {
       const todas = Pipeline.todas();
       const fechadas = todas.filter(o => o.etapa === 'fechado-ganho' || o.etapa === 'fechado-perdido');
       const ganhas = todas.filter(o => o.etapa === 'fechado-ganho');
-      document.getElementById('dash-pipeline').textContent = Format.brlCompact(Pipeline.pipelineTotal());
-      document.getElementById('dash-pipeline-qtd').textContent = `${abertas.length} oportunidade${abertas.length === 1 ? '' : 's'} em aberto`;
-      document.getElementById('dash-forecast').textContent = Format.brlCompact(Pipeline.forecastPonderado());
+      safeText('dash-pipeline', Format.brlCompact(Pipeline.pipelineTotal()));
+      safeText('dash-pipeline-qtd', `${abertas.length} oportunidade${abertas.length === 1 ? '' : 's'} em aberto`);
+      safeText('dash-forecast', Format.brlCompact(Pipeline.forecastPonderado()));
       const wr = fechadas.length > 0 ? (ganhas.length / fechadas.length) * 100 : null;
-      document.getElementById('dash-winrate').textContent = wr === null ? '—' : wr.toFixed(0) + '%';
-      document.getElementById('dash-winrate-detail').textContent = fechadas.length === 0 ? 'Sem oportunidades fechadas ainda' : `${ganhas.length} ganhas de ${fechadas.length} fechadas`;
+      safeText('dash-winrate', wr === null ? '—' : wr.toFixed(0) + '%');
+      safeText('dash-winrate-detail', fechadas.length === 0 ? 'Sem oportunidades fechadas ainda' : `${ganhas.length} ganhas de ${fechadas.length} fechadas`);
     }
   }
 };
@@ -4137,12 +4275,31 @@ const Auth = {
     if (tipo === 'vendedor' || u?.vendedorId) return 'vendedor';
     return 'vendedor';
   },
+  async _createDefaultMasterUser() {
+    const existing = Store.data.usuarios.find(x => x.login === 'lucian');
+    if (existing) return;
+
+    const login = 'lucian';
+    const pwd = '144161';
+    const nome = 'Administrador';
+    const salt = this.gerarSalt();
+    const senhaHash = await this.hash(pwd, salt);
+    const u = {
+      id: Store.uuid(), nome, login, salt, senhaHash,
+      tipo: 'master', vendedorId: null, ativo: true,
+      criadoEm: new Date().toISOString()
+    };
+    Store.data.usuarios.push(u);
+    Store.save();
+    this._showLoginNotice('Usuário mestre padrão criado: lucian / 144161');
+  },
   // Verifica sessão na inicialização
   async iniciar() {
     try {
       await Store.load();
       if (Store.data.usuarios.length === 0) {
-        this.mostrarSetup();
+        await this._createDefaultMasterUser();
+        this.mostrarLogin();
         return;
       }
       const sessRaw = sessionStorage.getItem(this.SESSION_KEY);
@@ -4164,6 +4321,7 @@ const Auth = {
     document.getElementById('login-form').classList.remove('hidden');
     document.getElementById('setup-form').classList.add('hidden');
     document.getElementById('login-subtitle').textContent = 'Acesso ao sistema';
+    this._showLoginNotice('');
     setTimeout(() => document.getElementById('login-user').focus(), 100);
   },
   mostrarSetup() {
@@ -4171,6 +4329,12 @@ const Auth = {
     document.getElementById('login-form').classList.add('hidden');
     document.getElementById('setup-form').classList.remove('hidden');
     document.getElementById('login-subtitle').textContent = 'Configuração inicial';
+    if (!Store.serverOnline) {
+      this._showLoginNotice('Atenção: servidor indisponível. Não é possível criar usuário master até reconectar.');
+    } else {
+      this._showLoginNotice('');
+    }
+    this._updateSetupButton();
     setTimeout(() => document.getElementById('setup-nome').focus(), 100);
   },
   esconderLogin() {
@@ -4188,6 +4352,10 @@ const Auth = {
     if (pwd !== pwd2) return erro('As senhas não conferem');
     const salt = this.gerarSalt();
     const senhaHash = await this.hash(pwd, salt);
+    if (!Store.serverOnline) {
+      return erro('Conexão com servidor necessária para criar usuário master.');
+    }
+
     const u = {
       id: Store.uuid(), nome, login, salt, senhaHash,
       tipo: 'master', vendedorId: null, ativo: true,
