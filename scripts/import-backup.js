@@ -32,13 +32,21 @@ try {
   process.exit(1);
 }
 
-const dbPath = path.resolve(__dirname, '..', 'crm_database.sqlite');
+const payload = data && typeof data === 'object' && data.data && typeof data.data === 'object' ? data.data : data;
+const isEnergiaBackup = payload && typeof payload === 'object' && Array.isArray(payload.clientes) && Array.isArray(payload.produtos) && Array.isArray(payload.vendas);
+const dbFileName = isEnergiaBackup ? 'energia_database.sqlite' : 'crm_database.sqlite';
+const dbPath = path.resolve(__dirname, '..', dbFileName);
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Error opening DB:', err.message);
     process.exit(1);
   }
 });
+
+if (isEnergiaBackup) {
+  console.log('Detected Energia backup. Importing into energia_database.sqlite');
+}
+
 
 function runAsync(sql, params=[]) {
   return new Promise((resolve, reject) => db.run(sql, params, function(err) {
@@ -56,31 +64,42 @@ function allAsync(sql, params=[]) {
 
 (async () => {
   try {
-    const collections = Object.keys(data).filter(k => Array.isArray(data[k]));
-    if (collections.length === 0) {
-      console.error('No top-level arrays found in backup JSON. Found keys:', Object.keys(data));
-      process.exit(1);
-    }
-
-    console.log('Collections to import:', collections.join(', '));
-
-    await runAsync('BEGIN');
-
-    for (const col of collections) {
-      const rows = data[col];
-      if (!Array.isArray(rows)) continue;
-
-      if (clearFlag) {
-        console.log(`Clearing existing rows for collection '${col}'`);
-        await runAsync('DELETE FROM documents WHERE collection = ?', [col]);
+    if (isEnergiaBackup) {
+      console.log('Importing Energia backup into energia_database.sqlite');
+      await runAsync('BEGIN');
+      await runAsync('DELETE FROM documents WHERE collection = ?', ['energia-data']);
+      await runAsync('INSERT INTO documents (collection, payload) VALUES (?, ?)', ['energia-data', JSON.stringify(payload)]);
+      await runAsync('COMMIT');
+      console.log('Energia backup imported successfully.');
+    } else {
+      const collections = Object.keys(payload).filter(k => Array.isArray(payload[k]));
+      if (collections.length === 0) {
+        console.error('No top-level arrays found in backup JSON. Found keys:', Object.keys(payload));
+        process.exit(1);
       }
 
-      console.log(`Inserting ${rows.length} rows into '${col}'`);
-      for (const item of rows) {
-        // store original object as payload; keep original id inside payload if present
-        const payload = JSON.stringify(item);
-        await runAsync('INSERT INTO documents (collection, payload) VALUES (?, ?)', [col, payload]);
+      console.log('Collections to import:', collections.join(', '));
+
+      await runAsync('BEGIN');
+
+      for (const col of collections) {
+        const rows = payload[col];
+        if (!Array.isArray(rows)) continue;
+
+        if (clearFlag) {
+          console.log(`Clearing existing rows for collection '${col}'`);
+          await runAsync('DELETE FROM documents WHERE collection = ?', [col]);
+        }
+
+        console.log(`Inserting ${rows.length} rows into '${col}'`);
+        for (const item of rows) {
+          // store original object as payload; keep original id inside payload if present
+          const itemPayload = JSON.stringify(item);
+          await runAsync('INSERT INTO documents (collection, payload) VALUES (?, ?)', [col, itemPayload]);
+        }
       }
+
+      await runAsync('COMMIT');
     }
 
     await runAsync('COMMIT');

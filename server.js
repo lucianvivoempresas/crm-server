@@ -1460,6 +1460,22 @@ app.delete('/api/:collection/:id', requireAuth, (req, res) => {
 });
 
 /**
+function normalizeImportBackupPayload(body) {
+    if (!body || typeof body !== 'object') return null;
+    if (body.data && typeof body.data === 'object' && !Array.isArray(body.data)) {
+        return body.data;
+    }
+    return body;
+}
+
+function isEnergiaBackupPayload(payload) {
+    return payload && typeof payload === 'object' &&
+        Array.isArray(payload.clientes) &&
+        Array.isArray(payload.produtos) &&
+        Array.isArray(payload.vendas);
+}
+
+/**
  * POST /api/import-backup
  * Importa um backup JSON enviado no corpo da requisição.
  * Protegido: requer token e perfil `master`.
@@ -1468,10 +1484,40 @@ app.delete('/api/:collection/:id', requireAuth, (req, res) => {
 app.post('/api/import-backup', requireAuth, requireMaster, async (req, res) => {
     try {
         const clear = String(req.query.clear || '').toLowerCase() === 'true';
-        const payload = req.body;
+        const payload = normalizeImportBackupPayload(req.body);
 
         if (!payload || typeof payload !== 'object') {
             return res.status(400).json({ success: false, error: 'Corpo inválido: JSON esperado.' });
+        }
+
+        if (isEnergiaBackupPayload(payload)) {
+            console.log('📡 [energia] Importando backup do CRM Energia para energia_database.sqlite');
+            energiaDb.serialize(() => {
+                energiaDb.run('BEGIN TRANSACTION');
+                energiaDb.run('DELETE FROM documents WHERE collection = ?', ['energia-data'], (deleteErr) => {
+                    if (deleteErr) {
+                        energiaDb.run('ROLLBACK');
+                        console.error('❌ Erro ao limpar energia-data antes de importar backup:', deleteErr.message);
+                        return res.status(500).json({ success: false, error: deleteErr.message });
+                    }
+
+                    energiaDb.run(
+                        'INSERT INTO documents (collection, payload) VALUES (?, ?)',
+                        ['energia-data', JSON.stringify(payload)],
+                        function(insertErr) {
+                            if (insertErr) {
+                                energiaDb.run('ROLLBACK');
+                                console.error('❌ Erro ao inserir energia-data durante importação:', insertErr.message);
+                                return res.status(500).json({ success: false, error: insertErr.message });
+                            }
+
+                            energiaDb.run('COMMIT');
+                            return res.json({ success: true, importedCollections: 1, id: this.lastID });
+                        }
+                    );
+                });
+            });
+            return;
         }
 
         // Proteção: limitar número de coleções e total aproximado de registros
