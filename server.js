@@ -1362,6 +1362,44 @@ app.delete('/api/energia-data/:id', (req, res) => {
     );
 });
 
+/**
+ * POST /api/energia-import-backup
+ * Importa backup do CRM Energia diretamente no banco energia_database.sqlite.
+ * Este endpoint não exige autenticação, pois é usado pela interface local.
+ */
+app.post('/api/energia-import-backup', (req, res) => {
+    const payload = normalizeImportBackupPayload(req.body);
+    if (!isEnergiaBackupPayload(payload)) {
+        return res.status(400).json({ success: false, error: 'Backup inválido para CRM Energia.' });
+    }
+
+    energiaDb.serialize(() => {
+        energiaDb.run('BEGIN TRANSACTION');
+        energiaDb.run('DELETE FROM documents WHERE collection = ?', ['energia-data'], (deleteErr) => {
+            if (deleteErr) {
+                energiaDb.run('ROLLBACK');
+                console.error('❌ Erro ao limpar energia-data antes de importação:', deleteErr.message);
+                return res.status(500).json({ success: false, error: deleteErr.message });
+            }
+
+            energiaDb.run(
+                'INSERT INTO documents (collection, payload) VALUES (?, ?)',
+                ['energia-data', JSON.stringify(payload)],
+                function(insertErr) {
+                    if (insertErr) {
+                        energiaDb.run('ROLLBACK');
+                        console.error('❌ Erro ao salvar energia-data durante importação:', insertErr.message);
+                        return res.status(500).json({ success: false, error: insertErr.message });
+                    }
+
+                    energiaDb.run('COMMIT');
+                    return res.json({ success: true, id: this.lastID });
+                }
+            );
+        });
+    });
+});
+
 app.get('/api/:collection', requireAuth, (req, res) => {
     const collection = req.params.collection;
     const userId = req.auth.userId;

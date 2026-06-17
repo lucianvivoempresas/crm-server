@@ -5151,13 +5151,39 @@ const Backup = {
         const data = Backup._normalizeImportPayload(rawData);
         if (!data) return;
 
+        let importedByServer = false;
+        try {
+          const response = await fetch('/api/energia-import-backup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(rawData)
+          });
+
+          if (response.ok) {
+            const result = await response.json().catch(() => null);
+            if (!result || !result.success) {
+              throw new Error(result?.error || 'Resposta inesperada do servidor');
+            }
+            importedByServer = true;
+          } else {
+            const bodyText = await response.text();
+            throw new Error(bodyText || `Status ${response.status}`);
+          }
+        } catch (networkError) {
+          console.warn('Falha ao importar backup no servidor:', networkError);
+        }
+
         Store.data = data;
         Store._ensureDefaults();
 
-        const success = await Store.sync();
-        if (!success) {
-          UI.toast('Falha ao salvar no servidor. Verifique a conexão.', 'error');
-          return;
+        if (importedByServer) {
+          const success = await Store.sync();
+          if (!success) {
+            UI.toast('Backup importado no servidor, mas a sincronização falhou.', 'warning');
+          }
+        } else {
+          Store.save();
+          UI.toast('Backup importado localmente. Servidor indisponível.', 'warning');
         }
 
         UI.toast('Backup importado com sucesso!');
