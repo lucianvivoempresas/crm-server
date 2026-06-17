@@ -348,6 +348,92 @@ function parseEnvInt(value, fallback) {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
+function migrateEnergiaDataFromLegacyDb() {
+    return new Promise((resolve) => {
+        if (!fs.existsSync(DB_PATH)) {
+            return resolve();
+        }
+
+        energiaDb.get("SELECT COUNT(*) AS count FROM documents WHERE collection = 'energia-data'", [], (err, row) => {
+            if (err) {
+                console.error('❌ Falha ao verificar energia-data no banco exclusivo:', err.message);
+                return resolve();
+            }
+
+            if (row && row.count > 0) {
+                console.log('ℹ️ Banco exclusivo já contém dados energia-data. Migração não necessária.');
+                return resolve();
+            }
+
+            const sourceDb = new sqlite3.Database(DB_PATH, sqlite3.OPEN_READONLY, (openErr) => {
+                if (openErr) {
+                    console.error('❌ Falha ao abrir banco legado para migração:', openErr.message);
+                    return resolve();
+                }
+
+                sourceDb.all("SELECT id, payload FROM documents WHERE collection = 'energia-data' ORDER BY id ASC", [], (queryErr, rows) => {
+                    if (queryErr) {
+                        console.error('❌ Falha ao ler dados de energia do banco legado:', queryErr.message);
+                        sourceDb.close();
+                        return resolve();
+                    }
+
+                    sourceDb.close();
+                    const parsedRows = rows
+                        .map(r => {
+                            try {
+                                return { id: r.id, payload: JSON.parse(r.payload) };
+                            } catch (e) {
+                                console.warn('⚠️ Payload inválido na migração de energia:', e.message);
+                                return null;
+                            }
+                        })
+                        .filter(Boolean);
+
+                    const chunkRows = parsedRows.filter(r => r.payload && r.payload.chunked === true && typeof r.payload.chunkIndex === 'number' && typeof r.payload.data === 'string');
+                    let validData = null;
+
+                    if (chunkRows.length > 0) {
+                        const ordered = chunkRows.sort((a, b) => a.payload.chunkIndex - b.payload.chunkIndex);
+                        const fullString = ordered.map(r => r.payload.data).join('');
+                        try {
+                            validData = JSON.parse(fullString);
+                        } catch (e) {
+                            console.warn('⚠️ Falha ao montar chunks de energia do banco legado:', e.message);
+                        }
+                    }
+
+                    if (!validData) {
+                        const normalRows = parsedRows.filter(r => !r.payload || r.payload.chunked !== true);
+                        const latest = normalRows.sort((a, b) => b.id - a.id)[0];
+                        if (latest && latest.payload && typeof latest.payload === 'object') {
+                            validData = latest.payload;
+                        }
+                    }
+
+                    if (!validData) {
+                        console.log('ℹ️ Nenhum dado válido de energia encontrado no banco legado para migrar.');
+                        return resolve();
+                    }
+
+                    energiaDb.run(
+                        "INSERT INTO documents (collection, payload) VALUES (?, ?)",
+                        ['energia-data', JSON.stringify(validData)],
+                        function(insertErr) {
+                            if (insertErr) {
+                                console.error('❌ Falha ao migrar dados de energia para o banco exclusivo:', insertErr.message);
+                            } else {
+                                console.log('✅ Dados de energia migrados do banco legado para energia_database.sqlite (id:', this.lastID, ')');
+                            }
+                            resolve();
+                        }
+                    );
+                });
+            });
+        });
+    });
+}
+
 function delay(ms) {
     if (!ms || ms <= 0) {
         return Promise.resolve();
@@ -1081,7 +1167,7 @@ app.post('/api/clientes/bulk-upsert', requireAuth, (req, res) => {
 app.get('/api/energia-data', (req, res) => {
     console.log('📡 [energia] GET /api/energia-data recebido');
     energiaDb.all(
-        "SELECT id, payload FROM documents WHERE collection = 'energia-data'",
+        "SELECT id, payload FROM documents WHERE collection = 'energia-data' ORDER BY id ASC",
         [],
         (err, rows) => {
             if (err) {
@@ -1114,10 +1200,13 @@ app.get('/api/energia-data', (req, res) => {
                 }
             }
 
-            const data = parsedRows
-                .map(row => ({ id: row.id, ...row.payload }))
-                .filter(Boolean);
-            res.json(data);
+            const normalRows = parsedRows.filter(row => !row.payload || row.payload.chunked !== true);
+            const latest = normalRows.sort((a, b) => b.id - a.id)[0];
+            if (!latest) {
+                return res.json([]);
+            }
+
+            return res.json([{ id: latest.id, ...latest.payload }]);
         }
     );
 });
@@ -1172,10 +1261,10 @@ app.post('/api/energia-data', (req, res) => {
     const payload = JSON.stringify(req.body);
     energiaDb.serialize(() => {
         energiaDb.run(
-            "DELETE FROM documents WHERE collection = 'energia-data' AND payload LIKE '%\"chunked\":true%'",
+            "DELETE FROM documents WHERE collection = 'energia-data'",
             (deleteErr) => {
                 if (deleteErr) {
-                    console.error('❌ Erro ao limpar chunks antigos antes de salvar energia-data:', deleteErr.message);
+                    console.error('❌ Erro ao limpar energia-data antes de salvar:', deleteErr.message);
                     return res.status(500).json({ error: deleteErr.message });
                 }
 
@@ -1220,6 +1309,32 @@ app.put('/api/energia-data/:id', (req, res) => {
                             console.error('❌ Erro ao atualizar dados de energia:', err.message);
                             return res.status(500).json({ error: err.message });
                         }
+
+                        if (this.changes === 0) {
+                            console.log('ℹ️ Registro de energia não encontrado para update; criando novo registro.');
+                            energiaDb.run(
+                                "DELETE FROM documents WHERE collection = 'energia-data'",
+                                (clearErr) => {
+                                    if (clearErr) {
+                                        console.error('❌ Erro ao limpar energia-data antes de recrear:', clearErr.message);
+                                        return res.status(500).json({ error: clearErr.message });
+                                    }
+                                    energiaDb.run(
+                                        "INSERT INTO documents (collection, payload) VALUES (?, ?)",
+                                        ['energia-data', payload],
+                                        function(insertErr) {
+                                            if (insertErr) {
+                                                console.error('❌ Erro ao recriar dados de energia:', insertErr.message);
+                                                return res.status(500).json({ error: insertErr.message });
+                                            }
+                                            res.json({ success: true, id: this.lastID });
+                                        }
+                                    );
+                                }
+                            );
+                            return;
+                        }
+
                         res.json({ success: true });
                     }
                 );
@@ -1696,12 +1811,13 @@ function startServer() {
 }
 
 Promise.all([dbReady, energiaDbReady])
+    .then(() => migrateEnergiaDataFromLegacyDb())
     .then(() => {
-        console.log('✅ Todos os bancos de dados foram inicializados com sucesso.');
+        console.log('✅ Todos os bancos de dados foram inicializados e a migração foi concluída.');
         startServer();
     })
     .catch((err) => {
-        console.error('❌ Não foi possível inicializar todos os bancos de dados:', err.message || err);
+        console.error('❌ Não foi possível inicializar todos os bancos de dados ou concluir a migração:', err.message || err);
         console.error('⚠️ O servidor ainda será iniciado, mas algumas funcionalidades podem não funcionar corretamente.');
         startServer();
     });

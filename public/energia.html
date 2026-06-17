@@ -1734,9 +1734,9 @@ const Store = {
   },
 
   save() {
-    this._saveLocalCache();
     if (!this.serverOnline) {
       this._markServerOffline('Sem conexão com servidor. Dados salvos localmente.');
+      this._saveLocalCache();
       return true;
     }
 
@@ -1780,38 +1780,50 @@ const Store = {
           },
           body: payload
         });
+
         if (response.ok) {
+          const result = await response.json().catch(() => null);
+          if (result && result.id) {
+            this.serverDocId = result.id;
+          }
           console.log('✅ Dados de energia sincronizados com servidor');
           this.serverOnline = true;
           this.syncFailureReported = false;
           this.clearLocalCache();
           return true;
+        }
+
+        console.warn('⚠️ PUT falhou ao sincronizar: ' + response.status);
+        if (response.status === 404 || response.status === 410) {
+          console.log('ℹ️ Documento de energia não encontrado no servidor. Registrando um novo documento.');
+          this.serverDocId = null;
         } else {
-          console.warn('⚠️ Erro ao sincronizar: ' + response.status);
           this._saveLocalCache();
           return false;
         }
-      } else {
-        const response = await fetch(`/api/energia-data`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: payload
-        });
-        if (response.ok) {
-          const result = await response.json();
-          this.serverOnline = true;
-          this.syncFailureReported = false;
+      }
+
+      const response = await fetch(`/api/energia-data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: payload
+      });
+      if (response.ok) {
+        const result = await response.json();
+        this.serverOnline = true;
+        this.syncFailureReported = false;
+        if (result && result.id) {
           this.serverDocId = result.id;
-          this.clearLocalCache();
           console.log('✅ Dados de energia salvos no servidor com ID:', result.id);
-          return true;
-        } else {
-          console.warn('⚠️ Erro ao salvar: ' + response.status);
-          this._saveLocalCache();
-          return false;
         }
+        this.clearLocalCache();
+        return true;
+      } else {
+        console.warn('⚠️ Erro ao salvar: ' + response.status);
+        this._saveLocalCache();
+        return false;
       }
     } catch (e) {
       console.error('❌ Erro ao sincronizar com servidor:', e.message || e);
