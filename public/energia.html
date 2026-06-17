@@ -1624,10 +1624,11 @@ const Store = {
       if (Array.isArray(data) && data.length > 0) {
         // Selecionar somente documentos válidos (com a estrutura esperada);
         // ignora documentos legacy/teste como {"test": true} que poluam o GET.
-        const validos = data.filter(d => d && (Array.isArray(d.clientes) || Array.isArray(d.produtos) || Array.isArray(d.vendas) || Array.isArray(d.usuarios)));
+        const normalizados = data.map(d => this._normalizeLoadedData(d));
+        const validos = normalizados.filter(d => d && (Array.isArray(d.clientes) || Array.isArray(d.produtos) || Array.isArray(d.vendas) || Array.isArray(d.usuarios)));
         const escolhido = validos.length > 0 ? validos[validos.length - 1] : null;
         if (escolhido) {
-          this.data = escolhido;
+          this.data = Store._normalizeLoadedData(escolhido);
           this.serverDocId = escolhido.id;
           this._saveLocalCache();
         } else {
@@ -1654,7 +1655,7 @@ const Store = {
         if (typeof UI !== 'undefined') {
           UI.toast('Servidor de energia indisponível. Usando dados locais salvos.', 'warning');
         }
-        this.data = cached.data;
+        this.data = Store._normalizeLoadedData(cached.data);
         this.serverDocId = cached.serverDocId;
       }
     }
@@ -1687,6 +1688,9 @@ const Store = {
   },
 
   _ensureDefaults() {
+    if (this.data && typeof this.data === 'object' && !Array.isArray(this.data) && this.data.data && typeof this.data.data === 'object' && !Array.isArray(this.data.data)) {
+      this.data = this.data.data;
+    }
     if (!this.data || typeof this.data !== 'object') this.data = {};
     this.data.clientes = this.data.clientes || [];
     this.data.produtos = this.data.produtos || [];
@@ -1723,6 +1727,18 @@ const Store = {
   _getToken() {
     // Endpoints de energia não requerem token
     return '';
+  },
+
+  _normalizeLoadedData(data) {
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+        return this._normalizeLoadedData(data.data);
+      }
+      if (data.payload && typeof data.payload === 'object' && !Array.isArray(data.payload)) {
+        return this._normalizeLoadedData(data.payload);
+      }
+    }
+    return data;
   },
 
   _markServerOffline(message) {
