@@ -1223,7 +1223,12 @@ app.get('/api/energia-data', (req, res) => {
                     return res.json([{ id: ordered[0].id, ...parsed }]);
                 } catch (e) {
                     console.error('❌ Erro ao montar chunks de energia-data:', e.message);
-                    return res.status(500).json({ error: 'Erro ao montar chunks de energia-data.' });
+                    const normalRowsFallback = parsedRows.filter(row => !row.payload || row.payload.chunked !== true);
+                    const latestFallback = normalRowsFallback.sort((a, b) => b.id - a.id)[0];
+                    if (latestFallback && latestFallback.payload && typeof latestFallback.payload === 'object' && !Array.isArray(latestFallback.payload)) {
+                        return res.json([{ id: latestFallback.id, ...latestFallback.payload }]);
+                    }
+                    return res.json([]);
                 }
             }
 
