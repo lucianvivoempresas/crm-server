@@ -148,7 +148,7 @@
   @keyframes modalIn { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
 
   /* Toast */
-  .toast { animation: toastIn 0.25s ease, toastOut 0.3s ease 2.7s forwards; }
+  .toast { animation: toastIn 0.25s ease; }
   @keyframes toastIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
   @keyframes toastOut { to { opacity: 0; transform: translateX(20px); } }
 
@@ -1706,7 +1706,7 @@ const Store = {
   _markServerOffline(message) {
     this.serverOnline = false;
     if (!this.syncFailureReported && typeof UI !== 'undefined') {
-      UI.toast(message || 'Servidor indisponível. Dados salvos localmente.', 'warning');
+      UI.toast(message || 'Servidor indisponível. Nada foi salvo no banco.', 'warning', 8000);
       this.syncFailureReported = true;
     }
   },
@@ -1719,7 +1719,7 @@ const Store = {
 
     this._syncToServer().then(success => {
       if (!success) {
-        this._markServerOffline('Servidor indisponível. Dados salvos localmente.');
+        this._markServerOffline('Servidor indisponível. Nada foi salvo no banco.');
       }
     });
     return true;
@@ -2001,22 +2001,24 @@ const UI = {
     sb.classList.toggle('open', open);
     ov.classList.toggle('open', open);
   },
-  toast(msg, type = 'success') {
+  toast(msg, type = 'success', duration = 3000) {
     const colors = {
       success: 'bg-emerald-600 border-emerald-700',
       error: 'bg-red-600 border-red-700',
-      info: 'bg-blue-600 border-blue-700'
+      info: 'bg-blue-600 border-blue-700',
+      warning: 'bg-amber-600 border-amber-700'
     };
     const icons = {
       success: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>',
       error: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>',
-      info: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01"/></svg>'
+      info: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01"/></svg>',
+      warning: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>'
     };
     const el = document.createElement('div');
-    el.className = `toast ${colors[type]} text-white px-4 py-3 rounded-xl shadow-2xl text-sm max-w-sm flex items-center gap-2 border`;
-    el.innerHTML = `${icons[type]}<span>${msg}</span>`;
+    el.className = `toast ${colors[type] || colors.info} text-white px-4 py-3 rounded-xl shadow-2xl text-sm max-w-sm flex items-center gap-2 border`;
+    el.innerHTML = `${icons[type] || icons.info}<span>${msg}</span>`;
     document.getElementById('toast-container').appendChild(el);
-    setTimeout(() => el.remove(), 3000);
+    setTimeout(() => el.remove(), duration);
   },
   confirm(titulo, mensagem, onConfirm) {
     document.getElementById('confirm-titulo').textContent = titulo;
@@ -5162,52 +5164,43 @@ const Backup = {
     if (!file) return;
     event.target.value = '';
 
-    UI.confirm('Importar Backup', 'Isso vai substituir todos os dados atuais. Continuar?', async () => {
+    UI.confirm('Importar Backup', 'Isso vai substituir todos os dados atuais no banco. Continuar?', async () => {
       try {
         const text = await Backup._readFile(file);
         const rawData = JSON.parse(text);
         const data = Backup._normalizeImportPayload(rawData);
         if (!data) return;
 
-        let importedByServer = false;
-        try {
-          const response = await fetch('/api/energia-import-backup', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(rawData)
-          });
-
-          if (response.ok) {
-            const result = await response.json().catch(() => null);
-            if (!result || !result.success) {
-              throw new Error(result?.error || 'Resposta inesperada do servidor');
-            }
-            importedByServer = true;
-          } else {
-            const bodyText = await response.text();
-            throw new Error(bodyText || `Status ${response.status}`);
-          }
-        } catch (networkError) {
-          console.warn('Falha ao importar backup no servidor:', networkError);
+        const response = await fetch('/api/energia-import-backup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(rawData)
+        });
+        const resultText = await response.text();
+        let result = null;
+        try { result = resultText ? JSON.parse(resultText) : null; } catch (e) {}
+        if (!response.ok || !result || result.success !== true) {
+          throw new Error(result?.error || resultText || `Servidor retornou ${response.status}`);
         }
 
         Store.data = data;
         Store._ensureDefaults();
+        Store.serverDocId = result.id || Store.serverDocId;
+        Store.serverOnline = true;
+        Store.syncFailureReported = false;
 
-        if (importedByServer) {
-          const success = await Store.sync();
-          if (!success) {
-            UI.toast('Backup importado no servidor, mas a sincronização falhou.', 'warning');
-          }
-        } else {
-          Store.save();
-          UI.toast('Backup importado localmente. Servidor indisponível.', 'warning');
+        if (Auth.current) {
+          const current = Store.data.usuarios.find(u => u.id === Auth.current.id || u.login === Auth.current.login);
+          if (current) Auth.current = current;
         }
 
-        UI.toast('Backup importado com sucesso!');
-        location.reload();
+        UI.toast('Backup importado com sucesso no banco de dados.', 'success', 8000);
+        UI.switchTab('dashboard');
       } catch (err) {
-        UI.toast(`Erro ao importar backup: ${err.message || err}`, 'error');
+        const message = `Erro ao importar backup: ${err.message || err}`;
+        console.error(message, err);
+        UI.toast(message, 'error', 12000);
+        alert(message);
       }
     });
   },
