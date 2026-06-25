@@ -646,11 +646,12 @@
     <!-- CLIENTES -->
     <section id="panel-clientes" class="panel hidden">
       <div class="card overflow-hidden">
-        <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-3">
+        <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div class="flex-1 relative ring-focus rounded-lg border border-slate-300 px-3 py-2 flex items-center gap-2 bg-white">
             <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             <input id="cliente-busca" type="text" placeholder="Buscar por nome, CPF/CNPJ, telefone ou email..." class="flex-1 outline-none text-sm placeholder-slate-400" />
           </div>
+          <button onclick="Clientes.openModal()" class="btn-primary whitespace-nowrap">Novo Cliente</button>
         </div>
         <div id="clientes-lista"></div>
       </div>
@@ -689,17 +690,20 @@
     <!-- VENDAS -->
     <section id="panel-vendas" class="panel hidden">
       <div class="card overflow-hidden">
-        <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-3">
+        <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div class="flex-1 relative ring-focus rounded-lg border border-slate-300 px-3 py-2 flex items-center gap-2 bg-white">
             <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
             <input id="venda-busca" type="text" placeholder="Buscar por cliente ou produto..." class="flex-1 outline-none text-sm placeholder-slate-400" />
           </div>
-          <select id="venda-filtro-status" class="select sm:w-44">
-            <option value="">Todos os status</option>
-            <option value="pendente">Pendente</option>
-            <option value="fechada">Fechada</option>
-            <option value="cancelada">Cancelada</option>
-          </select>
+          <div class="flex items-center gap-3">
+            <select id="venda-filtro-status" class="select sm:w-44">
+              <option value="">Todos os status</option>
+              <option value="pendente">Pendente</option>
+              <option value="fechada">Fechada</option>
+              <option value="cancelada">Cancelada</option>
+            </select>
+            <button onclick="Vendas.openModal()" class="btn-primary whitespace-nowrap">Nova Venda</button>
+          </div>
         </div>
         <div id="vendas-lista"></div>
       </div>
@@ -2955,12 +2959,6 @@ const Vendas = {
     UI.openModal('modal-venda-view');
   },
   openModal(id = null) {
-    // Vendedor não pode criar/editar venda — apenas visualizar
-    if (typeof Auth !== 'undefined' && Auth.isVendedor()) {
-      if (id) return this.verDetalhes(id);
-      UI.toast('Apenas o master pode registrar/editar vendas. Use o Pipeline para criar oportunidades.', 'error');
-      return;
-    }
     if (Store.data.clientes.length === 0) { UI.toast('Cadastre ao menos um cliente', 'error'); UI.switchTab('clientes'); return; }
     if (Store.data.produtos.length === 0) { UI.toast('Cadastre ao menos um produto em Configurações', 'error'); UI.switchTab('config'); return; }
     const cs = [...Store.data.clientes].sort((a, b) => a.nome.localeCompare(b.nome));
