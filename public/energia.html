@@ -5171,21 +5171,13 @@ const Backup = {
         const data = Backup._normalizeImportPayload(rawData);
         if (!data) return;
 
-        const response = await fetch('/api/energia-import-backup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(rawData)
-        });
-        const resultText = await response.text();
-        let result = null;
-        try { result = resultText ? JSON.parse(resultText) : null; } catch (e) {}
-        if (!response.ok || !result || result.success !== true) {
-          throw new Error(result?.error || resultText || `Servidor retornou ${response.status}`);
-        }
-
         Store.data = data;
         Store._ensureDefaults();
-        Store.serverDocId = result.id || Store.serverDocId;
+        UI.toast('Enviando backup para o banco em partes...', 'info', 6000);
+        const success = await Store._syncToServerChunked(JSON.stringify(Store.data));
+        if (!success) {
+          throw new Error('Servidor recusou o envio em partes. Verifique os logs do servidor.');
+        }
         Store.serverOnline = true;
         Store.syncFailureReported = false;
 
