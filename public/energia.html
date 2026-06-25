@@ -4344,6 +4344,7 @@ const Auth = {
         return;
       }
       Store.clearLocalState();
+      if (await this.restaurarSessao()) return;
       this.mostrarLogin();
     } catch (e) {
       console.error('Erro ao iniciar autenticacao:', e);
@@ -4373,6 +4374,21 @@ const Auth = {
   },
   esconderLogin() {
     document.getElementById('login-screen').style.display = 'none';
+  },
+  async restaurarSessao() {
+    try {
+      const response = await fetch('/api/energia-session', { cache: 'no-store' });
+      if (!response.ok) return false;
+      const result = await response.json().catch(() => null);
+      if (!result || result.success !== true || !result.usuario) return false;
+      const usuario = Store.data.usuarios.find(u => u.id === result.usuario.id || u.login === result.usuario.login);
+      if (!usuario || usuario.ativo === false) return false;
+      this.aposLogin(usuario, { silent: true });
+      return true;
+    } catch (e) {
+      console.warn('Nao foi possivel restaurar a sessao Energia:', e.message || e);
+      return false;
+    }
   },
   async criarMaster() {
     const nome = document.getElementById('setup-nome').value.trim();
@@ -4408,10 +4424,23 @@ const Auth = {
     if (!u) return erro();
     const h = await this.hash(pwd, u.salt);
     if (h !== u.senhaHash) return erro();
+    try {
+      const response = await fetch('/api/energia-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login, senha: pwd })
+      });
+      if (!response.ok) return erro();
+      const result = await response.json().catch(() => null);
+      if (!result || result.success !== true) return erro();
+    } catch (e) {
+      console.error('Erro ao criar sessao no servidor:', e);
+      return erro();
+    }
     document.getElementById('login-pwd').value = '';
     this.aposLogin(u);
   },
-  aposLogin(u) {
+  aposLogin(u, options = {}) {
     u.tipo = this.normalizarTipo(u);
     this.current = u;
     document.body.classList.remove('role-master', 'role-vendedor');
@@ -4423,7 +4452,7 @@ const Auth = {
     try {
       UI.switchTab('dashboard');
       UI.updateBadges();
-      UI.toast(`Bem-vindo, ${u.nome.split(/\s+/)[0]}!`);
+      if (!options.silent) UI.toast(`Bem-vindo, ${u.nome.split(/\s+/)[0]}!`);
     } catch (e) {
       console.error('Erro ao renderizar apos login:', e);
       UI.toast('Login realizado, mas houve falha ao montar o dashboard.', 'error');
@@ -4431,6 +4460,7 @@ const Auth = {
   },
   sair() {
     UI.confirm('Sair do sistema', 'Deseja realmente encerrar a sessão?', () => {
+      fetch('/api/energia-logout', { method: 'POST' }).catch(() => {});
       this.current = null;
       document.body.classList.remove('role-master', 'role-vendedor');
       this.mostrarLogin();

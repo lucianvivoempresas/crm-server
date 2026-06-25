@@ -54,7 +54,7 @@ const app = express();
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 const TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12h
-const TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || (IS_PROD ? '' : 'dev-only-local-secret');
+const TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || crypto.createHash('sha256').update(`${__dirname}:crm-server-session`).digest('hex');
 
 if (IS_PROD && !TOKEN_SECRET) {
     console.warn('⚠️ AUTH_TOKEN_SECRET não configurado. Defina no ambiente para habilitar autenticação segura.');
@@ -641,6 +641,45 @@ function validarTokenSessao(token) {
     }
 }
 
+function readCookies(req) {
+    const header = req.headers.cookie || '';
+    return header
+        .split(';')
+        .map(part => part.trim())
+        .filter(Boolean)
+        .reduce((acc, part) => {
+            const idx = part.indexOf('=');
+            if (idx > 0) {
+                acc[decodeURIComponent(part.slice(0, idx))] = decodeURIComponent(part.slice(idx + 1));
+            }
+            return acc;
+        }, {});
+}
+
+function setEnergiaSessionCookie(res, token) {
+    const attrs = [
+        `energia_session=${encodeURIComponent(token)}`,
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Lax',
+        `Max-Age=${Math.floor(TOKEN_TTL_MS / 1000)}`
+    ];
+    if (IS_PROD) attrs.push('Secure');
+    res.setHeader('Set-Cookie', attrs.join('; '));
+}
+
+function clearEnergiaSessionCookie(res) {
+    const attrs = [
+        'energia_session=',
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Lax',
+        'Max-Age=0'
+    ];
+    if (IS_PROD) attrs.push('Secure');
+    res.setHeader('Set-Cookie', attrs.join('; '));
+}
+
 function extractBearerToken(req) {
     const authorization = req.get('Authorization') || '';
     if (!authorization.toLowerCase().startsWith('bearer ')) return null;
@@ -744,6 +783,75 @@ function initializeMainDatabase() {
     });
         });
     });
+}
+
+function montarEnergiaPayload(rows) {
+    const parsedRows = (rows || [])
+        .map(row => {
+            try {
+                return { id: row.id, payload: JSON.parse(row.payload) };
+            } catch (e) {
+                console.warn('Payload invalido em energia-data:', e.message);
+                return null;
+            }
+        })
+        .filter(Boolean);
+
+    const normalRows = parsedRows.filter(row => !row.payload || row.payload.chunked !== true);
+    const latest = normalRows.sort((a, b) => b.id - a.id)[0];
+
+    const chunkRows = parsedRows.filter(row => row.payload && row.payload.chunked === true && typeof row.payload.chunkIndex === 'number' && typeof row.payload.data === 'string');
+    if (chunkRows.length > 0) {
+        const ordered = chunkRows.sort((a, b) => a.payload.chunkIndex - b.payload.chunkIndex);
+        const fullString = ordered.map(r => r.payload.data).join('');
+        try {
+            const parsed = JSON.parse(fullString);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                return { id: ordered[0].id, payload: parsed };
+            }
+        } catch (e) {
+            console.warn('Falha ao montar chunks de energia-data:', e.message);
+        }
+    }
+
+    if (latest && latest.payload && typeof latest.payload === 'object' && !Array.isArray(latest.payload)) {
+        return { id: latest.id, payload: latest.payload };
+    }
+
+    return { id: null, payload: {} };
+}
+
+function carregarEnergiaPayload() {
+    return new Promise((resolve, reject) => {
+        energiaDb.all(
+            "SELECT id, payload FROM documents WHERE collection = 'energia-data' ORDER BY id ASC",
+            [],
+            (err, rows) => {
+                if (err) return reject(err);
+                resolve(montarEnergiaPayload(rows));
+            }
+        );
+    });
+}
+
+function normalizarTipoEnergia(usuario) {
+    const tipo = String(usuario?.tipo || '').trim().toLowerCase();
+    if (tipo === 'master') return 'master';
+    if (tipo === 'vendedor' || usuario?.vendedorId) return 'vendedor';
+    return 'vendedor';
+}
+
+function usuarioEnergiaSeguro(usuario) {
+    if (!usuario) return null;
+    return {
+        id: usuario.id,
+        nome: usuario.nome,
+        login: usuario.login,
+        tipo: normalizarTipoEnergia(usuario),
+        vendedorId: usuario.vendedorId || null,
+        ativo: usuario.ativo !== false,
+        chatIdTelegram: usuario.chatIdTelegram || null
+    };
 }
 
 /**
@@ -1186,6 +1294,71 @@ app.post('/api/clientes/bulk-upsert', requireAuth, (req, res) => {
 
 // ============ ENDPOINTS PARA CRM ENERGIA (SEM AUTENTICAÇÃO) ============
 // Estas rotas DEVEM estar ANTES das rotas genéricas /api/:collection para não serem capturadas por elas
+
+app.post('/api/energia-login', async (req, res) => {
+    try {
+        const login = String(req.body?.login || '').trim().toLowerCase();
+        const senha = String(req.body?.senha || '');
+        if (!login || !senha) {
+            return res.status(400).json({ success: false, error: 'Login e senha são obrigatórios.' });
+        }
+
+        const { payload } = await carregarEnergiaPayload();
+        const usuarios = Array.isArray(payload.usuarios) ? payload.usuarios : [];
+        const usuario = usuarios.find(u => String(u.login || '').trim().toLowerCase() === login && u.ativo !== false);
+        if (!usuario || !usuario.salt || !usuario.senhaHash) {
+            clearEnergiaSessionCookie(res);
+            return res.status(401).json({ success: false, error: 'Login ou senha inválidos.' });
+        }
+
+        const senhaHash = crypto.createHash('sha256').update(senha + '::' + usuario.salt).digest('hex');
+        if (senhaHash !== usuario.senhaHash) {
+            clearEnergiaSessionCookie(res);
+            return res.status(401).json({ success: false, error: 'Login ou senha inválidos.' });
+        }
+
+        const tipo = normalizarTipoEnergia(usuario);
+        const token = gerarTokenSessao({ id: usuario.id, perfil: tipo });
+        if (!token) {
+            return res.status(500).json({ success: false, error: 'Servidor sem AUTH_TOKEN_SECRET configurado.' });
+        }
+
+        setEnergiaSessionCookie(res, token);
+        return res.json({ success: true, usuario: usuarioEnergiaSeguro({ ...usuario, tipo }) });
+    } catch (err) {
+        console.error('Erro no login Energia:', err.message);
+        return res.status(500).json({ success: false, error: 'Erro ao autenticar no CRM Energia.' });
+    }
+});
+
+app.get('/api/energia-session', async (req, res) => {
+    try {
+        const token = readCookies(req).energia_session;
+        const session = validarTokenSessao(token);
+        if (!session || !session.userId) {
+            clearEnergiaSessionCookie(res);
+            return res.status(401).json({ success: false, error: 'Sessão expirada.' });
+        }
+
+        const { payload } = await carregarEnergiaPayload();
+        const usuarios = Array.isArray(payload.usuarios) ? payload.usuarios : [];
+        const usuario = usuarios.find(u => u.id === session.userId && u.ativo !== false);
+        if (!usuario) {
+            clearEnergiaSessionCookie(res);
+            return res.status(401).json({ success: false, error: 'Usuário não encontrado.' });
+        }
+
+        return res.json({ success: true, usuario: usuarioEnergiaSeguro(usuario) });
+    } catch (err) {
+        console.error('Erro ao validar sessão Energia:', err.message);
+        return res.status(500).json({ success: false, error: 'Erro ao validar sessão.' });
+    }
+});
+
+app.post('/api/energia-logout', (req, res) => {
+    clearEnergiaSessionCookie(res);
+    res.json({ success: true });
+});
 
 /**
  * GET /api/energia-data
