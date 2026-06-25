@@ -154,6 +154,10 @@ app.get('/energia', noStoreHtml, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'energia.html'));
 });
 
+app.get('/energiavolt', noStoreHtml, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'energia.html'));
+});
+
 app.get('/calculadora', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'calculadora.html'));
 });
