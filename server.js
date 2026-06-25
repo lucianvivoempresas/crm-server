@@ -87,7 +87,8 @@ app.disable('x-powered-by');
 // Permite requisições de outras origens e aumenta limite de tamanho para a importação de Excel
 app.use(cors({
     origin(origin, callback) {
-        if (!origin || allowedOrigins.includes(origin)) {
+        const isLocalDevOrigin = !IS_PROD && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin || '');
+        if (!origin || allowedOrigins.includes(origin) || isLocalDevOrigin) {
             return callback(null, true);
         }
         return callback(new Error('Origem não permitida pelo CORS'));
@@ -131,7 +132,7 @@ if (IS_PROD) {
 app.use(express.static(path.join(__dirname, 'public'), {
     index: false,
     setHeaders(res, filePath) {
-        if (filePath.endsWith('.html')) {
+        if (['.html', '.js', '.css'].includes(path.extname(filePath).toLowerCase())) {
             res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
             res.setHeader('Pragma', 'no-cache');
             res.setHeader('Expires', '0');
