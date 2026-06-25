@@ -1912,7 +1912,7 @@ const Format = {
     v = Number(v) || 0;
     if (Math.abs(v) >= 1000000) return 'R$ ' + (v / 1000000).toFixed(1).replace('.', ',') + 'M';
     if (Math.abs(v) >= 1000) return 'R$ ' + (v / 1000).toFixed(1).replace('.', ',') + 'k';
-    return this.brl(v);
+    return Format.brl(v);
   },
   date(iso) { if (!iso) return ''; const d = new Date(iso + 'T00:00:00'); return d.toLocaleDateString('pt-BR'); },
   dateTime(iso) {
@@ -2085,9 +2085,17 @@ const UI = {
   },
   updateBadges() {
     const badgeClientes = document.getElementById('badge-clientes');
-    if (badgeClientes) badgeClientes.textContent = Store.data.clientes.length;
+    if (badgeClientes) {
+      const totalClientes = typeof Clientes !== 'undefined' && typeof Clientes.dadosVisiveis === 'function'
+        ? Clientes.dadosVisiveis().length
+        : Store.data.clientes.length;
+      badgeClientes.textContent = totalClientes;
+    }
     const badgeVendas = document.getElementById('badge-vendas');
-    if (badgeVendas) badgeVendas.textContent = Store.data.vendas.length;
+    if (badgeVendas) {
+      const totalVendas = typeof Auth !== 'undefined' ? Auth.filtrarVendas(Store.data.vendas).length : Store.data.vendas.length;
+      badgeVendas.textContent = totalVendas;
+    }
     // Pipeline badge
     if (typeof Pipeline !== 'undefined') {
       const ab = Pipeline.abertas().length;
@@ -2138,7 +2146,9 @@ const Dashboard = {
       };
       const ehMaster = typeof Auth === 'undefined' || Auth.isMaster();
       const vendasBase = Array.isArray(Store.data.vendas) ? (typeof Auth !== 'undefined' ? Auth.filtrarVendas(Store.data.vendas) : Store.data.vendas) : [];
-      const clientes = ehMaster ? (Array.isArray(Store.data.clientes) ? Store.data.clientes.length : 0) : new Set(vendasBase.map(v => v.clienteId)).size;
+      const clientes = ehMaster
+        ? (Array.isArray(Store.data.clientes) ? Store.data.clientes.length : 0)
+        : (typeof Clientes !== 'undefined' && typeof Clientes.dadosVisiveis === 'function' ? Clientes.dadosVisiveis().length : new Set(vendasBase.map(v => v.clienteId)).size);
       const vendasFech = vendasBase.filter(v => v.status === 'fechada');
       const fat = vendasFech.reduce((s, v) => s + (v.valor || 0), 0);
       const com = vendasFech.reduce((s, v) => s + (typeof Vendas !== 'undefined' ? Vendas.comissaoLiquida(v) : 0), 0);
@@ -2305,8 +2315,14 @@ const Clientes = {
   filtroAtual: '',
   idsVisiveis() {
     if (typeof Auth === 'undefined' || Auth.isMaster()) return null;
+    const vid = Auth.vendedorIdAtual();
     const vendas = Auth.filtrarVendas(Store.data.vendas);
-    return new Set(vendas.map(v => v.clienteId).filter(Boolean));
+    const ids = new Set(vendas.map(v => v.clienteId).filter(Boolean));
+    Store.data.clientes.forEach(c => {
+      const owner = c.vendedorId ?? c.vendedor_id;
+      if (owner != null && vid != null && String(owner) === String(vid)) ids.add(c.id);
+    });
+    return ids;
   },
   dadosVisiveis() {
     const ids = this.idsVisiveis();
@@ -2466,6 +2482,7 @@ const Clientes = {
       endereco: document.getElementById('cliente-endereco').value.trim(),
       origem: document.getElementById('cliente-origem').value || null,
       indicadoPor: document.getElementById('cliente-origem').value === 'indicacao' ? (document.getElementById('cliente-indicado-por').value || null) : null,
+      vendedorId: existente ? (existente.vendedorId ?? existente.vendedor_id ?? null) : (typeof Auth !== 'undefined' && Auth.isVendedor() ? Auth.vendedorIdAtual() : null),
       primeiroContato: existente ? existente.primeiroContato : null,
       notas: existente ? existente.notas : [],
       arquivos: this.arquivosTemp,
@@ -2959,9 +2976,10 @@ const Vendas = {
     UI.openModal('modal-venda-view');
   },
   openModal(id = null) {
-    if (Store.data.clientes.length === 0) { UI.toast('Cadastre ao menos um cliente', 'error'); UI.switchTab('clientes'); return; }
+    const clientesDisponiveis = typeof Auth !== 'undefined' && Auth.isVendedor() ? Clientes.dadosVisiveis() : Store.data.clientes;
+    if (clientesDisponiveis.length === 0) { UI.toast('Cadastre ao menos um cliente', 'error'); UI.switchTab('clientes'); return; }
     if (Store.data.produtos.length === 0) { UI.toast('Cadastre ao menos um produto em Configurações', 'error'); UI.switchTab('config'); return; }
-    const cs = [...Store.data.clientes].sort((a, b) => a.nome.localeCompare(b.nome));
+    const cs = [...clientesDisponiveis].sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('venda-cliente').innerHTML = '<option value="">Selecione...</option>' + cs.map(c => `<option value="${c.id}">${c.nome} (${Format.doc(c.documento, c.tipo)})</option>`).join('');
     const ps = [...Store.data.produtos].sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('venda-produto').innerHTML = '<option value="">Selecione...</option>' + ps.map(p => `<option value="${p.id}">${p.nome} (${Number(p.comissao).toFixed(2)}%)</option>`).join('');
@@ -3074,9 +3092,12 @@ const Vendas = {
     const redRaw = document.getElementById('venda-reducao').value;
     const reducao = redRaw === '' ? null : parseFloat(redRaw);
     if (reducao !== null && (isNaN(reducao) || reducao < 0 || reducao > 100)) return UI.toast('Redução inválida (0-100%)', 'error');
+    const vendedorId = (typeof Auth !== 'undefined' && Auth.isVendedor())
+      ? Auth.vendedorIdAtual()
+      : (document.getElementById('venda-vendedor').value || null);
     const v = {
       id: id || Store.uuid(), clienteId: cid, produtoId: pid,
-      vendedorId: document.getElementById('venda-vendedor').value || null,
+      vendedorId,
       valor, comissao: com, fatorComissao: p.comissao, data,
       status: document.getElementById('venda-status').value,
       reducaoComissao: reducao,
@@ -4356,7 +4377,7 @@ const Auth = {
     };
     Store.data.usuarios.push(u);
     Store.save();
-    this._showLoginNotice('Usuário mestre padrão criado: lucian / 144161');
+    Store._showLoginNotice('Usuário mestre padrão criado: lucian / 144161');
   },
   // Verifica sessão na inicialização
   async iniciar() {
@@ -4386,7 +4407,7 @@ const Auth = {
     document.getElementById('login-form').classList.remove('hidden');
     document.getElementById('setup-form').classList.add('hidden');
     document.getElementById('login-subtitle').textContent = 'Acesso ao sistema';
-    this._showLoginNotice('');
+    Store._showLoginNotice('');
     setTimeout(() => document.getElementById('login-user').focus(), 100);
   },
   mostrarSetup() {
@@ -4395,11 +4416,11 @@ const Auth = {
     document.getElementById('setup-form').classList.remove('hidden');
     document.getElementById('login-subtitle').textContent = 'Configuração inicial';
     if (!Store.serverOnline) {
-      this._showLoginNotice('Atenção: servidor indisponível. Não é possível criar usuário master até reconectar.');
+      Store._showLoginNotice('Atenção: servidor indisponível. Não é possível criar usuário master até reconectar.');
     } else {
-      this._showLoginNotice('');
+      Store._showLoginNotice('');
     }
-    this._updateSetupButton();
+    Store._updateSetupButton();
     setTimeout(() => document.getElementById('setup-nome').focus(), 100);
   },
   esconderLogin() {
@@ -4476,7 +4497,7 @@ const Auth = {
   filtrarVendas(vs) {
     if (this.isMaster()) return vs;
     const vid = this.vendedorIdAtual();
-    return vs.filter(v => v.vendedorId === vid);
+    return vs.filter(v => String(v.vendedorId ?? '') === String(vid ?? ''));
   },
   filtrarLancamentos(lancs) {
     if (this.isMaster()) return lancs;

@@ -644,7 +644,9 @@ function requireMaster(req, res, next) {
 // ============ CRIAÇÃO DE TABELAS ============
 
 // Cria uma tabela universal (estilo NoSQL) para manter compatibilidade com o seu código anterior
-db.serialize(() => {
+function initializeMainDatabase() {
+    return new Promise((resolve) => {
+        db.serialize(() => {
     // Tabela de documentos (existente)
     db.run(`CREATE TABLE IF NOT EXISTS documents (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -715,9 +717,11 @@ db.serialize(() => {
             console.log('✅ Tabela email_logs verificada/criada');
         }
 
-        migrarCamposLegadosDocumentos();
+        resolve();
     });
-});
+        });
+    });
+}
 
 /**
  * Criar usuários de teste/padrão
@@ -1895,6 +1899,7 @@ function startServer() {
 }
 
 Promise.all([dbReady, energiaDbReady])
+    .then(() => initializeMainDatabase())
     .then(() => migrateEnergiaDataFromLegacyDb())
     .then(() => {
         console.log('✅ Todos os bancos de dados foram inicializados e a migração foi concluída.');
