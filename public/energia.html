@@ -1962,9 +1962,9 @@ const Validate = {
 //============================================================================
 const PAGE_CONFIG = {
   dashboard: { titulo: 'Dashboard', subtitulo: 'Visão geral do seu negócio', actions: [] },
-  clientes: { titulo: 'Clientes', subtitulo: 'Cadastro e gestão de clientes', actions: [{ label: 'Novo Cliente', action: 'Clientes.openModal()', primary: true, icon: 'plus', masterOnly: true }] },
+  clientes: { titulo: 'Clientes', subtitulo: 'Cadastro e gestão de clientes', actions: [{ label: 'Novo Cliente', action: 'Clientes.openModal()', primary: true, icon: 'plus' }] },
   pipeline: { titulo: 'Pipeline de Oportunidades', subtitulo: 'Forecast ponderado e funil de conversão', actions: [{ label: 'Nova Oportunidade', action: 'Pipeline.openModal()', primary: true, icon: 'plus' }] },
-  vendas: { titulo: 'Vendas', subtitulo: 'Registro de vendas e cálculo de comissões', actions: [{ label: 'Nova Venda', action: 'Vendas.openModal()', primary: true, icon: 'plus', masterOnly: true }] },
+  vendas: { titulo: 'Vendas', subtitulo: 'Registro de vendas e cálculo de comissões', actions: [{ label: 'Nova Venda', action: 'Vendas.openModal()', primary: true, icon: 'plus' }] },
   vendedores: { titulo: 'Vendedores', subtitulo: 'Sua equipe de vendas', actions: [{ label: 'Novo Vendedor', action: 'Vendedores.openModal()', primary: true, icon: 'plus' }] },
   followups: { titulo: 'Follow-ups', subtitulo: 'Próximas ações e lembretes', actions: [{ label: 'Novo Follow-up', action: 'Followups.openModal()', primary: true, icon: 'plus' }] },
   comissoes: { titulo: 'Comissões a Receber', subtitulo: 'Cronograma de comissões mês a mês', actions: [] },
@@ -2006,7 +2006,22 @@ const UI = {
         .join('');
     }
 
-    if (tab === 'dashboard' && typeof Dashboard !== 'undefined') Dashboard.render();
+    if (tab === 'dashboard') {
+      if (typeof Dashboard === 'undefined') {
+        console.error('UI.switchTab: Dashboard está indefinido');
+      } else if (typeof Dashboard.render !== 'function') {
+        console.error('UI.switchTab: Dashboard.render não é uma função');
+      } else {
+        try {
+          Dashboard.render();
+        } catch (err) {
+          console.error('UI.switchTab: Dashboard.render falhou:', err);
+          if (typeof UI !== 'undefined') {
+            UI.toast('Erro ao montar dashboard: ' + (err.message || 'falha desconhecida'), 'error');
+          }
+        }
+      }
+    }
     if (tab === 'clientes' && typeof Clientes !== 'undefined') Clientes.render();
     if (tab === 'pipeline' && typeof Pipeline !== 'undefined') Pipeline.render();
     if (tab === 'vendas' && typeof Vendas !== 'undefined') Vendas.render();
@@ -2102,159 +2117,178 @@ const UI = {
 //============================================================================
 const Dashboard = {
   render() {
-    const safeText = (id, value) => {
-      const el = document.getElementById(id);
-      if (el) el.textContent = value;
-    };
-    const safeHtml = (id, html) => {
-      const el = document.getElementById(id);
-      if (el) el.innerHTML = html;
-    };
-    const ehMaster = typeof Auth === 'undefined' || Auth.isMaster();
-    const vendasBase = typeof Auth !== 'undefined' ? Auth.filtrarVendas(Store.data.vendas) : Store.data.vendas;
-    const clientes = ehMaster ? Store.data.clientes.length : new Set(vendasBase.map(v => v.clienteId)).size;
-    const vendasFech = vendasBase.filter(v => v.status === 'fechada');
-    const fat = vendasFech.reduce((s, v) => s + (v.valor || 0), 0);
-    const com = vendasFech.reduce((s, v) => s + (typeof Vendas !== 'undefined' ? Vendas.comissaoLiquida(v) : 0), 0);
-    const ticket = vendasFech.length > 0 ? fat / vendasFech.length : 0;
+    try {
+      const safeText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+      };
+      const safeHtml = (id, html) => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = html;
+      };
+      const renderSafe = (name, fn) => {
+        try { return fn(); } catch (err) {
+          console.error(`Dashboard.render > ${name} falhou:`, err);
+          return null;
+        }
+      };
+      const ehMaster = typeof Auth === 'undefined' || Auth.isMaster();
+      const vendasBase = Array.isArray(Store.data.vendas) ? (typeof Auth !== 'undefined' ? Auth.filtrarVendas(Store.data.vendas) : Store.data.vendas) : [];
+      const clientes = ehMaster ? (Array.isArray(Store.data.clientes) ? Store.data.clientes.length : 0) : new Set(vendasBase.map(v => v.clienteId)).size;
+      const vendasFech = vendasBase.filter(v => v.status === 'fechada');
+      const fat = vendasFech.reduce((s, v) => s + (v.valor || 0), 0);
+      const com = vendasFech.reduce((s, v) => s + (typeof Vendas !== 'undefined' ? Vendas.comissaoLiquida(v) : 0), 0);
+      const ticket = vendasFech.length > 0 ? fat / vendasFech.length : 0;
 
-    safeText('stat-clientes', clientes);
-    safeText('stat-clientes-sub', clientes === 0 ? 'comece cadastrando' : 'cadastrados');
-    safeText('stat-vendas-qtd', vendasFech.length);
-    safeText('stat-vendas-sub', `${Store.data.vendas.length} totais · ${vendasFech.length} fechadas`);
-    safeText('stat-faturamento', Format.brlCompact(fat));
-    safeText('stat-comissoes', Format.brlCompact(com));
-    safeText('stat-ticket', `ticket médio: ${Format.brlCompact(ticket)}`);
+      safeText('stat-clientes', clientes);
+      safeText('stat-clientes-sub', clientes === 0 ? 'comece cadastrando' : 'cadastrados');
+      safeText('stat-vendas-qtd', vendasFech.length);
+      safeText('stat-vendas-sub', `${Array.isArray(Store.data.vendas) ? Store.data.vendas.length : 0} totais · ${vendasFech.length} fechadas`);
+      safeText('stat-faturamento', Format.brlCompact(fat));
+      safeText('stat-comissoes', Format.brlCompact(com));
+      safeText('stat-ticket', `ticket médio: ${Format.brlCompact(ticket)}`);
 
-    // Follow-ups
-    const fuList = document.getElementById('dashboard-followups-list');
-    const fuHoje = typeof Followups !== 'undefined' ? Followups.filtrar('hoje') : [];
-    const fuAtras = typeof Followups !== 'undefined' ? Followups.filtrar('atrasados') : [];
-    const fus = [...fuAtras, ...fuHoje].slice(0, 6);
-    safeText('dashboard-followups-sub', fus.length === 0 ? 'Tudo em dia!' : `${fuAtras.length} atrasados · ${fuHoje.length} hoje`);
-    if (fuList) {
-      if (fus.length === 0) {
-        fuList.innerHTML = `<div class="px-5 py-8 text-center">
-          <div class="w-12 h-12 mx-auto bg-emerald-50 rounded-full flex items-center justify-center mb-2">
-            <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-          </div>
-          <p class="text-sm text-slate-500">Nenhum follow-up pendente</p>
-        </div>`;
-      } else {
-        fuList.innerHTML = fus.map(f => Followups.renderItem(f, true)).join('');
-      }
-    }
-
-    // Últimas vendas (filtradas por role)
-    const ultimas = [...vendasBase].sort((a, b) => (b.data || '').localeCompare(a.data || '')).slice(0, 5);
-    const vEl = document.getElementById('dashboard-vendas-list');
-    if (vEl) {
-      if (ultimas.length === 0) {
-        vEl.innerHTML = `<div class="px-5 py-8 text-center text-sm text-slate-500">Nenhuma venda registrada ainda</div>`;
-      } else {
-        vEl.innerHTML = `<div class="divide-y divide-slate-100">` + ultimas.map(v => {
-          const c = Store.data.clientes.find(x => x.id === v.clienteId);
-          const p = Store.data.produtos.find(x => x.id === v.produtoId);
-          const ven = Store.data.vendedores.find(x => x.id === v.vendedorId);
-          return `<div class="px-5 py-3 flex items-center gap-3 hover:bg-slate-50/50">
-            <div class="avatar avatar-sm">${Format.initials(c?.nome || '?')}</div>
-            <div class="flex-1 min-w-0">
-              <div class="text-sm font-medium text-slate-900 truncate">${c?.nome || '<span class="text-slate-400 italic">cliente removido</span>'}</div>
-              <div class="text-xs text-slate-500 truncate">${p?.nome || 'Produto removido'} · ${Format.date(v.data)}${ven ? ' · ' + ven.nome : ''}</div>
+      // Follow-ups
+      const fuList = document.getElementById('dashboard-followups-list');
+      const fuHoje = renderSafe('Followups.filtrar(hoje)', () => typeof Followups !== 'undefined' ? Followups.filtrar('hoje') : []) || [];
+      const fuAtras = renderSafe('Followups.filtrar(atrasados)', () => typeof Followups !== 'undefined' ? Followups.filtrar('atrasados') : []) || [];
+      const fus = [...fuAtras, ...fuHoje].slice(0, 6);
+      safeText('dashboard-followups-sub', fus.length === 0 ? 'Tudo em dia!' : `${fuAtras.length} atrasados · ${fuHoje.length} hoje`);
+      if (fuList) {
+        if (fus.length === 0) {
+          fuList.innerHTML = `<div class="px-5 py-8 text-center">
+            <div class="w-12 h-12 mx-auto bg-emerald-50 rounded-full flex items-center justify-center mb-2">
+              <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
             </div>
-            <div class="text-right flex-shrink-0">
-              <div class="text-sm font-semibold text-slate-900">${Format.brlCompact(v.valor)}</div>
-              <span class="chip ${typeof Vendas !== 'undefined' ? Vendas.statusChip(v.status) : 'chip-gray'}">${v.status}</span>
-            </div>
+            <p class="text-sm text-slate-500">Nenhum follow-up pendente</p>
           </div>`;
-        }).join('') + '</div>';
+        } else {
+          if (typeof Followups !== 'undefined' && typeof Followups.renderItem === 'function') {
+            fuList.innerHTML = fus.map(f => Followups.renderItem(f, true)).join('');
+          } else {
+            fuList.innerHTML = fus.map(() => `<div class="px-5 py-3 text-sm text-slate-500">Follow-up disponível</div>`).join('');
+          }
+        }
       }
-    }
 
-    // Vendas por produto
-    const porProd = {};
-    vendasFech.forEach(v => { porProd[v.produtoId] = (porProd[v.produtoId] || 0) + (v.valor || 0); });
-    const totalP = Object.values(porProd).reduce((s, v) => s + v, 0);
-    const pEl = document.getElementById('dashboard-produtos-list');
-    if (pEl) {
-      if (Object.keys(porProd).length === 0) {
-        pEl.innerHTML = '<div class="text-center text-sm text-slate-500 py-4">Sem dados ainda</div>';
-      } else {
-        pEl.innerHTML = Object.entries(porProd).sort((a, b) => b[1] - a[1]).map(([pid, t]) => {
-          const p = Store.data.produtos.find(x => x.id === pid);
-          const pct = totalP > 0 ? (t / totalP) * 100 : 0;
-          return `<div>
-            <div class="flex items-center justify-between text-sm mb-1.5">
-              <span class="font-medium text-slate-700 truncate">${p?.nome || '?'}</span>
-              <span class="text-slate-600 ml-2 flex-shrink-0 number-display font-semibold">${Format.brl(t)}</span>
-            </div>
-            <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div class="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full" style="width: ${pct}%"></div>
-            </div>
-          </div>`;
-        }).join('');
+      // Últimas vendas (filtradas por role)
+      const ultimas = [...vendasBase].sort((a, b) => (b.data || '').localeCompare(a.data || '')).slice(0, 5);
+      const vEl = document.getElementById('dashboard-vendas-list');
+      if (vEl) {
+        if (ultimas.length === 0) {
+          vEl.innerHTML = `<div class="px-5 py-8 text-center text-sm text-slate-500">Nenhuma venda registrada ainda</div>`;
+        } else {
+          vEl.innerHTML = `<div class="divide-y divide-slate-100">` + ultimas.map(v => {
+            const c = Store.data.clientes.find(x => x.id === v.clienteId);
+            const p = Store.data.produtos.find(x => x.id === v.produtoId);
+            const ven = Store.data.vendedores.find(x => x.id === v.vendedorId);
+            return `<div class="px-5 py-3 flex items-center gap-3 hover:bg-slate-50/50">
+              <div class="avatar avatar-sm">${Format.initials(c?.nome || '?')}</div>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-slate-900 truncate">${c?.nome || '<span class="text-slate-400 italic">cliente removido</span>'}</div>
+                <div class="text-xs text-slate-500 truncate">${p?.nome || 'Produto removido'} · ${Format.date(v.data)}${ven ? ' · ' + ven.nome : ''}</div>
+              </div>
+              <div class="text-right flex-shrink-0">
+                <div class="text-sm font-semibold text-slate-900">${Format.brlCompact(v.valor)}</div>
+                <span class="chip ${typeof Vendas !== 'undefined' ? Vendas.statusChip(v.status) : 'chip-gray'}">${v.status}</span>
+              </div>
+            </div>`;
+          }).join('') + '</div>';
+        }
       }
-    }
 
-    // Top vendedores (por comissão líquida)
-    const porVen = {};
-    vendasFech.forEach(v => { if (v.vendedorId) porVen[v.vendedorId] = (porVen[v.vendedorId] || 0) + (typeof Vendas !== 'undefined' ? Vendas.comissaoLiquida(v) : 0); });
-    const totalV = Object.values(porVen).reduce((s, v) => s + v, 0);
-    const venEl = document.getElementById('dashboard-vendedores-list');
-    if (venEl) {
-      if (Object.keys(porVen).length === 0) {
-        venEl.innerHTML = '<div class="text-center text-sm text-slate-500 py-4">Vincule vendedores às vendas para ver o ranking</div>';
-      } else {
-        venEl.innerHTML = Object.entries(porVen).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([vid, t], idx) => {
-          const v = Store.data.vendedores.find(x => x.id === vid);
-          const pct = totalV > 0 ? (t / totalV) * 100 : 0;
-          const medals = ['🥇', '🥈', '🥉'];
-          return `<div class="flex items-center gap-3">
-            <div class="avatar avatar-sm">${Format.initials(v?.nome || '?')}</div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center justify-between text-sm mb-1">
-                <span class="font-medium text-slate-700 truncate">${idx < 3 ? medals[idx] + ' ' : ''}${v?.nome || '?'}</span>
+      // Vendas por produto
+      const porProd = {};
+      vendasFech.forEach(v => { porProd[v.produtoId] = (porProd[v.produtoId] || 0) + (v.valor || 0); });
+      const totalP = Object.values(porProd).reduce((s, v) => s + v, 0);
+      const pEl = document.getElementById('dashboard-produtos-list');
+      if (pEl) {
+        if (Object.keys(porProd).length === 0) {
+          pEl.innerHTML = '<div class="text-center text-sm text-slate-500 py-4">Sem dados ainda</div>';
+        } else {
+          pEl.innerHTML = Object.entries(porProd).sort((a, b) => b[1] - a[1]).map(([pid, t]) => {
+            const p = Store.data.produtos.find(x => x.id === pid);
+            const pct = totalP > 0 ? (t / totalP) * 100 : 0;
+            return `<div>
+              <div class="flex items-center justify-between text-sm mb-1.5">
+                <span class="font-medium text-slate-700 truncate">${p?.nome || '?'}</span>
                 <span class="text-slate-600 ml-2 flex-shrink-0 number-display font-semibold">${Format.brl(t)}</span>
               </div>
-              <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div class="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full" style="width: ${pct}%"></div>
+              <div class="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div class="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full" style="width: ${pct}%"></div>
               </div>
-            </div>
-          </div>`;
-        }).join('');
+            </div>`;
+          }).join('');
+        }
       }
-    }
 
-    // Metas
-    if (typeof Metas !== 'undefined') Metas.render();
-    // Ações de Hoje
-    if (typeof AcoesHoje !== 'undefined') AcoesHoje.render();
-    // Insights
-    if (typeof Insights !== 'undefined') Insights.render();
-    // Gráfico
-    if (typeof GraficoMensal !== 'undefined') setTimeout(() => GraficoMensal.render(), 50);
-    // SLA
-    if (typeof SLA !== 'undefined') SLA.render();
-    // Aceleradores
-    if (typeof Aceleradores !== 'undefined') Aceleradores.render();
-    // MRR
-    if (typeof MRR !== 'undefined') {
-      const mrr = MRR.calcular();
-      safeText('dash-mrr', Format.brlCompact(mrr));
-      safeText('dash-arr', Format.brlCompact(mrr * 12));
-    }
-    // Pipeline + Forecast + WinRate
-    if (typeof Pipeline !== 'undefined') {
-      const abertas = Pipeline.abertas();
-      const todas = Pipeline.todas();
-      const fechadas = todas.filter(o => o.etapa === 'fechado-ganho' || o.etapa === 'fechado-perdido');
-      const ganhas = todas.filter(o => o.etapa === 'fechado-ganho');
-      safeText('dash-pipeline', Format.brlCompact(Pipeline.pipelineTotal()));
-      safeText('dash-pipeline-qtd', `${abertas.length} oportunidade${abertas.length === 1 ? '' : 's'} em aberto`);
-      safeText('dash-forecast', Format.brlCompact(Pipeline.forecastPonderado()));
-      const wr = fechadas.length > 0 ? (ganhas.length / fechadas.length) * 100 : null;
-      safeText('dash-winrate', wr === null ? '—' : wr.toFixed(0) + '%');
-      safeText('dash-winrate-detail', fechadas.length === 0 ? 'Sem oportunidades fechadas ainda' : `${ganhas.length} ganhas de ${fechadas.length} fechadas`);
+      // Top vendedores (por comissão líquida)
+      const porVen = {};
+      vendasFech.forEach(v => { if (v.vendedorId) porVen[v.vendedorId] = (porVen[v.vendedorId] || 0) + (typeof Vendas !== 'undefined' ? Vendas.comissaoLiquida(v) : 0); });
+      const totalV = Object.values(porVen).reduce((s, v) => s + v, 0);
+      const venEl = document.getElementById('dashboard-vendedores-list');
+      if (venEl) {
+        if (Object.keys(porVen).length === 0) {
+          venEl.innerHTML = '<div class="text-center text-sm text-slate-500 py-4">Vincule vendedores às vendas para ver o ranking</div>';
+        } else {
+          venEl.innerHTML = Object.entries(porVen).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([vid, t], idx) => {
+            const v = Store.data.vendedores.find(x => x.id === vid);
+            const pct = totalV > 0 ? (t / totalV) * 100 : 0;
+            const medals = ['🥇', '🥈', '🥉'];
+            return `<div class="flex items-center gap-3">
+              <div class="avatar avatar-sm">${Format.initials(v?.nome || '?')}</div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between text-sm mb-1">
+                  <span class="font-medium text-slate-700 truncate">${idx < 3 ? medals[idx] + ' ' : ''}${v?.nome || '?'}</span>
+                  <span class="text-slate-600 ml-2 flex-shrink-0 number-display font-semibold">${Format.brl(t)}</span>
+                </div>
+                <div class="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full" style="width: ${pct}%"></div>
+                </div>
+              </div>
+            </div>`;
+          }).join('');
+        }
+      }
+
+      // Metas
+      renderSafe('Metas.render', () => { if (typeof Metas !== 'undefined' && typeof Metas.render === 'function') Metas.render(); });
+      // Ações de Hoje
+      renderSafe('AcoesHoje.render', () => { if (typeof AcoesHoje !== 'undefined' && typeof AcoesHoje.render === 'function') AcoesHoje.render(); });
+      // Insights
+      renderSafe('Insights.render', () => { if (typeof Insights !== 'undefined' && typeof Insights.render === 'function') Insights.render(); });
+      // Gráfico
+      if (typeof GraficoMensal !== 'undefined' && typeof GraficoMensal.render === 'function') {
+        setTimeout(() => renderSafe('GraficoMensal.render', () => GraficoMensal.render()), 50);
+      }
+      // SLA
+      renderSafe('SLA.render', () => { if (typeof SLA !== 'undefined' && typeof SLA.render === 'function') SLA.render(); });
+      // Aceleradores
+      renderSafe('Aceleradores.render', () => { if (typeof Aceleradores !== 'undefined' && typeof Aceleradores.render === 'function') Aceleradores.render(); });
+      // MRR
+      if (typeof MRR !== 'undefined' && typeof MRR.calcular === 'function') {
+        const mrr = MRR.calcular();
+        safeText('dash-mrr', Format.brlCompact(mrr));
+        safeText('dash-arr', Format.brlCompact(mrr * 12));
+      }
+      // Pipeline + Forecast + WinRate
+      if (typeof Pipeline !== 'undefined') {
+        const abertas = Pipeline.abertas();
+        const todas = Pipeline.todas();
+        const fechadas = todas.filter(o => o.etapa === 'fechado-ganho' || o.etapa === 'fechado-perdido');
+        const ganhas = todas.filter(o => o.etapa === 'fechado-ganho');
+        safeText('dash-pipeline', Format.brlCompact(Pipeline.pipelineTotal()));
+        safeText('dash-pipeline-qtd', `${abertas.length} oportunidade${abertas.length === 1 ? '' : 's'} em aberto`);
+        safeText('dash-forecast', Format.brlCompact(Pipeline.forecastPonderado()));
+        const wr = fechadas.length > 0 ? (ganhas.length / fechadas.length) * 100 : null;
+        safeText('dash-winrate', wr === null ? '—' : wr.toFixed(0) + '%');
+        safeText('dash-winrate-detail', fechadas.length === 0 ? 'Sem oportunidades fechadas ainda' : `${ganhas.length} ganhas de ${fechadas.length} fechadas`);
+      }
+    } catch (err) {
+      console.error('Dashboard.render falhou:', err);
+      if (typeof UI !== 'undefined') {
+        UI.toast('Erro ao montar dashboard: ' + (err.message || 'falha desconhecida'), 'error');
+      }
     }
   }
 };
