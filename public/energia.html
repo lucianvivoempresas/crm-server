@@ -1582,41 +1582,12 @@ const Store = {
   isSyncing: false,
   syncFailureReported: false,
 
-  _loadCachedData() {
-    try {
-      const raw = localStorage.getItem(this.KEY);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') {
-        return {
-          data: parsed.data || null,
-          serverDocId: parsed.serverDocId || null
-        };
-      }
-    } catch (e) {
-      console.warn('⚠️ Falha ao carregar cache local:', e.message || e);
-    }
-    return null;
-  },
-
-  _saveLocalCache() {
-    try {
-      localStorage.setItem(this.KEY, JSON.stringify({
-        data: this.data,
-        serverDocId: this.serverDocId
-      }));
-    } catch (e) {
-      console.warn('⚠️ Falha ao salvar cache local:', e.message || e);
-    }
-  },
-
-  clearLocalCache() {
+  clearLocalState() {
     try { localStorage.removeItem(this.KEY); } catch (e) {}
+    try { sessionStorage.removeItem(Auth.SESSION_KEY); } catch (e) {}
   },
 
   async load() {
-    const cached = this._loadCachedData();
-
     try {
       const response = await fetch(`/api/energia-data`, {
         headers: { 'Content-Type': 'application/json' },
@@ -1639,33 +1610,15 @@ const Store = {
         if (escolhido) {
           this.data = Store._normalizeLoadedData(escolhido);
           this.serverDocId = escolhido.id;
-          this._saveLocalCache();
         } else {
           console.warn('⚠️ Nenhum documento energia-data válido encontrado no servidor; usando defaults.');
-          if (cached && cached.data) {
-            if (typeof UI !== 'undefined') {
-              UI.toast('Servidor de energia retornou dados inválidos. Usando cache local.', 'warning');
-            }
-            this.data = cached.data;
-            this.serverDocId = cached.serverDocId;
-          }
         }
-      } else if (cached && cached.data) {
-        if (typeof UI !== 'undefined') {
-          UI.toast('Servidor de energia indisponível. Usando dados locais salvos.', 'warning');
-        }
-        this.data = cached.data;
-        this.serverDocId = cached.serverDocId;
       }
     } catch (e) {
       console.error('⚠️ Falha ao carregar do servidor:', e.message || e);
       this.serverOnline = false;
-      if (cached && cached.data) {
-        if (typeof UI !== 'undefined') {
-          UI.toast('Servidor de energia indisponível. Usando dados locais salvos.', 'warning');
-        }
-        this.data = Store._normalizeLoadedData(cached.data);
-        this.serverDocId = cached.serverDocId;
+      if (typeof UI !== 'undefined') {
+        UI.toast('Servidor indisponível. Não foi possível carregar dados do banco.', 'error');
       }
     }
 
@@ -1760,9 +1713,8 @@ const Store = {
 
   save() {
     if (!this.serverOnline) {
-      this._markServerOffline('Sem conexão com servidor. Dados salvos localmente.');
-      this._saveLocalCache();
-      return true;
+      this._markServerOffline('Sem conexão com servidor. Nada foi salvo.');
+      return false;
     }
 
     this._syncToServer().then(success => {
@@ -1791,9 +1743,6 @@ const Store = {
       const payload = JSON.stringify(this.data);
       if (payload.length > 100000) {
         const chunkedSuccess = await this._syncToServerChunked(payload);
-        if (!chunkedSuccess) {
-          this._saveLocalCache();
-        }
         return chunkedSuccess;
       }
 
@@ -1814,7 +1763,6 @@ const Store = {
           console.log('✅ Dados de energia sincronizados com servidor');
           this.serverOnline = true;
           this.syncFailureReported = false;
-          this.clearLocalCache();
           return true;
         }
 
@@ -1823,7 +1771,6 @@ const Store = {
           console.log('ℹ️ Documento de energia não encontrado no servidor. Registrando um novo documento.');
           this.serverDocId = null;
         } else {
-          this._saveLocalCache();
           return false;
         }
       }
@@ -1843,16 +1790,13 @@ const Store = {
           this.serverDocId = result.id;
           console.log('✅ Dados de energia salvos no servidor com ID:', result.id);
         }
-        this.clearLocalCache();
         return true;
       } else {
         console.warn('⚠️ Erro ao salvar: ' + response.status);
-        this._saveLocalCache();
         return false;
       }
     } catch (e) {
       console.error('❌ Erro ao sincronizar com servidor:', e.message || e);
-      this._saveLocalCache();
       return false;
     } finally {
       this.isSyncing = false;
@@ -1882,7 +1826,6 @@ const Store = {
 
         if (!response.ok) {
           console.warn('⚠️ Erro ao salvar chunk', index, response.status);
-          this._saveLocalCache();
           return false;
         }
       }
@@ -1890,12 +1833,10 @@ const Store = {
       this.serverOnline = true;
       this.syncFailureReported = false;
       this.serverDocId = null;
-      this.clearLocalCache();
       console.log('✅ Dados de energia sincronizados em chunks no servidor');
       return true;
     } catch (e) {
       console.error('❌ Erro ao salvar chunks no servidor:', e.message || e);
-      this._saveLocalCache();
       return false;
     }
   },
@@ -4400,14 +4341,7 @@ const Auth = {
         this.mostrarLogin();
         return;
       }
-      const sessRaw = sessionStorage.getItem(this.SESSION_KEY);
-      if (sessRaw) {
-        try {
-          const s = JSON.parse(sessRaw);
-          const u = Store.data.usuarios.find(x => x.id === s.id);
-          if (u && u.ativo !== false) { this.aposLogin(u); return; }
-        } catch {}
-      }
+      Store.clearLocalState();
       this.mostrarLogin();
     } catch (e) {
       console.error('Erro ao iniciar autenticacao:', e);
@@ -4478,7 +4412,6 @@ const Auth = {
   aposLogin(u) {
     u.tipo = this.normalizarTipo(u);
     this.current = u;
-    sessionStorage.setItem(this.SESSION_KEY, JSON.stringify({ id: u.id }));
     document.body.classList.remove('role-master', 'role-vendedor');
     document.body.classList.add('role-' + u.tipo);
     document.getElementById('user-avatar').textContent = Format.initials(u.nome);
@@ -4496,7 +4429,6 @@ const Auth = {
   },
   sair() {
     UI.confirm('Sair do sistema', 'Deseja realmente encerrar a sessão?', () => {
-      sessionStorage.removeItem(this.SESSION_KEY);
       this.current = null;
       document.body.classList.remove('role-master', 'role-vendedor');
       this.mostrarLogin();
@@ -5282,8 +5214,10 @@ const Backup = {
 
   limpar() {
     UI.confirm('Limpar Todos os Dados', 'Isso apagará TUDO inclusive usuários. Continuar?', () => {
-      localStorage.removeItem(Store.KEY);
-      sessionStorage.clear();
+      Store.data = { clientes: [], produtos: [], vendas: [], vendedores: [], followups: [], pagamentos: [], metas: [], config: {}, usuarios: [], oportunidades: [] };
+      Store.serverDocId = null;
+      Store.save();
+      Store.clearLocalState();
       location.reload();
     });
   },
