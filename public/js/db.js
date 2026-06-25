@@ -115,10 +115,19 @@ async function addData(storeName, data) {
       headers,
       body: JSON.stringify(copy)
     });
+    
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({ error: 'Erro desconhecido' }));
+      throw new Error(`Erro HTTP ${res.status}: ${errorData.error || 'Falha na requisição'}`);
+    }
+    
     const result = await res.json();
+    if (!result.id) {
+      throw new Error('Resposta inválida do servidor: sem ID retornado');
+    }
     return result.id;
   } catch (err) {
-    console.error('Erro ao adicionar dado:', err);
+    console.error(`Erro ao adicionar ${storeName}:`, err);
     throw err;
   }
 }

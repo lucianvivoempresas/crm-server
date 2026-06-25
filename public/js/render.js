@@ -1,9 +1,27 @@
 // js/render.js
 async function renderAll() {
   try {
-    [clientes, vendas, comissoes, metas] = await Promise.all([
-      getAllData('clientes'), getAllData('vendas'), getAllData('comissoes'), getAllData('metas')
-    ]);
+    // Carregar cada coleção individualmente com tratamento de erro
+    clientes = await getAllData('clientes').catch(err => {
+      console.error('Erro ao carregar clientes:', err);
+      return [];
+    });
+    
+    vendas = await getAllData('vendas').catch(err => {
+      console.error('Erro ao carregar vendas:', err);
+      return [];
+    });
+    
+    comissoes = await getAllData('comissoes').catch(err => {
+      console.error('Erro ao carregar comissões:', err);
+      return [];
+    });
+    
+    metas = await getAllData('metas').catch(err => {
+      console.error('Erro ao carregar metas:', err);
+      return [];
+    });
+    
     window.__clientesDataVersion = Date.now();
     renderDashboard();
     renderVendasTable();
@@ -16,7 +34,9 @@ async function renderAll() {
       await renderCampanhasTab();
     }
     updateDynamicSelects();
-  } catch (err) { console.error(err); }
+  } catch (err) { 
+    console.error('Erro crítico em renderAll:', err);
+  }
 }
 
 function normalizeOfferText(value) {

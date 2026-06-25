@@ -1609,6 +1609,15 @@ function setupQuickFormListeners() {
     
     qfCliente.onsubmit = async (e) => {
       e.preventDefault();
+      
+      // Validar se vendedor está logado
+      const vendedorId = obterIdUsuario();
+      if (!vendedorId) {
+        showQuickMessage('Erro: Vendedor não identificado. Faça login novamente.', true);
+        console.error('Cliente form submit: obterIdUsuario() retornou null/undefined');
+        return;
+      }
+      
       const cnpjInput = document.getElementById('qf-cliente-cpfCnpj');
       const data = { 
         nome: document.getElementById('qf-cliente-nome').value, 
@@ -1619,7 +1628,7 @@ function setupQuickFormListeners() {
         coelba: document.getElementById('qf-cliente-coelba')?.checked === true,
         placaSolar: document.getElementById('qf-cliente-placaSolar')?.checked === true,
         excedente: document.getElementById('qf-cliente-excedente-sim')?.checked ? 'Sim' : (document.getElementById('qf-cliente-excedente-nao')?.checked ? 'Nao' : ''),
-        vendedor_id: obterIdUsuario(),
+        vendedor_id: vendedorId,
         endereco: {
           cep: document.getElementById('qf-cliente-cep')?.value || '',
           logradouro: document.getElementById('qf-cliente-logradouro')?.value || '',
@@ -1632,11 +1641,14 @@ function setupQuickFormListeners() {
       };
       try { 
         await addData('clientes', data); 
-        showQuickMessage('Cliente Salvo!'); 
+        showQuickMessage('✅ Cliente Salvo com sucesso!'); 
         e.target.reset(); 
         document.getElementById('qf-cliente-placaSolar')?.dispatchEvent(new Event('change'));
         await renderAll(); 
-      } catch(err) { showQuickMessage('Erro', true); }
+      } catch(err) { 
+        console.error('Erro ao criar cliente:', err.message);
+        showQuickMessage(`❌ Erro ao salvar cliente: ${err.message || 'Erro desconhecido'}`, true); 
+      }
     };
   }
 
@@ -1693,10 +1705,27 @@ function setupQuickFormListeners() {
         return;
       }
 
+      // Validar se vendedor está logado
+      const vendedorId = obterIdUsuario();
+      if (!vendedorId) {
+        showQuickMessage('Erro: Vendedor não identificado. Faça login novamente.', true);
+        console.error('Venda form submit: obterIdUsuario() retornou null/undefined');
+        return;
+      }
+      
+      // Validar clienteId
+      const clienteIdStr = document.getElementById('qf-venda-clienteId').value;
+      const clienteId = parseInt(clienteIdStr, 10);
+      if (!clienteIdStr || isNaN(clienteId) || clienteId <= 0) {
+        showQuickMessage('Erro: Selecione um cliente válido.', true);
+        console.error('Venda form: clienteId inválido:', { clienteIdStr, clienteId });
+        return;
+      }
+      
       const hoje = new Date().toISOString().split('T')[0];
       const data = { 
-        vendedor_id: obterIdUsuario(),
-        clienteId: parseInt(document.getElementById('qf-venda-clienteId').value), 
+        vendedor_id: vendedorId,
+        clienteId: clienteId, 
         produto: document.getElementById('qf-venda-produto').value, 
         operadora: document.getElementById('qf-venda-operadora').value, 
         valorVenda: document.getElementById('qf-venda-valorVenda').value, 
@@ -1713,11 +1742,14 @@ function setupQuickFormListeners() {
       };
       try { 
         await addData('vendas', data); 
-        showQuickMessage('Venda Salva!'); 
+        showQuickMessage('✅ Venda Salva com sucesso!'); 
         e.target.reset(); 
         if (qfStatus) qfStatus.dispatchEvent(new Event('change'));
         await renderAll(); 
-      } catch(err) { showQuickMessage('Erro', true); }
+      } catch(err) { 
+        console.error('Erro ao criar venda:', err.message);
+        showQuickMessage(`❌ Erro ao salvar venda: ${err.message || 'Erro desconhecido'}`, true); 
+      }
     };
   }
 }
