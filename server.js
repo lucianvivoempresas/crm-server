@@ -109,6 +109,14 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '50mb' })); 
 
+function noStoreHtml(req, res, next) {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Surrogate-Control', 'no-store');
+    next();
+}
+
 if (IS_PROD) {
     app.use((req, res, next) => {
         const filename = path.basename(req.path || '').toLowerCase();
@@ -120,7 +128,17 @@ if (IS_PROD) {
 }
 
 // Serve os arquivos do seu CRM (HTML, CSS, JS) automaticamente
-app.use(express.static(path.join(__dirname, 'public'), { index: false }));
+app.use(express.static(path.join(__dirname, 'public'), {
+    index: false,
+    setHeaders(res, filePath) {
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            res.setHeader('Pragma', 'no-cache');
+            res.setHeader('Expires', '0');
+            res.setHeader('Surrogate-Control', 'no-store');
+        }
+    }
+}));
 
 // Landing page inicial e rota dedicada para o CRM
 app.get('/', (req, res) => {
@@ -131,7 +149,7 @@ app.get('/crm', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.get('/energia', (req, res) => {
+app.get('/energia', noStoreHtml, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'energia.html'));
 });
 

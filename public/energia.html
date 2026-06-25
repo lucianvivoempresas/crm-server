@@ -1914,6 +1914,7 @@ const Format = {
     if (Math.abs(v) >= 1000) return 'R$ ' + (v / 1000).toFixed(1).replace('.', ',') + 'k';
     return Format.brl(v);
   },
+  brlCompactSafe(v) { return Format.brlCompact(v); },
   date(iso) { if (!iso) return ''; const d = new Date(iso + 'T00:00:00'); return d.toLocaleDateString('pt-BR'); },
   dateTime(iso) {
     if (!iso) return '';
@@ -2009,6 +2010,7 @@ const UI = {
         .map(a => `<button onclick="${a.action}" class="${a.primary ? 'btn-primary' : 'btn-secondary'}">${ICONS[a.icon] || ''}${a.label}</button>`)
         .join('');
     }
+    this.ensurePrimaryAction(tab);
 
     if (tab === 'dashboard') {
       if (typeof Dashboard === 'undefined') {
@@ -2040,6 +2042,16 @@ const UI = {
       if (typeof ConfigTelegram !== 'undefined') ConfigTelegram.carregar();
     }
     this.toggleSidebar(false);
+  },
+  ensurePrimaryAction(tab) {
+    const actions = {
+      clientes: { id: 'btn-page-novo-cliente', label: 'Novo Cliente', action: 'Clientes.openModal()' },
+      vendas: { id: 'btn-page-nova-venda', label: 'Nova Venda', action: 'Vendas.openModal()' }
+    };
+    const cfg = actions[tab];
+    const actionsEl = document.getElementById('page-actions');
+    if (!cfg || !actionsEl || document.getElementById(cfg.id)) return;
+    actionsEl.insertAdjacentHTML('beforeend', `<button id="${cfg.id}" onclick="${cfg.action}" class="btn-primary">${ICONS.plus}${cfg.label}</button>`);
   },
   toggleSidebar(force) {
     const sb = document.getElementById('sidebar');
@@ -4052,9 +4064,9 @@ const Metas = {
           <button onclick="Metas.abrirModal()" class="btn-ghost text-xs">✎ Editar</button>
         </div>
         <div class="space-y-3">
-          ${renderItem('Faturamento', real.faturamento, meta.faturamento, 'bg-gradient-to-r from-emerald-400 to-emerald-600', Format.brlCompact)}
+          ${renderItem('Faturamento', real.faturamento, meta.faturamento, 'bg-gradient-to-r from-emerald-400 to-emerald-600', Format.brlCompactSafe)}
           ${renderItem('Vendas fechadas', real.vendas, meta.vendas, 'bg-gradient-to-r from-blue-400 to-blue-600', n => Math.round(n))}
-          ${renderItem('Comissão líquida', real.comissao, meta.comissao, 'bg-gradient-to-r from-amber-400 to-amber-600', Format.brlCompact)}
+          ${renderItem('Comissão líquida', real.comissao, meta.comissao, 'bg-gradient-to-r from-amber-400 to-amber-600', Format.brlCompactSafe)}
         </div>
       </div>`;
   },
@@ -5377,9 +5389,14 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('setup-pwd2').addEventListener('keydown', e => { if (e.key === 'Enter') Auth.criarMaster(); });
   setInterval(() => { if (typeof SLA !== 'undefined' && document.getElementById('panel-dashboard') && !document.getElementById('panel-dashboard').classList.contains('hidden')) SLA.render(); }, 60000);
   if ('serviceWorker' in navigator) {
-    const swCode = `const C='crm-energia-v1';self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(caches.open(C).then(c=>c.match(e.request).then(h=>h||fetch(e.request).then(r=>{if(r&&r.status===200&&(r.type==='basic'||r.type==='cors'))c.put(e.request,r.clone());return r;}).catch(()=>c.match('/')))));});`;
-    const b = new Blob([swCode], { type: 'application/javascript' });
-    navigator.serviceWorker.register(URL.createObjectURL(b)).catch(() => {});
+    navigator.serviceWorker.getRegistrations()
+      .then(regs => Promise.all(regs.map(reg => reg.unregister())))
+      .catch(() => {});
+    if (window.caches) {
+      caches.keys()
+        .then(keys => Promise.all(keys.filter(k => k.startsWith('crm-energia-')).map(k => caches.delete(k))))
+        .catch(() => {});
+    }
   }
 });
 </script>
