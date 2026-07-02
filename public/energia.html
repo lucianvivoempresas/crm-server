@@ -16,6 +16,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
   tailwind.config = {
     theme: {
@@ -682,6 +683,11 @@
             <option value="fechado-perdido">Fechado Perdido</option>
             <option value="todas">Todas</option>
           </select>
+          <label class="btn-secondary cursor-pointer whitespace-nowrap">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Importar Excel
+            <input type="file" accept=".xlsx,.xls,.csv" onchange="Pipeline.importarPlanilha(event)" class="hidden" />
+          </label>
         </div>
         <div id="pipeline-lista"></div>
       </div>
@@ -1381,14 +1387,25 @@
     </div>
     <div class="flex-1 overflow-y-auto px-6 py-5">
       <input type="hidden" id="opo-id" />
-      <div class="mb-4"><label class="label">Título *</label><input id="opo-titulo" type="text" class="input" placeholder="Ex: Energia Solar 5kWp - Padaria do João" /></div>
+      <div class="mb-4"><label class="label">Título</label><input id="opo-titulo" type="text" class="input" placeholder="Ex: Energia Solar 5kWp - Padaria do João" /></div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-        <div><label class="label">Cliente *</label><select id="opo-cliente" class="select"></select></div>
+        <div><label class="label">Cliente cadastrado (opcional)</label><select id="opo-cliente" class="select"></select></div>
         <div class="master-only"><label class="label">Vendedor</label><select id="opo-vendedor" class="select"></select></div>
+      </div>
+      <div class="border border-slate-200 rounded-xl p-4 mb-4 bg-slate-50/60">
+        <div class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Dados do lead / cliente</div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div><label class="label">Nome da empresa ou cliente</label><input id="opo-cliente-nome" type="text" class="input" placeholder="Nome do lead" /></div>
+          <div><label class="label">CPF/CNPJ</label><input id="opo-cliente-doc" type="text" class="input" placeholder="Documento" /></div>
+          <div><label class="label">Telefone</label><input id="opo-cliente-telefone" type="text" class="input" placeholder="(00) 00000-0000" /></div>
+          <div><label class="label">Email</label><input id="opo-cliente-email" type="email" class="input" placeholder="email@empresa.com" /></div>
+          <div><label class="label">Nome do gestor</label><input id="opo-cliente-gestor" type="text" class="input" placeholder="Contato/gestor" /></div>
+          <div><label class="label">Valor pago quando houver</label><input id="opo-valor-pago" type="text" inputmode="decimal" class="input" placeholder="R$ 0,00" /></div>
+        </div>
       </div>
       <div class="grid grid-cols-2 gap-4 mb-4">
         <div><label class="label">Produto (opcional)</label><select id="opo-produto" class="select"></select></div>
-        <div><label class="label">Valor estimado *</label><input id="opo-valor" type="text" inputmode="decimal" class="input" placeholder="R$ 0,00" /></div>
+        <div><label class="label">Valor estimado</label><input id="opo-valor" type="text" inputmode="decimal" class="input" placeholder="R$ 0,00" /></div>
       </div>
       <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
@@ -4634,6 +4651,25 @@ const Pipeline = {
   pipelineTotal() {
     return this.abertas().reduce((s, o) => s + (o.valor || 0), 0);
   },
+  clienteBase(o) {
+    return Store.data.clientes.find(x => x.id === o.clienteId) || null;
+  },
+  clienteDados(o) {
+    const base = this.clienteBase(o);
+    const extra = o.clienteDados || {};
+    return {
+      nome: extra.nome || base?.nome || '',
+      documento: extra.documento || base?.documento || '',
+      telefone: extra.telefone || base?.telefone || '',
+      email: extra.email || base?.email || '',
+      gestor: extra.gestor || extra.nomeGestor || '',
+      valorPago: Number(extra.valorPago || 0)
+    };
+  },
+  clienteTextoBusca(o) {
+    const c = this.clienteDados(o);
+    return [c.nome, c.documento, c.telefone, c.email, c.gestor, o.titulo].join(' ').toLowerCase();
+  },
   render() {
     this.filtroBusca = (document.getElementById('pipe-busca')?.value || '').toLowerCase();
     this.filtroEtapa = document.getElementById('pipe-filtro-etapa')?.value || 'abertas';
@@ -4658,8 +4694,7 @@ const Pipeline = {
     else dados = todas.filter(o => o.etapa === this.filtroEtapa);
     if (this.filtroBusca) {
       dados = dados.filter(o => {
-        const c = Store.data.clientes.find(x => x.id === o.clienteId);
-        return (o.titulo || '').toLowerCase().includes(this.filtroBusca) || (c?.nome || '').toLowerCase().includes(this.filtroBusca);
+        return this.clienteTextoBusca(o).includes(this.filtroBusca);
       });
     }
     const lista = document.getElementById('pipeline-lista');
@@ -4675,18 +4710,27 @@ const Pipeline = {
     dados.sort((a, b) => (b.dataAbertura || '').localeCompare(a.dataAbertura || ''));
     const ehMaster = typeof Auth === 'undefined' || Auth.isMaster();
     lista.innerHTML = `<div class="overflow-x-auto"><table class="data-table">
-      <thead><tr><th>Cliente</th><th>Título</th>${ehMaster ? '<th>Vendedor</th>' : ''}<th class="text-right">Valor</th><th class="text-right">Prob.</th><th class="text-right">Ponderado</th><th class="text-center">Etapa</th><th></th></tr></thead>
+      <thead><tr><th>Cliente / Lead</th><th>Título</th>${ehMaster ? '<th>Vendedor</th>' : ''}<th class="text-right">Valor</th><th class="text-right">Pago</th><th class="text-right">Prob.</th><th class="text-right">Ponderado</th><th class="text-center">Etapa</th><th></th></tr></thead>
       <tbody>${dados.map(o => {
-        const c = Store.data.clientes.find(x => x.id === o.clienteId);
+        const c = this.clienteDados(o);
         const ven = o.vendedorId ? Store.data.vendedores.find(x => x.id === o.vendedorId) : null;
         const prob = o.probabilidade != null ? o.probabilidade : this.ETAPAS[o.etapa].prob;
         const pond = (o.valor || 0) * (prob / 100);
         const meta = this.ETAPAS[o.etapa];
         return `<tr>
-          <td class="font-medium text-slate-900">${c?.nome || '<span class="text-slate-400 italic">—</span>'}</td>
+          <td class="font-medium text-slate-900">
+            <div>${c.nome || '<span class="text-slate-400 italic">Sem nome</span>'}</div>
+            <div class="text-[11px] text-slate-500 font-normal">${[
+              c.telefone ? Format.telefone(c.telefone) : '',
+              c.email || '',
+              c.gestor ? 'Gestor: ' + c.gestor : '',
+              c.documento ? Format.doc(c.documento, c.documento.replace(/\D/g, '').length > 11 ? 'cnpj' : 'cpf') : ''
+            ].filter(Boolean).join(' · ')}</div>
+          </td>
           <td class="text-slate-700">${o.titulo || ''}</td>
           ${ehMaster ? `<td class="text-slate-700">${ven?.nome || '<span class="text-slate-400">—</span>'}</td>` : ''}
           <td class="text-right font-semibold whitespace-nowrap number-display">${Format.brl(o.valor)}</td>
+          <td class="text-right whitespace-nowrap number-display">${c.valorPago ? Format.brl(c.valorPago) : '<span class="text-slate-400">—</span>'}</td>
           <td class="text-right whitespace-nowrap">${prob}%</td>
           <td class="text-right text-emerald-700 font-semibold whitespace-nowrap number-display">${Format.brl(pond)}</td>
           <td class="text-center"><span class="chip ${meta.cor}">${meta.label}</span></td>
@@ -4698,9 +4742,8 @@ const Pipeline = {
     UI.updateBadges();
   },
   openModal(id = null) {
-    if (Store.data.clientes.length === 0) { UI.toast('Cadastre ao menos um cliente', 'error'); UI.switchTab('clientes'); return; }
     const cs = Clientes.dadosVisiveis().sort((a, b) => a.nome.localeCompare(b.nome));
-    document.getElementById('opo-cliente').innerHTML = '<option value="">Selecione...</option>' + cs.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
+    document.getElementById('opo-cliente').innerHTML = '<option value="">Sem cliente cadastrado</option>' + cs.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
     const vs = Store.data.vendedores.filter(v => v.ativo !== false).sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('opo-vendedor').innerHTML = '<option value="">— Sem vendedor —</option>' + vs.map(v => `<option value="${v.id}">${v.nome}</option>`).join('');
     const ps = [...Store.data.produtos].sort((a, b) => a.nome.localeCompare(b.nome));
@@ -4710,6 +4753,12 @@ const Pipeline = {
     document.getElementById('opo-cliente').value = '';
     document.getElementById('opo-vendedor').value = (typeof Auth !== 'undefined' && Auth.isVendedor()) ? Auth.vendedorIdAtual() : '';
     document.getElementById('opo-produto').value = '';
+    document.getElementById('opo-cliente-nome').value = '';
+    document.getElementById('opo-cliente-doc').value = '';
+    document.getElementById('opo-cliente-telefone').value = '';
+    document.getElementById('opo-cliente-email').value = '';
+    document.getElementById('opo-cliente-gestor').value = '';
+    document.getElementById('opo-valor-pago').value = '';
     document.getElementById('opo-valor').value = '';
     document.getElementById('opo-etapa').value = 'lead-novo';
     document.getElementById('opo-probabilidade').value = '';
@@ -4726,6 +4775,13 @@ const Pipeline = {
       document.getElementById('opo-cliente').value = o.clienteId;
       document.getElementById('opo-vendedor').value = o.vendedorId || '';
       document.getElementById('opo-produto').value = o.produtoId || '';
+      const cd = this.clienteDados(o);
+      document.getElementById('opo-cliente-nome').value = cd.nome || '';
+      document.getElementById('opo-cliente-doc').value = cd.documento ? Format.doc(cd.documento, cd.documento.replace(/\D/g, '').length > 11 ? 'cnpj' : 'cpf') : '';
+      document.getElementById('opo-cliente-telefone').value = cd.telefone ? Format.telefone(cd.telefone) : '';
+      document.getElementById('opo-cliente-email').value = cd.email || '';
+      document.getElementById('opo-cliente-gestor').value = cd.gestor || '';
+      document.getElementById('opo-valor-pago').value = cd.valorPago ? Format.moeda(String(Math.round(cd.valorPago * 100))) : '';
       document.getElementById('opo-valor').value = Format.moeda(String(Math.round((o.valor || 0) * 100)));
       document.getElementById('opo-etapa').value = o.etapa;
       document.getElementById('opo-probabilidade').value = o.probabilidade != null ? o.probabilidade : '';
@@ -4746,21 +4802,37 @@ const Pipeline = {
     const etapa = document.getElementById('opo-etapa').value;
     document.getElementById('opo-prob-info').textContent = `Padrão para esta etapa: ${this.ETAPAS[etapa].prob}%`;
   },
+  preencherClienteSelecionado() {
+    const id = document.getElementById('opo-cliente').value;
+    const c = Store.data.clientes.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('opo-cliente-nome').value = c.nome || '';
+    document.getElementById('opo-cliente-doc').value = c.documento ? Format.doc(c.documento, c.tipo || (String(c.documento).replace(/\D/g, '').length > 11 ? 'cnpj' : 'cpf')) : '';
+    document.getElementById('opo-cliente-telefone').value = c.telefone ? Format.telefone(c.telefone) : '';
+    document.getElementById('opo-cliente-email').value = c.email || '';
+  },
   salvar() {
     const id = document.getElementById('opo-id').value;
     const titulo = document.getElementById('opo-titulo').value.trim();
     const clienteId = document.getElementById('opo-cliente').value;
     const valor = Format.parseMoeda(document.getElementById('opo-valor').value);
     const etapa = document.getElementById('opo-etapa').value;
-    if (!titulo) return UI.toast('Título obrigatório', 'error');
-    if (!clienteId) return UI.toast('Selecione um cliente', 'error');
-    if (!valor || valor <= 0) return UI.toast('Informe um valor estimado', 'error');
+    const clienteDados = {
+      nome: document.getElementById('opo-cliente-nome').value.trim(),
+      documento: document.getElementById('opo-cliente-doc').value.replace(/\D/g, ''),
+      telefone: document.getElementById('opo-cliente-telefone').value.replace(/\D/g, ''),
+      email: document.getElementById('opo-cliente-email').value.trim(),
+      gestor: document.getElementById('opo-cliente-gestor').value.trim(),
+      valorPago: Format.parseMoeda(document.getElementById('opo-valor-pago').value)
+    };
     const probRaw = document.getElementById('opo-probabilidade').value;
     const prob = probRaw === '' ? null : parseFloat(probRaw);
     const existente = id ? Store.data.oportunidades.find(x => x.id === id) : null;
+    const tituloFinal = titulo || clienteDados.nome || 'Lead sem nome';
     const o = {
       id: id || Store.uuid(),
-      titulo, clienteId,
+      titulo: tituloFinal, clienteId: clienteId || null,
+      clienteDados,
       vendedorId: document.getElementById('opo-vendedor').value || null,
       produtoId: document.getElementById('opo-produto').value || null,
       valor, etapa,
@@ -4782,7 +4854,7 @@ const Pipeline = {
       else if (etapaAntiga !== o.etapa) Telegram.notificarPipeline(o, 'etapa');
     }
     // Conversão automática para venda quando vai para "fechado-ganho"
-    if (etapa === 'fechado-ganho' && (!existente || existente.etapa !== 'fechado-ganho') && o.produtoId) {
+    if (etapa === 'fechado-ganho' && (!existente || existente.etapa !== 'fechado-ganho') && o.produtoId && o.clienteId) {
       const p = Store.data.produtos.find(x => x.id === o.produtoId);
       if (p) {
         const com = o.valor * (p.comissao / 100);
@@ -4801,6 +4873,105 @@ const Pipeline = {
       }
     }
     if (Store.save()) { UI.toast(id ? 'Oportunidade atualizada!' : 'Oportunidade criada!'); this.closeModal(); this.render(); UI.updateBadges(); }
+  },
+  async importarPlanilha(event) {
+    const file = event.target?.files?.[0];
+    if (!file) return;
+    event.target.value = '';
+    if (typeof XLSX === 'undefined') {
+      return UI.toast('Leitor de Excel não carregou. Atualize a página e tente novamente.', 'error', 8000);
+    }
+    try {
+      const buffer = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
+        reader.readAsArrayBuffer(file);
+      });
+      const wb = XLSX.read(buffer, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      if (!rows.length) return UI.toast('Planilha sem linhas para importar.', 'error');
+      const criadas = [];
+      rows.forEach(row => {
+        const lead = this.linhaParaOportunidade(row);
+        if (lead) criadas.push(lead);
+      });
+      if (!criadas.length) return UI.toast('Nenhuma oportunidade válida encontrada na planilha.', 'error');
+      Store.data.oportunidades.push(...criadas);
+      if (Store.save()) {
+        UI.toast(`${criadas.length} oportunidade${criadas.length === 1 ? '' : 's'} importada${criadas.length === 1 ? '' : 's'}!`, 'success', 8000);
+        this.render();
+        UI.updateBadges();
+      }
+    } catch (err) {
+      console.error('Erro ao importar pipeline:', err);
+      UI.toast('Erro ao importar planilha: ' + (err.message || err), 'error', 10000);
+    }
+  },
+  linhaParaOportunidade(row) {
+    const get = (...names) => {
+      const wanted = names.map(n => this.normalizarCabecalho(n));
+      for (const [key, value] of Object.entries(row)) {
+        if (wanted.includes(this.normalizarCabecalho(key))) return String(value ?? '').trim();
+      }
+      return '';
+    };
+    const nome = get('nome', 'cliente', 'empresa', 'nome da empresa', 'nome do cliente', 'razao social', 'razão social');
+    const documento = get('cpf', 'cnpj', 'cpf/cnpj', 'documento');
+    const telefone = get('telefone', 'celular', 'whatsapp', 'fone');
+    const email = get('email', 'e-mail');
+    const gestor = get('gestor', 'nome do gestor', 'responsavel', 'responsável', 'contato');
+    const valor = this.parseValorLivre(get('valor estimado', 'valor', 'estimativa', 'potencial'));
+    const valorPago = this.parseValorLivre(get('valor pago', 'pago', 'mensalidade', 'valor atual'));
+    const tituloPlanilha = get('titulo', 'título', 'oportunidade', 'lead');
+    const docDigits = documento.replace(/\D/g, '');
+    if (!nome && !docDigits && !telefone && !email && !valor && !tituloPlanilha) return null;
+    const titulo = tituloPlanilha || nome || 'Lead importado';
+    const clienteExistente = docDigits
+      ? Store.data.clientes.find(c => String(c.documento || '').replace(/\D/g, '') === docDigits)
+      : Store.data.clientes.find(c => nome && (c.nome || '').trim().toLowerCase() === nome.trim().toLowerCase());
+    return {
+      id: Store.uuid(),
+      titulo,
+      clienteId: clienteExistente?.id || null,
+      clienteDados: {
+        nome,
+        documento: docDigits,
+        telefone: telefone.replace(/\D/g, ''),
+        email,
+        gestor,
+        valorPago
+      },
+      vendedorId: (typeof Auth !== 'undefined' && Auth.isVendedor()) ? Auth.vendedorIdAtual() : null,
+      produtoId: null,
+      valor,
+      etapa: 'lead-novo',
+      probabilidade: null,
+      dataAbertura: new Date().toISOString().slice(0, 10),
+      dataPrevisao: null,
+      dataFechamento: null,
+      motivoPerda: null,
+      observacoes: get('observacoes', 'observações', 'obs', 'nota'),
+      criadoEm: new Date().toISOString(),
+      atualizadoEm: new Date().toISOString()
+    };
+  },
+  normalizarCabecalho(value) {
+    return String(value || '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  },
+  parseValorLivre(value) {
+    if (typeof value === 'number') return value;
+    const raw = String(value || '').trim();
+    if (!raw) return 0;
+    if (raw.includes('.') && !raw.includes(',')) {
+      return Number(raw.replace(/[^\d.-]/g, '')) || 0;
+    }
+    return Format.parseMoeda(raw);
   },
   editar(id) { this.openModal(id); },
   excluir(id) {
@@ -5332,6 +5503,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('opo-etapa')) {
     document.getElementById('opo-etapa').addEventListener('change', () => { Pipeline.toggleMotivoPerda(); Pipeline.atualizarProbInfo(); });
     document.getElementById('opo-valor').addEventListener('input', e => { e.target.value = Format.moeda(e.target.value); });
+    document.getElementById('opo-valor-pago').addEventListener('input', e => { e.target.value = Format.moeda(e.target.value); });
+    document.getElementById('opo-cliente-telefone').addEventListener('input', e => { e.target.value = Format.telefone(e.target.value); });
+    document.getElementById('opo-cliente-doc').addEventListener('input', e => {
+      const digits = e.target.value.replace(/\D/g, '');
+      e.target.value = Format.doc(digits, digits.length > 11 ? 'cnpj' : 'cpf');
+    });
+    document.getElementById('opo-cliente').addEventListener('change', () => Pipeline.preencherClienteSelecionado());
   }
   if (document.getElementById('pipe-busca')) document.getElementById('pipe-busca').addEventListener('input', () => Pipeline.render());
   document.getElementById('login-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') Auth.entrar(); });
