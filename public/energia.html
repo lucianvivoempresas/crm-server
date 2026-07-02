@@ -688,6 +688,10 @@
             Importar Excel
             <input type="file" accept=".xlsx,.xls,.csv" onchange="Pipeline.importarPlanilha(event)" class="hidden" />
           </label>
+          <button onclick="Pipeline.baixarModeloImportacao()" class="btn-secondary whitespace-nowrap">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v12m0 0l4-4m-4 4l-4-4M4 17v1a3 3 0 003 3h10a3 3 0 003-3v-1"/></svg>
+            Modelo Excel
+          </button>
         </div>
         <div id="pipeline-lista"></div>
       </div>
@@ -1388,8 +1392,7 @@
     <div class="flex-1 overflow-y-auto px-6 py-5">
       <input type="hidden" id="opo-id" />
       <div class="mb-4"><label class="label">Título</label><input id="opo-titulo" type="text" class="input" placeholder="Ex: Energia Solar 5kWp - Padaria do João" /></div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-        <div><label class="label">Cliente cadastrado (opcional)</label><select id="opo-cliente" class="select"></select></div>
+      <div class="grid grid-cols-1 gap-4 mb-4">
         <div class="master-only"><label class="label">Vendedor</label><select id="opo-vendedor" class="select"></select></div>
       </div>
       <div class="border border-slate-200 rounded-xl p-4 mb-4 bg-slate-50/60">
@@ -1440,7 +1443,7 @@
         </select>
       </div>
       <div class="mb-4"><label class="label">Observações</label><textarea id="opo-obs" rows="3" class="textarea"></textarea></div>
-      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">💡 Ao mudar a etapa para <strong>Fechado Ganho</strong> com produto selecionado, uma venda é criada automaticamente.</div>
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">💡 Ao mudar a etapa para <strong>Fechado Ganho</strong> com produto selecionado, o cliente e a venda são criados automaticamente quando necessário.</div>
     </div>
     <div class="px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-2 bg-slate-50">
       <button onclick="Pipeline.closeModal()" class="btn-ghost">Cancelar</button>
@@ -4742,15 +4745,12 @@ const Pipeline = {
     UI.updateBadges();
   },
   openModal(id = null) {
-    const cs = Clientes.dadosVisiveis().sort((a, b) => a.nome.localeCompare(b.nome));
-    document.getElementById('opo-cliente').innerHTML = '<option value="">Sem cliente cadastrado</option>' + cs.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
     const vs = Store.data.vendedores.filter(v => v.ativo !== false).sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('opo-vendedor').innerHTML = '<option value="">— Sem vendedor —</option>' + vs.map(v => `<option value="${v.id}">${v.nome}</option>`).join('');
     const ps = [...Store.data.produtos].sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('opo-produto').innerHTML = '<option value="">— Sem produto definido —</option>' + ps.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
     document.getElementById('opo-id').value = '';
     document.getElementById('opo-titulo').value = '';
-    document.getElementById('opo-cliente').value = '';
     document.getElementById('opo-vendedor').value = (typeof Auth !== 'undefined' && Auth.isVendedor()) ? Auth.vendedorIdAtual() : '';
     document.getElementById('opo-produto').value = '';
     document.getElementById('opo-cliente-nome').value = '';
@@ -4772,7 +4772,6 @@ const Pipeline = {
       document.getElementById('modal-oportunidade-titulo').textContent = 'Editar Oportunidade';
       document.getElementById('opo-id').value = o.id;
       document.getElementById('opo-titulo').value = o.titulo || '';
-      document.getElementById('opo-cliente').value = o.clienteId;
       document.getElementById('opo-vendedor').value = o.vendedorId || '';
       document.getElementById('opo-produto').value = o.produtoId || '';
       const cd = this.clienteDados(o);
@@ -4802,19 +4801,54 @@ const Pipeline = {
     const etapa = document.getElementById('opo-etapa').value;
     document.getElementById('opo-prob-info').textContent = `Padrão para esta etapa: ${this.ETAPAS[etapa].prob}%`;
   },
-  preencherClienteSelecionado() {
-    const id = document.getElementById('opo-cliente').value;
-    const c = Store.data.clientes.find(x => x.id === id);
-    if (!c) return;
-    document.getElementById('opo-cliente-nome').value = c.nome || '';
-    document.getElementById('opo-cliente-doc').value = c.documento ? Format.doc(c.documento, c.tipo || (String(c.documento).replace(/\D/g, '').length > 11 ? 'cnpj' : 'cpf')) : '';
-    document.getElementById('opo-cliente-telefone').value = c.telefone ? Format.telefone(c.telefone) : '';
-    document.getElementById('opo-cliente-email').value = c.email || '';
+  tipoDocumento(documento) {
+    return String(documento || '').replace(/\D/g, '').length > 11 ? 'cnpj' : 'cpf';
+  },
+  localizarClienteExistente(clienteDados = {}) {
+    const doc = String(clienteDados.documento || '').replace(/\D/g, '');
+    if (doc) {
+      const porDoc = Store.data.clientes.find(c => String(c.documento || '').replace(/\D/g, '') === doc);
+      if (porDoc) return porDoc;
+    }
+    const nome = String(clienteDados.nome || '').trim().toLowerCase();
+    if (!nome) return null;
+    return Store.data.clientes.find(c => String(c.nome || '').trim().toLowerCase() === nome) || null;
+  },
+  garantirClienteDaOportunidade(o) {
+    const atual = o.clienteId ? Store.data.clientes.find(c => c.id === o.clienteId) : null;
+    if (atual) return atual.id;
+    const dados = this.clienteDados(o);
+    const existente = this.localizarClienteExistente(dados);
+    if (existente) {
+      o.clienteId = existente.id;
+      return existente.id;
+    }
+    const agora = new Date().toISOString();
+    const cliente = {
+      id: Store.uuid(),
+      tipo: this.tipoDocumento(dados.documento),
+      documento: String(dados.documento || '').replace(/\D/g, ''),
+      nome: dados.nome || o.titulo || 'Cliente sem nome',
+      telefone: String(dados.telefone || '').replace(/\D/g, ''),
+      email: dados.email || '',
+      contrato: '',
+      endereco: '',
+      origem: 'pipeline',
+      indicadoPor: null,
+      vendedorId: o.vendedorId || ((typeof Auth !== 'undefined' && Auth.isVendedor()) ? Auth.vendedorIdAtual() : null),
+      primeiroContato: null,
+      notas: dados.gestor ? [{ id: Store.uuid(), texto: 'Gestor/contato: ' + dados.gestor, tipo: 'outro', data: agora }] : [],
+      arquivos: [],
+      criadoEm: agora,
+      atualizadoEm: agora
+    };
+    Store.data.clientes.push(cliente);
+    o.clienteId = cliente.id;
+    return cliente.id;
   },
   salvar() {
     const id = document.getElementById('opo-id').value;
     const titulo = document.getElementById('opo-titulo').value.trim();
-    const clienteId = document.getElementById('opo-cliente').value;
     const valor = Format.parseMoeda(document.getElementById('opo-valor').value);
     const etapa = document.getElementById('opo-etapa').value;
     const clienteDados = {
@@ -4829,6 +4863,8 @@ const Pipeline = {
     const prob = probRaw === '' ? null : parseFloat(probRaw);
     const existente = id ? Store.data.oportunidades.find(x => x.id === id) : null;
     const tituloFinal = titulo || clienteDados.nome || 'Lead sem nome';
+    const clienteEncontrado = this.localizarClienteExistente(clienteDados);
+    const clienteId = existente?.clienteId || clienteEncontrado?.id || null;
     const o = {
       id: id || Store.uuid(),
       titulo: tituloFinal, clienteId: clienteId || null,
@@ -4853,14 +4889,18 @@ const Pipeline = {
       if (!id) Telegram.notificarPipeline(o, 'nova');
       else if (etapaAntiga !== o.etapa) Telegram.notificarPipeline(o, 'etapa');
     }
+    let toastExtra = '';
     // Conversão automática para venda quando vai para "fechado-ganho"
-    if (etapa === 'fechado-ganho' && (!existente || existente.etapa !== 'fechado-ganho') && o.produtoId && o.clienteId) {
+    const jaTemVenda = Store.data.vendas.some(v => v.oportunidadeId === o.id);
+    if (etapa === 'fechado-ganho' && o.produtoId && !jaTemVenda) {
       const p = Store.data.produtos.find(x => x.id === o.produtoId);
       if (p) {
-        const com = o.valor * (p.comissao / 100);
+        const cid = this.garantirClienteDaOportunidade(o);
+        const valorVenda = o.valor || o.clienteDados?.valorPago || 0;
+        const com = valorVenda * (p.comissao / 100);
         Store.data.vendas.push({
-          id: Store.uuid(), clienteId: o.clienteId, produtoId: o.produtoId,
-          vendedorId: o.vendedorId, valor: o.valor, comissao: com,
+          id: Store.uuid(), clienteId: cid, produtoId: o.produtoId,
+          vendedorId: o.vendedorId, valor: valorVenda, comissao: com,
           fatorComissao: p.comissao,
           data: new Date().toISOString().slice(0, 10),
           status: 'fechada',
@@ -4869,10 +4909,41 @@ const Pipeline = {
           criadoEm: new Date().toISOString(),
           atualizadoEm: new Date().toISOString()
         });
-        UI.toast('Venda criada automaticamente!', 'success');
+        toastExtra = ' Cliente e venda criados automaticamente.';
       }
+    } else if (etapa === 'fechado-ganho' && !o.produtoId && !jaTemVenda) {
+      toastExtra = ' Selecione um produto para criar a venda automaticamente.';
     }
-    if (Store.save()) { UI.toast(id ? 'Oportunidade atualizada!' : 'Oportunidade criada!'); this.closeModal(); this.render(); UI.updateBadges(); }
+    if (Store.save()) { UI.toast((id ? 'Oportunidade atualizada!' : 'Oportunidade criada!') + toastExtra, toastExtra.includes('Selecione') ? 'warning' : 'success', 8000); this.closeModal(); this.render(); UI.updateBadges(); }
+  },
+  baixarModeloImportacao() {
+    const linhas = [{
+      'Nome da empresa ou cliente': 'Mercado Exemplo Ltda',
+      'CPF/CNPJ': '12.345.678/0001-90',
+      'Telefone': '(73) 99999-0000',
+      'Email': 'contato@mercadoexemplo.com.br',
+      'Nome do gestor': 'Maria Silva',
+      'Produto': 'Produto cadastrado no CRM',
+      'Valor estimado': '15000,00',
+      'Valor pago': '',
+      'Título': 'Energia solar - Mercado Exemplo',
+      'Observações': 'Lead importado pelo modelo'
+    }];
+    if (typeof XLSX === 'undefined') {
+      const csv = Object.keys(linhas[0]).join(';') + '\n' + Object.values(linhas[0]).join(';');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'modelo-pipeline-oportunidades.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+    const ws = XLSX.utils.json_to_sheet(linhas);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Pipeline');
+    XLSX.writeFile(wb, 'modelo-pipeline-oportunidades.xlsx');
   },
   async importarPlanilha(event) {
     const file = event.target?.files?.[0];
@@ -4922,6 +4993,7 @@ const Pipeline = {
     const telefone = get('telefone', 'celular', 'whatsapp', 'fone');
     const email = get('email', 'e-mail');
     const gestor = get('gestor', 'nome do gestor', 'responsavel', 'responsável', 'contato');
+    const produtoNome = get('produto', 'plano', 'servico', 'serviço');
     const valor = this.parseValorLivre(get('valor estimado', 'valor', 'estimativa', 'potencial'));
     const valorPago = this.parseValorLivre(get('valor pago', 'pago', 'mensalidade', 'valor atual'));
     const tituloPlanilha = get('titulo', 'título', 'oportunidade', 'lead');
@@ -4931,6 +5003,9 @@ const Pipeline = {
     const clienteExistente = docDigits
       ? Store.data.clientes.find(c => String(c.documento || '').replace(/\D/g, '') === docDigits)
       : Store.data.clientes.find(c => nome && (c.nome || '').trim().toLowerCase() === nome.trim().toLowerCase());
+    const produtoExistente = produtoNome
+      ? Store.data.produtos.find(p => (p.nome || '').trim().toLowerCase() === produtoNome.trim().toLowerCase())
+      : null;
     return {
       id: Store.uuid(),
       titulo,
@@ -4944,7 +5019,7 @@ const Pipeline = {
         valorPago
       },
       vendedorId: (typeof Auth !== 'undefined' && Auth.isVendedor()) ? Auth.vendedorIdAtual() : null,
-      produtoId: null,
+      produtoId: produtoExistente?.id || null,
       valor,
       etapa: 'lead-novo',
       probabilidade: null,
@@ -5509,7 +5584,6 @@ document.addEventListener('DOMContentLoaded', () => {
       const digits = e.target.value.replace(/\D/g, '');
       e.target.value = Format.doc(digits, digits.length > 11 ? 'cnpj' : 'cpf');
     });
-    document.getElementById('opo-cliente').addEventListener('change', () => Pipeline.preencherClienteSelecionado());
   }
   if (document.getElementById('pipe-busca')) document.getElementById('pipe-busca').addEventListener('input', () => Pipeline.render());
   document.getElementById('login-pwd').addEventListener('keydown', e => { if (e.key === 'Enter') Auth.entrar(); });
