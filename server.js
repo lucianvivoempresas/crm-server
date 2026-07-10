@@ -834,6 +834,74 @@ function carregarEnergiaPayload() {
     });
 }
 
+function backupEnergiaAtual(callback) {
+    carregarEnergiaPayload()
+        .then(({ payload }) => {
+            if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length === 0) {
+                return callback();
+            }
+
+            const backupPayload = JSON.stringify({
+                criadoEm: new Date().toISOString(),
+                payload
+            });
+
+            energiaDb.run(
+                "INSERT INTO documents (collection, payload) VALUES (?, ?)",
+                ['energia-data-backup', backupPayload],
+                (err) => {
+                    if (err) {
+                        console.warn('⚠️ Falha ao criar backup de energia-data:', err.message);
+                    }
+                    callback();
+                }
+            );
+        })
+        .catch(err => {
+            console.warn('⚠️ Falha ao carregar energia-data para backup:', err.message);
+            callback();
+        });
+}
+
+function substituirEnergiaPayloadAtomico(payloadString, res, okBodyFactory) {
+    let parsed;
+    try {
+        parsed = JSON.parse(payloadString);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            throw new Error('Payload final inválido');
+        }
+    } catch (err) {
+        return res.status(400).json({ error: 'Payload final inválido: ' + err.message });
+    }
+
+    backupEnergiaAtual(() => {
+        energiaDb.serialize(() => {
+            energiaDb.run(
+                "DELETE FROM documents WHERE collection = 'energia-data'",
+                (deleteErr) => {
+                    if (deleteErr) {
+                        console.error('❌ Erro ao limpar energia-data antes de salvar:', deleteErr.message);
+                        return res.status(500).json({ error: deleteErr.message });
+                    }
+
+                    energiaDb.run(
+                        "INSERT INTO documents (collection, payload) VALUES (?, ?)",
+                        ['energia-data', JSON.stringify(parsed)],
+                        function(insertErr) {
+                            if (insertErr) {
+                                console.error('❌ Erro ao salvar energia-data:', insertErr.message);
+                                return res.status(500).json({ error: insertErr.message });
+                            }
+                            const body = typeof okBodyFactory === 'function' ? okBodyFactory.call(this, this.lastID) : { id: this.lastID };
+                            res.json(body);
+                        }
+                    );
+                }
+            );
+        });
+    });
+}
+
 function normalizarTipoEnergia(usuario) {
     const tipo = String(usuario?.tipo || '').trim().toLowerCase();
     if (tipo === 'master') return 'master';
@@ -1421,17 +1489,25 @@ app.get('/api/energia-data', (req, res) => {
  * Salva dados de energia em múltiplos pedaços menores para evitar limites de upload.
  */
 app.post('/api/energia-data/chunks', (req, res) => {
-    const { chunkIndex, data, clear } = req.body;
+    const { uploadId, chunkIndex, totalChunks, data, clear } = req.body;
 
-    if (typeof chunkIndex !== 'number' || typeof data !== 'string') {
-        return res.status(400).json({ error: 'chunkIndex e data são obrigatórios.' });
+    if (!uploadId || typeof uploadId !== 'string' || typeof chunkIndex !== 'number' || typeof totalChunks !== 'number' || typeof data !== 'string') {
+        return res.status(400).json({ error: 'uploadId, chunkIndex, totalChunks e data são obrigatórios.' });
+    }
+    if (chunkIndex < 0 || totalChunks <= 0 || chunkIndex >= totalChunks) {
+        return res.status(400).json({ error: 'Índice de chunk inválido.' });
+    }
+
+    const tempCollection = `energia-data-tmp-${uploadId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+    if (tempCollection === 'energia-data-tmp-') {
+        return res.status(400).json({ error: 'uploadId inválido.' });
     }
 
     energiaDb.serialize(() => {
         if (clear) {
-            energiaDb.run("DELETE FROM documents WHERE collection = 'energia-data'", (deleteErr) => {
+            energiaDb.run("DELETE FROM documents WHERE collection = ?", [tempCollection], (deleteErr) => {
                 if (deleteErr) {
-                    console.error('❌ Erro ao limpar energia-data antes de salvar chunks:', deleteErr.message);
+                    console.error('❌ Erro ao limpar chunks temporários:', deleteErr.message);
                     return res.status(500).json({ error: deleteErr.message });
                 }
                 insertChunk();
@@ -1441,16 +1517,55 @@ app.post('/api/energia-data/chunks', (req, res) => {
         }
 
         function insertChunk() {
-            const payload = JSON.stringify({ chunked: true, chunkIndex, data });
+            const payload = JSON.stringify({ chunked: true, uploadId, chunkIndex, totalChunks, data });
             energiaDb.run(
                 "INSERT INTO documents (collection, payload) VALUES (?, ?)",
-                ['energia-data', payload],
+                [tempCollection, payload],
                 function(err) {
                     if (err) {
-                        console.error('❌ Erro ao salvar chunk de energia-data:', err.message);
+                        console.error('❌ Erro ao salvar chunk temporário de energia-data:', err.message);
                         return res.status(500).json({ error: err.message });
                     }
-                    res.json({ id: this.lastID, chunkIndex });
+                    finalizarSeCompleto();
+                }
+            );
+        }
+
+        function finalizarSeCompleto() {
+            energiaDb.all(
+                "SELECT id, payload FROM documents WHERE collection = ? ORDER BY id ASC",
+                [tempCollection],
+                (err, rows) => {
+                    if (err) {
+                        console.error('❌ Erro ao consultar chunks temporários:', err.message);
+                        return res.status(500).json({ error: err.message });
+                    }
+
+                    if (!rows || rows.length < totalChunks) {
+                        return res.json({ received: rows ? rows.length : 0, chunkIndex, complete: false });
+                    }
+
+                    const parsedRows = rows.map(row => {
+                        try { return JSON.parse(row.payload); }
+                        catch (e) { return null; }
+                    }).filter(Boolean);
+
+                    const indices = new Set(parsedRows.map(row => row.chunkIndex));
+                    if (indices.size !== totalChunks) {
+                        return res.status(400).json({ error: 'Chunks incompletos ou duplicados.' });
+                    }
+
+                    const fullString = parsedRows
+                        .sort((a, b) => a.chunkIndex - b.chunkIndex)
+                        .map(row => row.data)
+                        .join('');
+
+                    substituirEnergiaPayloadAtomico(fullString, res, function(id) {
+                        energiaDb.run("DELETE FROM documents WHERE collection = ?", [tempCollection], cleanupErr => {
+                            if (cleanupErr) console.warn('⚠️ Falha ao limpar chunks temporários:', cleanupErr.message);
+                        });
+                        return { id, complete: true, totalChunks };
+                    });
                 }
             );
         }
@@ -1464,28 +1579,8 @@ app.post('/api/energia-data/chunks', (req, res) => {
 app.post('/api/energia-data', (req, res) => {
     console.log('📡 [energia] POST /api/energia-data recebido — headers:', JSON.stringify(req.headers));
     const payload = JSON.stringify(req.body);
-    energiaDb.serialize(() => {
-        energiaDb.run(
-            "DELETE FROM documents WHERE collection = 'energia-data'",
-            (deleteErr) => {
-                if (deleteErr) {
-                    console.error('❌ Erro ao limpar energia-data antes de salvar:', deleteErr.message);
-                    return res.status(500).json({ error: deleteErr.message });
-                }
-
-                energiaDb.run(
-                    "INSERT INTO documents (collection, payload) VALUES (?, ?)",
-                    ['energia-data', payload],
-                    function(err) {
-                        if (err) {
-                            console.error('❌ Erro ao salvar dados de energia:', err.message);
-                            return res.status(500).json({ error: err.message });
-                        }
-                        res.json({ id: this.lastID });
-                    }
-                );
-            }
-        );
+    substituirEnergiaPayloadAtomico(payload, res, function(id) {
+        return { id };
     });
 });
 
@@ -1495,56 +1590,9 @@ app.post('/api/energia-data', (req, res) => {
  */
 app.put('/api/energia-data/:id', (req, res) => {
     console.log(`📡 [energia] PUT /api/energia-data/${req.params.id} recebido — headers:`, JSON.stringify(req.headers));
-    const id = req.params.id;
     const payload = JSON.stringify(req.body);
-    energiaDb.serialize(() => {
-        energiaDb.run(
-            "DELETE FROM documents WHERE collection = 'energia-data' AND payload LIKE '%\"chunked\":true%'",
-            (deleteErr) => {
-                if (deleteErr) {
-                    console.error('❌ Erro ao limpar chunks antigos antes de atualizar energia-data:', deleteErr.message);
-                    return res.status(500).json({ error: deleteErr.message });
-                }
-
-                energiaDb.run(
-                    "UPDATE documents SET payload = ? WHERE collection = 'energia-data' AND id = ?",
-                    [payload, id],
-                    function(err) {
-                        if (err) {
-                            console.error('❌ Erro ao atualizar dados de energia:', err.message);
-                            return res.status(500).json({ error: err.message });
-                        }
-
-                        if (this.changes === 0) {
-                            console.log('ℹ️ Registro de energia não encontrado para update; criando novo registro.');
-                            energiaDb.run(
-                                "DELETE FROM documents WHERE collection = 'energia-data'",
-                                (clearErr) => {
-                                    if (clearErr) {
-                                        console.error('❌ Erro ao limpar energia-data antes de recrear:', clearErr.message);
-                                        return res.status(500).json({ error: clearErr.message });
-                                    }
-                                    energiaDb.run(
-                                        "INSERT INTO documents (collection, payload) VALUES (?, ?)",
-                                        ['energia-data', payload],
-                                        function(insertErr) {
-                                            if (insertErr) {
-                                                console.error('❌ Erro ao recriar dados de energia:', insertErr.message);
-                                                return res.status(500).json({ error: insertErr.message });
-                                            }
-                                            res.json({ success: true, id: this.lastID });
-                                        }
-                                    );
-                                }
-                            );
-                            return;
-                        }
-
-                        res.json({ success: true });
-                    }
-                );
-            }
-        );
+    substituirEnergiaPayloadAtomico(payload, res, function(id) {
+        return { success: true, id };
     });
 });
 

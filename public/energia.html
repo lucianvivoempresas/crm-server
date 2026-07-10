@@ -1835,6 +1835,7 @@ const Store = {
       for (let i = 0; i < payload.length; i += chunkSize) {
         chunks.push(payload.slice(i, i + chunkSize));
       }
+      const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
       for (let index = 0; index < chunks.length; index += 1) {
         const response = await fetch('/api/energia-data/chunks', {
@@ -1843,7 +1844,9 @@ const Store = {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
+            uploadId,
             chunkIndex: index,
+            totalChunks: chunks.length,
             data: chunks[index],
             clear: index === 0
           })
