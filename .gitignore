@@ -35,3 +35,4 @@ Thumbs.db
 server-backup.js
 server-v1.js
 *.sqlite.recovery_*
+database-backups/

@@ -181,15 +181,110 @@ app.get('/contato', (req, res) => {
 const DB_PATH = path.join(__dirname, 'crm_database.sqlite');
 const ENERGIA_DB_PATH = path.join(__dirname, 'energia_database.sqlite');
 const DB_BACKUP_DIR = path.join(__dirname, 'database-backups');
+const ENERGIA_JSON_BACKUP_DIR = path.join(DB_BACKUP_DIR, 'energia-json');
+const ENERGIA_BACKUP_RETENTION = parseEnvInt(process.env.ENERGIA_BACKUP_RETENTION, 200);
+const ENERGIA_PERIODIC_BACKUP_MS = parseEnvInt(process.env.ENERGIA_PERIODIC_BACKUP_MINUTES, 180) * 60 * 1000;
 
 function ensureBackupDirectory() {
     try {
         fs.mkdirSync(DB_BACKUP_DIR, { recursive: true });
+        fs.mkdirSync(ENERGIA_JSON_BACKUP_DIR, { recursive: true });
     } catch (err) {
         if (err.code !== 'EEXIST') {
             console.warn('⚠️ Falha ao criar diretório de backups de banco de dados:', err.message);
         }
     }
+}
+
+function timestampArquivo() {
+    return new Date().toISOString().replace(/[:.]/g, '').replace(/T/, '_').replace(/Z$/, '');
+}
+
+function contarRegistrosEnergia(payload) {
+    const contagem = {};
+    let total = 0;
+    ['clientes', 'produtos', 'vendas', 'vendedores', 'followups', 'pagamentos', 'metas', 'usuarios', 'oportunidades'].forEach(key => {
+        const qtd = Array.isArray(payload?.[key]) ? payload[key].length : 0;
+        contagem[key] = qtd;
+        total += qtd;
+    });
+    contagem.total = total;
+    return contagem;
+}
+
+function limparBackupsEnergiaAntigos() {
+    try {
+        ensureBackupDirectory();
+        const arquivos = fs.readdirSync(ENERGIA_JSON_BACKUP_DIR)
+            .filter(nome => nome.endsWith('.json'))
+            .map(nome => {
+                const fullPath = path.join(ENERGIA_JSON_BACKUP_DIR, nome);
+                const stat = fs.statSync(fullPath);
+                return { fullPath, mtimeMs: stat.mtimeMs };
+            })
+            .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+        arquivos.slice(ENERGIA_BACKUP_RETENTION).forEach(item => {
+            try { fs.unlinkSync(item.fullPath); } catch (err) {
+                console.warn('⚠️ Falha ao remover backup antigo:', item.fullPath, err.message);
+            }
+        });
+    } catch (err) {
+        console.warn('⚠️ Falha ao limpar backups antigos de energia:', err.message);
+    }
+}
+
+function criarBackupEnergiaArquivo(payload, reason = 'manual') {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length === 0) return null;
+    ensureBackupDirectory();
+    const safeReason = String(reason || 'manual').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50);
+    const backupPath = path.join(ENERGIA_JSON_BACKUP_DIR, `energia_${safeReason}_${timestampArquivo()}.json`);
+    const envelope = {
+        criadoEm: new Date().toISOString(),
+        reason,
+        counts: contarRegistrosEnergia(payload),
+        payload
+    };
+    try {
+        fs.writeFileSync(backupPath, JSON.stringify(envelope, null, 2), 'utf8');
+        limparBackupsEnergiaAntigos();
+        console.log(`✅ Backup JSON do CRM Energia criado em: ${backupPath}`);
+        return backupPath;
+    } catch (err) {
+        console.warn('⚠️ Falha ao criar backup JSON do CRM Energia:', err.message);
+        return null;
+    }
+}
+
+function sobrescritaEnergiaPerigosa(atual, proximo) {
+    const atualCounts = contarRegistrosEnergia(atual);
+    const nextCounts = contarRegistrosEnergia(proximo);
+    if (atualCounts.total < 10) return null;
+
+    const limiteMinimo = Math.max(3, Math.floor(atualCounts.total * 0.2));
+    if (nextCounts.total < limiteMinimo) {
+        return `bloqueado para evitar perda: total cairia de ${atualCounts.total} para ${nextCounts.total}`;
+    }
+
+    const colecoesCriticas = ['clientes', 'vendas', 'oportunidades'];
+    for (const key of colecoesCriticas) {
+        if (atualCounts[key] >= 5 && nextCounts[key] === 0) {
+            return `bloqueado para evitar perda: coleção ${key} cairia de ${atualCounts[key]} para 0`;
+        }
+    }
+
+    return null;
+}
+
+function criarBackupEnergiaPeriodico(reason = 'periodic') {
+    if (!energiaDb) return;
+    carregarEnergiaPayload()
+        .then(({ payload }) => {
+            criarBackupEnergiaArquivo(payload, reason);
+        })
+        .catch(err => {
+            console.warn('⚠️ Falha ao criar backup periódico do CRM Energia:', err.message);
+        });
 }
 
 function backupDatabaseFile(filePath, label, reason) {
@@ -838,11 +933,13 @@ function backupEnergiaAtual(callback) {
     carregarEnergiaPayload()
         .then(({ payload }) => {
             if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length === 0) {
-                return callback();
+                return callback(null);
             }
 
+            criarBackupEnergiaArquivo(payload, 'before-write');
             const backupPayload = JSON.stringify({
                 criadoEm: new Date().toISOString(),
+                counts: contarRegistrosEnergia(payload),
                 payload
             });
 
@@ -853,17 +950,17 @@ function backupEnergiaAtual(callback) {
                     if (err) {
                         console.warn('⚠️ Falha ao criar backup de energia-data:', err.message);
                     }
-                    callback();
+                    callback(payload);
                 }
             );
         })
         .catch(err => {
             console.warn('⚠️ Falha ao carregar energia-data para backup:', err.message);
-            callback();
+            callback(null);
         });
 }
 
-function substituirEnergiaPayloadAtomico(payloadString, res, okBodyFactory) {
+function substituirEnergiaPayloadAtomico(payloadString, res, okBodyFactory, options = {}) {
     let parsed;
     try {
         parsed = JSON.parse(payloadString);
@@ -874,7 +971,20 @@ function substituirEnergiaPayloadAtomico(payloadString, res, okBodyFactory) {
         return res.status(400).json({ error: 'Payload final inválido: ' + err.message });
     }
 
-    backupEnergiaAtual(() => {
+    backupEnergiaAtual((payloadAtual) => {
+        if (!options.allowDangerousOverwrite) {
+            const motivo = sobrescritaEnergiaPerigosa(payloadAtual, parsed);
+            if (motivo) {
+                console.warn('🛑 Salvamento do CRM Energia bloqueado:', motivo);
+                return res.status(409).json({
+                    error: 'Salvamento bloqueado para evitar perda de dados.',
+                    detail: motivo,
+                    currentCounts: contarRegistrosEnergia(payloadAtual),
+                    nextCounts: contarRegistrosEnergia(parsed)
+                });
+            }
+        }
+
         energiaDb.serialize(() => {
             energiaDb.run(
                 "DELETE FROM documents WHERE collection = 'energia-data'",
@@ -1565,6 +1675,8 @@ app.post('/api/energia-data/chunks', (req, res) => {
                             if (cleanupErr) console.warn('⚠️ Falha ao limpar chunks temporários:', cleanupErr.message);
                         });
                         return { id, complete: true, totalChunks };
+                    }, {
+                        allowDangerousOverwrite: String(req.headers['x-allow-data-reset'] || '').toLowerCase() === 'true'
                     });
                 }
             );
@@ -1581,6 +1693,8 @@ app.post('/api/energia-data', (req, res) => {
     const payload = JSON.stringify(req.body);
     substituirEnergiaPayloadAtomico(payload, res, function(id) {
         return { id };
+    }, {
+        allowDangerousOverwrite: String(req.headers['x-allow-data-reset'] || '').toLowerCase() === 'true'
     });
 });
 
@@ -1593,6 +1707,8 @@ app.put('/api/energia-data/:id', (req, res) => {
     const payload = JSON.stringify(req.body);
     substituirEnergiaPayloadAtomico(payload, res, function(id) {
         return { success: true, id };
+    }, {
+        allowDangerousOverwrite: String(req.headers['x-allow-data-reset'] || '').toLowerCase() === 'true'
     });
 });
 
@@ -1626,30 +1742,10 @@ app.post('/api/energia-import-backup', (req, res) => {
         return res.status(400).json({ success: false, error: 'Backup inválido para CRM Energia.' });
     }
 
-    energiaDb.serialize(() => {
-        energiaDb.run('BEGIN TRANSACTION');
-        energiaDb.run('DELETE FROM documents WHERE collection = ?', ['energia-data'], (deleteErr) => {
-            if (deleteErr) {
-                energiaDb.run('ROLLBACK');
-                console.error('❌ Erro ao limpar energia-data antes de importação:', deleteErr.message);
-                return res.status(500).json({ success: false, error: deleteErr.message });
-            }
-
-            energiaDb.run(
-                'INSERT INTO documents (collection, payload) VALUES (?, ?)',
-                ['energia-data', JSON.stringify(payload)],
-                function(insertErr) {
-                    if (insertErr) {
-                        energiaDb.run('ROLLBACK');
-                        console.error('❌ Erro ao salvar energia-data durante importação:', insertErr.message);
-                        return res.status(500).json({ success: false, error: insertErr.message });
-                    }
-
-                    energiaDb.run('COMMIT');
-                    return res.json({ success: true, id: this.lastID });
-                }
-            );
-        });
+    substituirEnergiaPayloadAtomico(JSON.stringify(payload), res, function(id) {
+        return { success: true, id };
+    }, {
+        allowDangerousOverwrite: true
     });
 });
 
@@ -1783,30 +1879,10 @@ app.post('/api/import-backup', requireAuth, requireMaster, async (req, res) => {
 
         if (isEnergiaBackupPayload(payload)) {
             console.log('📡 [energia] Importando backup do CRM Energia para energia_database.sqlite');
-            energiaDb.serialize(() => {
-                energiaDb.run('BEGIN TRANSACTION');
-                energiaDb.run('DELETE FROM documents WHERE collection = ?', ['energia-data'], (deleteErr) => {
-                    if (deleteErr) {
-                        energiaDb.run('ROLLBACK');
-                        console.error('❌ Erro ao limpar energia-data antes de importar backup:', deleteErr.message);
-                        return res.status(500).json({ success: false, error: deleteErr.message });
-                    }
-
-                    energiaDb.run(
-                        'INSERT INTO documents (collection, payload) VALUES (?, ?)',
-                        ['energia-data', JSON.stringify(payload)],
-                        function(insertErr) {
-                            if (insertErr) {
-                                energiaDb.run('ROLLBACK');
-                                console.error('❌ Erro ao inserir energia-data durante importação:', insertErr.message);
-                                return res.status(500).json({ success: false, error: insertErr.message });
-                            }
-
-                            energiaDb.run('COMMIT');
-                            return res.json({ success: true, importedCollections: 1, id: this.lastID });
-                        }
-                    );
-                });
+            substituirEnergiaPayloadAtomico(JSON.stringify(payload), res, function(id) {
+                return { success: true, importedCollections: 1, id };
+            }, {
+                allowDangerousOverwrite: true
             });
             return;
         }
@@ -2144,6 +2220,8 @@ function startServer() {
         console.log(`🚀 CRM Servidor rodando em http://localhost:${PORT}`);
         console.log(`📡 Acesse remotamente via: https://loconecta.com.br (com Nginx como proxy)`);
         console.log(`💡 Certifique-se de que Nginx está configurado apontando para localhost:${PORT}`);
+        criarBackupEnergiaPeriodico('startup');
+        setInterval(() => criarBackupEnergiaPeriodico('periodic'), ENERGIA_PERIODIC_BACKUP_MS).unref();
     });
 }
 
