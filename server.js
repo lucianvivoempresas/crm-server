@@ -75,6 +75,11 @@ const allowedOrigins = (
     .map(origin => origin.trim())
     .filter(Boolean);
 
+function isAllowedOrigin(origin) {
+    const isLocalDevOrigin = !IS_PROD && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin || '');
+    return !origin || allowedOrigins.includes(origin) || isLocalDevOrigin;
+}
+
 const blockedPublicFiles = new Set([
     'debug-auth.html',
     'debug-cnpj.html',
@@ -87,14 +92,13 @@ app.disable('x-powered-by');
 // Permite requisições de outras origens e aumenta limite de tamanho para a importação de Excel
 app.use(cors({
     origin(origin, callback) {
-        const isLocalDevOrigin = !IS_PROD && /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin || '');
-        if (!origin || allowedOrigins.includes(origin) || isLocalDevOrigin) {
+        if (isAllowedOrigin(origin)) {
             return callback(null, true);
         }
         return callback(new Error('Origem não permitida pelo CORS'));
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Id', 'X-User-Perfil']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Id', 'X-User-Perfil', 'X-Allow-Data-Reset']
 }));
 
 app.use((req, res, next) => {
@@ -104,6 +108,15 @@ app.use((req, res, next) => {
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
     if (IS_PROD) {
         res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    }
+    next();
+});
+
+app.use((req, res, next) => {
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+    const origin = req.get('Origin');
+    if (origin && !isAllowedOrigin(origin)) {
+        return res.status(403).json({ success: false, error: 'Origem não permitida.' });
     }
     next();
 });
@@ -798,6 +811,74 @@ function requireMaster(req, res, next) {
     next();
 }
 
+const loginAttempts = new Map();
+
+function rateLimitLogin(req, res, next) {
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    const userKey = String(req.body?.login || req.body?.email || '').trim().toLowerCase();
+    const key = `${ip}:${userKey}`;
+    const now = Date.now();
+    const windowMs = 15 * 60 * 1000;
+    const maxAttempts = 10;
+    const current = loginAttempts.get(key) || { count: 0, first: now };
+
+    if (now - current.first > windowMs) {
+        current.count = 0;
+        current.first = now;
+    }
+
+    current.count += 1;
+    loginAttempts.set(key, current);
+
+    if (current.count > maxAttempts) {
+        return res.status(429).json({ success: false, error: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' });
+    }
+
+    next();
+}
+
+function clearLoginAttempts(req) {
+    const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+    const userKey = String(req.body?.login || req.body?.email || '').trim().toLowerCase();
+    loginAttempts.delete(`${ip}:${userKey}`);
+}
+
+async function requireEnergiaAuth(req, res, next) {
+    try {
+        const token = readCookies(req).energia_session;
+        const session = validarTokenSessao(token);
+        if (!session || !session.userId) {
+            clearEnergiaSessionCookie(res);
+            return res.status(401).json({ success: false, error: 'Não autenticado.' });
+        }
+
+        const { payload } = await carregarEnergiaPayload();
+        const usuarios = Array.isArray(payload.usuarios) ? payload.usuarios : [];
+        const usuario = usuarios.find(u => u.id === session.userId && u.ativo !== false);
+        if (!usuario) {
+            clearEnergiaSessionCookie(res);
+            return res.status(401).json({ success: false, error: 'Usuário não encontrado.' });
+        }
+
+        req.energiaAuth = {
+            userId: usuario.id,
+            perfil: normalizarTipoEnergia(usuario),
+            usuario
+        };
+        next();
+    } catch (err) {
+        console.error('Erro ao validar autenticação Energia:', err.message);
+        return res.status(500).json({ success: false, error: 'Erro ao validar autenticação.' });
+    }
+}
+
+function requireEnergiaMaster(req, res, next) {
+    if (!req.energiaAuth || req.energiaAuth.perfil !== 'master') {
+        return res.status(403).json({ success: false, error: 'Acesso restrito ao perfil master.' });
+    }
+    next();
+}
+
 // ============ CRIAÇÃO DE TABELAS ============
 
 // Cria uma tabela universal (estilo NoSQL) para manter compatibilidade com o seu código anterior
@@ -1093,7 +1174,7 @@ function criarUsuariosPadroes() {
  * POST /auth/login
  * Autentica usuário e retorna dados do usuário
  */
-app.post('/auth/login', (req, res) => {
+app.post('/auth/login', rateLimitLogin, (req, res) => {
     const { email, senha } = req.body;
     
     console.log(`🔐 Tentativa de login: ${email}`);
@@ -1139,6 +1220,7 @@ app.post('/auth/login', (req, res) => {
             
             // Login bem-sucedido
             console.log(`✅ Login bem-sucedido: ${email} (${user.perfil})`);
+            clearLoginAttempts(req);
             
             // Atualizar último acesso
             const agora = new Date().toISOString();
@@ -1473,7 +1555,7 @@ app.post('/api/clientes/bulk-upsert', requireAuth, (req, res) => {
 // ============ ENDPOINTS PARA CRM ENERGIA (SEM AUTENTICAÇÃO) ============
 // Estas rotas DEVEM estar ANTES das rotas genéricas /api/:collection para não serem capturadas por elas
 
-app.post('/api/energia-login', async (req, res) => {
+app.post('/api/energia-login', rateLimitLogin, async (req, res) => {
     try {
         const login = String(req.body?.login || '').trim().toLowerCase();
         const senha = String(req.body?.senha || '');
@@ -1502,10 +1584,68 @@ app.post('/api/energia-login', async (req, res) => {
         }
 
         setEnergiaSessionCookie(res, token);
+        clearLoginAttempts(req);
         return res.json({ success: true, usuario: usuarioEnergiaSeguro({ ...usuario, tipo }) });
     } catch (err) {
         console.error('Erro no login Energia:', err.message);
         return res.status(500).json({ success: false, error: 'Erro ao autenticar no CRM Energia.' });
+    }
+});
+
+app.post('/api/energia-setup', rateLimitLogin, async (req, res) => {
+    try {
+        const nome = String(req.body?.nome || '').trim();
+        const login = String(req.body?.login || '').trim().toLowerCase();
+        const salt = String(req.body?.salt || '').trim();
+        const senhaHash = String(req.body?.senhaHash || '').trim();
+
+        if (!nome || !/^[a-z0-9._-]{3,}$/.test(login) || !salt || !senhaHash) {
+            return res.status(400).json({ success: false, error: 'Dados inválidos para criação do master.' });
+        }
+
+        const { payload } = await carregarEnergiaPayload();
+        const usuarios = Array.isArray(payload.usuarios) ? payload.usuarios : [];
+        if (usuarios.length > 0) {
+            return res.status(409).json({ success: false, error: 'Configuração inicial já foi realizada.' });
+        }
+
+        const usuario = {
+            id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}${crypto.randomBytes(6).toString('hex')}`,
+            nome,
+            login,
+            salt,
+            senhaHash,
+            tipo: 'master',
+            vendedorId: null,
+            ativo: true,
+            criadoEm: new Date().toISOString()
+        };
+
+        const nextPayload = {
+            ...payload,
+            clientes: Array.isArray(payload.clientes) ? payload.clientes : [],
+            produtos: Array.isArray(payload.produtos) ? payload.produtos : [],
+            vendas: Array.isArray(payload.vendas) ? payload.vendas : [],
+            vendedores: Array.isArray(payload.vendedores) ? payload.vendedores : [],
+            followups: Array.isArray(payload.followups) ? payload.followups : [],
+            pagamentos: Array.isArray(payload.pagamentos) ? payload.pagamentos : [],
+            metas: Array.isArray(payload.metas) ? payload.metas : [],
+            oportunidades: Array.isArray(payload.oportunidades) ? payload.oportunidades : [],
+            config: payload.config && typeof payload.config === 'object' ? payload.config : {},
+            usuarios: [usuario]
+        };
+
+        substituirEnergiaPayloadAtomico(JSON.stringify(nextPayload), res, function(id) {
+            const token = gerarTokenSessao({ id: usuario.id, perfil: 'master' });
+            if (token) setEnergiaSessionCookie(res, token);
+            clearLoginAttempts(req);
+            return { success: true, id, usuario: usuarioEnergiaSeguro(usuario) };
+        }, {
+            allowDangerousOverwrite: true
+        });
+    } catch (err) {
+        console.error('Erro no setup Energia:', err.message);
+        return res.status(500).json({ success: false, error: 'Erro ao configurar master.' });
     }
 });
 
@@ -1542,7 +1682,7 @@ app.post('/api/energia-logout', (req, res) => {
  * GET /api/energia-data
  * Carregar dados de energia do banco
  */
-app.get('/api/energia-data', (req, res) => {
+app.get('/api/energia-data', requireEnergiaAuth, (req, res) => {
     console.log('📡 [energia] GET /api/energia-data recebido');
     energiaDb.all(
         "SELECT id, payload FROM documents WHERE collection = 'energia-data' ORDER BY id ASC",
@@ -1598,7 +1738,7 @@ app.get('/api/energia-data', (req, res) => {
  * POST /api/energia-data/chunks
  * Salva dados de energia em múltiplos pedaços menores para evitar limites de upload.
  */
-app.post('/api/energia-data/chunks', (req, res) => {
+app.post('/api/energia-data/chunks', requireEnergiaAuth, (req, res) => {
     const { uploadId, chunkIndex, totalChunks, data, clear } = req.body;
 
     if (!uploadId || typeof uploadId !== 'string' || typeof chunkIndex !== 'number' || typeof totalChunks !== 'number' || typeof data !== 'string') {
@@ -1688,7 +1828,7 @@ app.post('/api/energia-data/chunks', (req, res) => {
  * POST /api/energia-data
  * Criar novo registro de dados de energia
  */
-app.post('/api/energia-data', (req, res) => {
+app.post('/api/energia-data', requireEnergiaAuth, (req, res) => {
     console.log('📡 [energia] POST /api/energia-data recebido — headers:', JSON.stringify(req.headers));
     const payload = JSON.stringify(req.body);
     substituirEnergiaPayloadAtomico(payload, res, function(id) {
@@ -1702,7 +1842,7 @@ app.post('/api/energia-data', (req, res) => {
  * PUT /api/energia-data/:id
  * Atualizar dados de energia existentes
  */
-app.put('/api/energia-data/:id', (req, res) => {
+app.put('/api/energia-data/:id', requireEnergiaAuth, (req, res) => {
     console.log(`📡 [energia] PUT /api/energia-data/${req.params.id} recebido — headers:`, JSON.stringify(req.headers));
     const payload = JSON.stringify(req.body);
     substituirEnergiaPayloadAtomico(payload, res, function(id) {
@@ -1716,7 +1856,7 @@ app.put('/api/energia-data/:id', (req, res) => {
  * DELETE /api/energia-data/:id
  * Deletar dados de energia
  */
-app.delete('/api/energia-data/:id', (req, res) => {
+app.delete('/api/energia-data/:id', requireEnergiaAuth, requireEnergiaMaster, (req, res) => {
     const id = req.params.id;
     energiaDb.run(
         "DELETE FROM documents WHERE collection = 'energia-data' AND id = ?",
@@ -1736,7 +1876,7 @@ app.delete('/api/energia-data/:id', (req, res) => {
  * Importa backup do CRM Energia diretamente no banco energia_database.sqlite.
  * Este endpoint não exige autenticação, pois é usado pela interface local.
  */
-app.post('/api/energia-import-backup', (req, res) => {
+app.post('/api/energia-import-backup', requireEnergiaAuth, requireEnergiaMaster, (req, res) => {
     const payload = normalizeImportBackupPayload(req.body);
     if (!isEnergiaBackupPayload(payload)) {
         return res.status(400).json({ success: false, error: 'Backup inválido para CRM Energia.' });

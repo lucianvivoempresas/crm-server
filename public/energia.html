@@ -4409,12 +4409,6 @@ const Auth = {
   // Verifica sessão na inicialização
   async iniciar() {
     try {
-      await Store.load();
-      if (Store.data.usuarios.length === 0) {
-        await this._createDefaultMasterUser();
-        this.mostrarLogin();
-        return;
-      }
       Store.clearLocalState();
       if (await this.restaurarSessao()) return;
       this.mostrarLogin();
@@ -4453,7 +4447,8 @@ const Auth = {
       if (!response.ok) return false;
       const result = await response.json().catch(() => null);
       if (!result || result.success !== true || !result.usuario) return false;
-      const usuario = Store.data.usuarios.find(u => u.id === result.usuario.id || u.login === result.usuario.login);
+      await Store.load();
+      const usuario = Store.data.usuarios.find(u => u.id === result.usuario.id || u.login === result.usuario.login) || result.usuario;
       if (!usuario || usuario.ativo === false) return false;
       this.aposLogin(usuario, { silent: true });
       return true;
@@ -4474,28 +4469,29 @@ const Auth = {
     if (pwd !== pwd2) return erro('As senhas não conferem');
     const salt = this.gerarSalt();
     const senhaHash = await this.hash(pwd, salt);
-    if (!Store.serverOnline) {
+    try {
+      const response = await fetch('/api/energia-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome, login, salt, senhaHash })
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success || !result.usuario) {
+        return erro(result?.error || 'Não foi possível criar a conta master.');
+      }
+      await Store.load();
+      const usuario = Store.data.usuarios.find(u => u.id === result.usuario.id || u.login === result.usuario.login) || result.usuario;
+      UI.toast('Conta master criada!');
+      this.aposLogin(usuario);
+    } catch (e) {
       return erro('Conexão com servidor necessária para criar usuário master.');
     }
-
-    const u = {
-      id: Store.uuid(), nome, login, salt, senhaHash,
-      tipo: 'master', vendedorId: null, ativo: true,
-      criadoEm: new Date().toISOString()
-    };
-    Store.data.usuarios.push(u);
-    Store.save();
-    UI.toast('Conta master criada!');
-    this.aposLogin(u);
   },
   async entrar() {
     const login = document.getElementById('login-user').value.trim().toLowerCase();
     const pwd = document.getElementById('login-pwd').value;
-    const u = Store.data.usuarios.find(x => x.login === login && x.ativo !== false);
     const erro = () => { const e = document.getElementById('login-erro'); e.classList.remove('hidden'); setTimeout(() => e.classList.add('hidden'), 3000); };
-    if (!u) return erro();
-    const h = await this.hash(pwd, u.salt);
-    if (h !== u.senhaHash) return erro();
+    let usuarioLogado = null;
     try {
       const response = await fetch('/api/energia-login', {
         method: 'POST',
@@ -4505,12 +4501,15 @@ const Auth = {
       if (!response.ok) return erro();
       const result = await response.json().catch(() => null);
       if (!result || result.success !== true) return erro();
+      await Store.load();
+      usuarioLogado = Store.data.usuarios.find(x => x.id === result.usuario?.id || x.login === result.usuario?.login) || result.usuario;
     } catch (e) {
       console.error('Erro ao criar sessao no servidor:', e);
       return erro();
     }
+    if (!usuarioLogado) return erro();
     document.getElementById('login-pwd').value = '';
-    this.aposLogin(u);
+    this.aposLogin(usuarioLogado);
   },
   aposLogin(u, options = {}) {
     u.tipo = this.normalizarTipo(u);
