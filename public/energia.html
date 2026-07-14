@@ -1605,6 +1605,11 @@ const Store = {
   serverDocId: null,
   serverOnline: false,
   isSyncing: false,
+  pendingSync: false,
+  syncPromise: null,
+  lastSyncErrorType: null,
+  lastSyncErrorMessage: '',
+  allowDangerousOverwriteOnce: false,
   syncFailureReported: false,
 
   clearLocalState() {
@@ -1742,9 +1747,13 @@ const Store = {
       return false;
     }
 
-    this._syncToServer().then(success => {
+    this._queueSync().then(success => {
       if (!success) {
-        this._markServerOffline('Servidor indisponível. Nada foi salvo no banco.');
+        if (this.lastSyncErrorType === 'blocked') {
+          if (typeof UI !== 'undefined') UI.toast(this.lastSyncErrorMessage || 'Salvamento bloqueado para evitar perda de dados.', 'error', 12000);
+        } else {
+          this._markServerOffline('Servidor indisponível. Nada foi salvo no banco.');
+        }
       }
     });
     return true;
@@ -1753,34 +1762,61 @@ const Store = {
   // Método público para sincronizar manualmente com o servidor
   async sync() {
     try {
-      await this._syncToServer();
+      await this._queueSync();
     } catch (e) {
       console.error('Erro durante sync manual:', e);
       throw e;
     }
   },
 
-  async _syncToServer() {
-    if (this.isSyncing) return;
+  _queueSync() {
+    if (this.isSyncing) {
+      this.pendingSync = true;
+      return this.syncPromise || Promise.resolve(true);
+    }
+    this.syncPromise = this._syncLoop();
+    return this.syncPromise;
+  },
+
+  async _syncLoop() {
     this.isSyncing = true;
+    let ok = true;
+
+    try {
+      do {
+        this.pendingSync = false;
+        ok = await this._syncToServerOnce();
+      } while (ok && this.pendingSync);
+      return ok;
+    } finally {
+      this.isSyncing = false;
+      this.syncPromise = null;
+    }
+  },
+
+  async _syncToServerOnce() {
+    this.lastSyncErrorType = null;
+    this.lastSyncErrorMessage = '';
 
     try {
       const payload = JSON.stringify(this.data);
+      const headers = { 'Content-Type': 'application/json' };
+      if (this.allowDangerousOverwriteOnce) headers['X-Allow-Data-Reset'] = 'true';
       if (payload.length > 100000) {
-        const chunkedSuccess = await this._syncToServerChunked(payload);
+        const chunkedSuccess = await this._syncToServerChunked(payload, headers);
+        if (chunkedSuccess) this.allowDangerousOverwriteOnce = false;
         return chunkedSuccess;
       }
 
       if (this.serverDocId) {
         const response = await fetch(`/api/energia-data/${this.serverDocId}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers,
           body: payload
         });
 
         if (response.ok) {
+          this.allowDangerousOverwriteOnce = false;
           const result = await response.json().catch(() => null);
           if (result && result.id) {
             this.serverDocId = result.id;
@@ -1791,7 +1827,7 @@ const Store = {
           return true;
         }
 
-        console.warn('⚠️ PUT falhou ao sincronizar: ' + response.status);
+        await this._handleSyncFailureResponse(response, 'PUT');
         if (response.status === 404 || response.status === 410) {
           console.log('ℹ️ Documento de energia não encontrado no servidor. Registrando um novo documento.');
           this.serverDocId = null;
@@ -1802,12 +1838,11 @@ const Store = {
 
       const response = await fetch(`/api/energia-data`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers,
         body: payload
       });
       if (response.ok) {
+        this.allowDangerousOverwriteOnce = false;
         const result = await response.json();
         this.serverOnline = true;
         this.syncFailureReported = false;
@@ -1817,18 +1852,29 @@ const Store = {
         }
         return true;
       } else {
-        console.warn('⚠️ Erro ao salvar: ' + response.status);
+        await this._handleSyncFailureResponse(response, 'POST');
         return false;
       }
     } catch (e) {
       console.error('❌ Erro ao sincronizar com servidor:', e.message || e);
+      this.lastSyncErrorType = 'network';
+      this.lastSyncErrorMessage = e.message || String(e);
       return false;
-    } finally {
-      this.isSyncing = false;
     }
   },
 
-  async _syncToServerChunked(payload) {
+  async _handleSyncFailureResponse(response, contexto) {
+    let detalhe = '';
+    try {
+      const data = await response.clone().json();
+      detalhe = data?.detail || data?.error || '';
+    } catch (e) {}
+    console.warn(`⚠️ ${contexto} falhou ao sincronizar: ${response.status}`, detalhe);
+    this.lastSyncErrorType = response.status === 409 ? 'blocked' : 'server';
+    this.lastSyncErrorMessage = detalhe || `Servidor retornou ${response.status}`;
+  },
+
+  async _syncToServerChunked(payload, headers = { 'Content-Type': 'application/json' }) {
     try {
       const chunkSize = 100000;
       const chunks = [];
@@ -1840,9 +1886,7 @@ const Store = {
       for (let index = 0; index < chunks.length; index += 1) {
         const response = await fetch('/api/energia-data/chunks', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
+          headers,
           body: JSON.stringify({
             uploadId,
             chunkIndex: index,
@@ -1853,7 +1897,7 @@ const Store = {
         });
 
         if (!response.ok) {
-          console.warn('⚠️ Erro ao salvar chunk', index, response.status);
+          await this._handleSyncFailureResponse(response, `chunk ${index + 1}/${chunks.length}`);
           return false;
         }
       }
@@ -4648,6 +4692,9 @@ const Pipeline = {
   },
   filtroBusca: '',
   filtroEtapa: 'abertas',
+  pagina: 1,
+  porPagina: 100,
+  ultimoFiltroKey: '',
   selecionados: new Set(),
   todas() {
     return typeof Auth !== 'undefined' && Auth.isVendedor()
@@ -4714,15 +4761,25 @@ const Pipeline = {
       const set = new Set(ids);
       Store.data.oportunidades = Store.data.oportunidades.filter(o => !set.has(o.id));
       this.selecionados.clear();
+      Store.allowDangerousOverwriteOnce = true;
       Store.save();
       UI.toast('Oportunidades excluídas');
       this.render();
       UI.updateBadges();
     });
   },
+  mudarPagina(delta) {
+    this.pagina = Math.max(1, this.pagina + delta);
+    this.render();
+  },
   render() {
     this.filtroBusca = (document.getElementById('pipe-busca')?.value || '').toLowerCase();
     this.filtroEtapa = document.getElementById('pipe-filtro-etapa')?.value || 'abertas';
+    const filtroKey = `${this.filtroBusca}|${this.filtroEtapa}`;
+    if (this.ultimoFiltroKey !== filtroKey) {
+      this.pagina = 1;
+      this.ultimoFiltroKey = filtroKey;
+    }
     const todas = this.todas();
     const abertas = todas.filter(o => !['fechado-ganho', 'fechado-perdido'].includes(o.etapa));
     // Stats por etapa
@@ -4760,11 +4817,24 @@ const Pipeline = {
     if (dados.length === 0) { lista.innerHTML = '<div class="text-center py-12 text-sm text-slate-500">Nenhuma oportunidade nesta visualização</div>'; return; }
     dados.sort((a, b) => (b.dataAbertura || '').localeCompare(a.dataAbertura || ''));
     const ehMaster = typeof Auth === 'undefined' || Auth.isMaster();
+    const totalFiltrado = dados.length;
+    const totalPaginas = Math.max(1, Math.ceil(totalFiltrado / this.porPagina));
+    this.pagina = Math.min(Math.max(1, this.pagina), totalPaginas);
+    const inicio = (this.pagina - 1) * this.porPagina;
+    const dadosPagina = dados.slice(inicio, inicio + this.porPagina);
     const todosIds = dados.map(o => o.id);
     const todosMarcados = todosIds.length > 0 && todosIds.every(id => this.selecionados.has(id));
+    const paginacao = totalPaginas > 1 ? `<div class="flex items-center justify-between gap-3 px-4 py-3 border-t border-slate-100 text-xs text-slate-500">
+      <span>Mostrando ${inicio + 1}-${Math.min(inicio + this.porPagina, totalFiltrado)} de ${totalFiltrado}</span>
+      <div class="flex items-center gap-2">
+        <button class="btn-secondary text-xs" style="padding:0.35rem 0.7rem" onclick="Pipeline.mudarPagina(-1)" ${this.pagina <= 1 ? 'disabled' : ''}>Anterior</button>
+        <span class="font-semibold text-slate-700">Página ${this.pagina}/${totalPaginas}</span>
+        <button class="btn-secondary text-xs" style="padding:0.35rem 0.7rem" onclick="Pipeline.mudarPagina(1)" ${this.pagina >= totalPaginas ? 'disabled' : ''}>Próxima</button>
+      </div>
+    </div>` : '';
     lista.innerHTML = `<div class="overflow-x-auto"><table class="data-table">
       <thead><tr><th class="w-10 text-center"><input type="checkbox" class="w-4 h-4 accent-emerald-600" onchange="Pipeline.selecionarTodosVisiveis(this.checked)" ${todosMarcados ? 'checked' : ''} title="Selecionar todos" /></th><th>Cliente / Lead</th><th>Título</th>${ehMaster ? '<th>Vendedor</th>' : ''}<th class="text-right">Valor</th><th class="text-right">Pago</th><th class="text-right">Prob.</th><th class="text-right">Ponderado</th><th class="text-center">Etapa</th><th></th></tr></thead>
-      <tbody>${dados.map(o => {
+      <tbody>${dadosPagina.map(o => {
         const c = this.clienteDados(o);
         const ven = o.vendedorId ? Store.data.vendedores.find(x => x.id === o.vendedorId) : null;
         const prob = o.probabilidade != null ? o.probabilidade : this.ETAPAS[o.etapa].prob;
@@ -4792,7 +4862,7 @@ const Pipeline = {
             <button onclick="Pipeline.editar('${o.id}')" class="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">${ICONS.edit}</button>
             <button onclick="Pipeline.excluir('${o.id}')" class="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">${ICONS.trash}</button>
           </td>
-        </tr>`;}).join('')}</tbody></table></div>`;
+        </tr>`;}).join('')}</tbody></table>${paginacao}</div>`;
     UI.updateBadges();
   },
   openModal(id = null) {
@@ -5525,7 +5595,7 @@ const Backup = {
         Store.data = data;
         Store._ensureDefaults();
         UI.toast('Enviando backup para o banco em partes...', 'info', 6000);
-        const success = await Store._syncToServerChunked(JSON.stringify(Store.data));
+        const success = await Store._syncToServerChunked(JSON.stringify(Store.data), { 'Content-Type': 'application/json', 'X-Allow-Data-Reset': 'true' });
         if (!success) {
           throw new Error('Servidor recusou o envio em partes. Verifique os logs do servidor.');
         }
@@ -5552,6 +5622,7 @@ const Backup = {
     UI.confirm('Limpar Todos os Dados', 'Isso apagará TUDO inclusive usuários. Continuar?', () => {
       Store.data = { clientes: [], produtos: [], vendas: [], vendedores: [], followups: [], pagamentos: [], metas: [], config: {}, usuarios: [], oportunidades: [] };
       Store.serverDocId = null;
+      Store.allowDangerousOverwriteOnce = true;
       Store.save();
       Store.clearLocalState();
       location.reload();
