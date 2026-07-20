@@ -1837,6 +1837,89 @@ app.patch('/api/energia-config', requireEnergiaAuth, requireEnergiaMaster, (req,
     });
 });
 
+app.post('/api/energia-telegram/notificar', requireEnergiaAuth, async (req, res) => {
+    const evento = String(req.body?.evento || '').trim();
+    const texto = String(req.body?.texto || '');
+    const eventosPermitidos = new Set(['geral', 'pipeline', 'venda-nova', 'venda-status', 'venda-obs']);
+
+    if (!eventosPermitidos.has(evento) || !texto || texto.length > 4000) {
+        return res.status(400).json({ success: false, error: 'Notificação inválida.' });
+    }
+
+    try {
+        const { payload } = await carregarEnergiaPayload();
+        const telegram = payload?.config?.telegram;
+        if (!telegram || telegram.ativo !== true) {
+            return res.json({ success: true, sent: 0, blocked: 'telegram-inativo' });
+        }
+
+        const eventoAtivo = {
+            geral: true,
+            pipeline: telegram.eventos?.pipelineEtapa !== false,
+            'venda-nova': telegram.eventos?.novaVenda !== false,
+            'venda-status': telegram.eventos?.vendaStatus !== false,
+            'venda-obs': telegram.eventos?.vendaObs !== false
+        }[evento];
+
+        if (!eventoAtivo) {
+            return res.json({ success: true, sent: 0, blocked: 'evento-inativo' });
+        }
+
+        const token = String(telegram.token || '').trim();
+        if (!/^\d+:[A-Za-z0-9_-]+$/.test(token)) {
+            return res.status(400).json({ success: false, error: 'Token do Telegram inválido.' });
+        }
+
+        const usuarios = Array.isArray(payload.usuarios) ? payload.usuarios : [];
+        let vendedorId = String(req.body?.vendedorId || '').trim();
+        if (req.energiaAuth.perfil !== 'master') {
+            vendedorId = String(req.energiaAuth.usuario?.vendedorId || '').trim();
+        }
+
+        const destinatarios = new Set();
+        if (vendedorId) {
+            usuarios
+                .filter(u => String(u.vendedorId || '') === vendedorId && u.ativo !== false && u.chatIdTelegram)
+                .forEach(u => destinatarios.add(String(u.chatIdTelegram)));
+        }
+        usuarios
+            .filter(u => normalizarTipoEnergia(u) === 'master' && u.ativo !== false && u.chatIdTelegram)
+            .forEach(u => destinatarios.add(String(u.chatIdTelegram)));
+        if (telegram.chatId) destinatarios.add(String(telegram.chatId));
+
+        let sent = 0;
+        const errors = [];
+        for (const chatId of destinatarios) {
+            try {
+                const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text: texto,
+                        parse_mode: 'HTML',
+                        disable_web_page_preview: true
+                    })
+                });
+                const result = await response.json().catch(() => null);
+                if (response.ok && result?.ok) sent += 1;
+                else errors.push(result?.description || `Telegram retornou ${response.status}`);
+            } catch (err) {
+                errors.push(err.message || String(err));
+            }
+        }
+
+        return res.json({
+            success: errors.length === 0,
+            sent,
+            errors: errors.slice(0, 3)
+        });
+    } catch (err) {
+        console.error('Erro ao processar notificação do Telegram:', err.message);
+        return res.status(500).json({ success: false, error: 'Erro ao processar notificação.' });
+    }
+});
+
 /**
  * POST /api/energia-data/chunks
  * Salva dados de energia em múltiplos pedaços menores para evitar limites de upload.

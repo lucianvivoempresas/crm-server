@@ -5413,32 +5413,32 @@ const Telegram = {
     // Compatibilidade: envia para o chatId global (usado em testar)
     return this._postTo(this.cfg().chatId, texto);
   },
-  // Determina destinatários: vendedor da venda + todos os masters; fallback no global
-  destinatariosVenda(v) {
-    const c = this.cfg();
-    const ids = new Set();
-    // Vendedor da venda
-    if (v && v.vendedorId) {
-      const u = Store.data.usuarios.find(x => x.vendedorId === v.vendedorId && x.ativo !== false && x.chatIdTelegram);
-      if (u) ids.add(String(u.chatIdTelegram));
+  async enviarParaVenda(v, texto, evento = 'geral') {
+    try {
+      const response = await fetch('/api/energia-telegram/notificar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          evento,
+          texto,
+          vendedorId: v?.vendedorId || null
+        })
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok) {
+        console.warn('Falha ao processar notificação do Telegram:', result?.error || response.status);
+      }
+      return result;
+    } catch (e) {
+      console.warn('Falha ao acessar o serviço de notificações:', e.message || e);
+      return null;
     }
-    // Todos os masters
-    Store.data.usuarios.filter(x => x.tipo === 'master' && x.ativo !== false && x.chatIdTelegram)
-      .forEach(x => ids.add(String(x.chatIdTelegram)));
-    // Chat global/master tambem recebe as notificacoes, mesmo quando ha vendedor vinculado.
-    if (c.chatId) ids.add(String(c.chatId));
-    return Array.from(ids);
-  },
-  async enviarParaVenda(v, texto) {
-    if (!this.cfg().ativo) return;
-    const ids = this.destinatariosVenda(v);
-    for (const id of ids) await this._postTo(id, texto);
   },
   async enviar(texto) {
     const c = await this.cfgAtual();
     if (!c.ativo) return;
     // Sem contexto de venda → manda para masters + global fallback
-    return this.enviarParaVenda(null, texto);
+    return this.enviarParaVenda(null, texto, 'geral');
   },
   // Notificação formatada padrão do CRM
   async notificar({ cliente, status, vendedor, data, obs, titulo }) {
@@ -5512,7 +5512,11 @@ const Telegram = {
       data: Format.date(v.data),
       obs: v.observacoes
     });
-    this.enviarParaVenda(v, msg);
+    return this.enviarParaVenda(v, msg, {
+      nova: 'venda-nova',
+      status: 'venda-status',
+      obs: 'venda-obs'
+    }[motivo] || 'geral');
   },
   async notificarPipeline(o, motivo) {
     const c = await this.cfgAtual();
@@ -5527,7 +5531,7 @@ const Telegram = {
       data: new Date().toLocaleDateString('pt-BR'),
       obs: o.titulo + (o.observacoes ? ' · ' + o.observacoes : '')
     });
-    this.enviarParaVenda({ vendedorId: o.vendedorId }, msg);
+    return this.enviarParaVenda({ vendedorId: o.vendedorId }, msg, 'pipeline');
   }
 };
 
