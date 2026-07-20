@@ -1769,6 +1769,34 @@ const Store = {
     }
   },
 
+  async saveConfig(patch) {
+    if (!this.serverOnline) {
+      this._markServerOffline('Sem conexão com servidor. A configuração não foi salva.');
+      return false;
+    }
+
+    try {
+      const response = await fetch('/api/energia-config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ patch })
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success || !result.config) {
+        throw new Error(result?.error || `Servidor retornou ${response.status}`);
+      }
+
+      this.data.config = result.config;
+      this.serverOnline = true;
+      this.syncFailureReported = false;
+      return true;
+    } catch (e) {
+      console.error('Erro ao salvar configuração:', e);
+      UI.toast('Não foi possível salvar a configuração no banco.', 'error', 8000);
+      return false;
+    }
+  },
+
   _queueSync() {
     if (this.isSyncing) {
       this.pendingSync = true;
@@ -2757,18 +2785,22 @@ const ConfigAuto = {
     if (el('cfg-dias-inat')) el('cfg-dias-inat').value = cfg.diasInatividade || 90;
     if (el('cfg-empresa')) el('cfg-empresa').value = cfg.empresaNome || '';
   },
-  salvarFlag() {
-    Store.data.config.autoFollowups = document.getElementById('cfg-auto-fu').checked;
-    Store.data.config.empresaNome = document.getElementById('cfg-empresa').value.trim();
-    Store.save();
-    UI.toast('Configuração salva');
+  async salvarFlag() {
+    const patch = {
+      autoFollowups: document.getElementById('cfg-auto-fu').checked,
+      empresaNome: document.getElementById('cfg-empresa').value.trim()
+    };
+    if (await Store.saveConfig(patch)) UI.toast('Configuração salva');
+    else this.carregar();
   },
-  salvarDias() {
-    Store.data.config.diasBoasVindas = parseInt(document.getElementById('cfg-dias-bv').value) || 7;
-    Store.data.config.diasAntesRenovacao = parseInt(document.getElementById('cfg-dias-renov').value) || 5;
-    Store.data.config.diasInatividade = parseInt(document.getElementById('cfg-dias-inat').value) || 90;
-    Store.save();
-    UI.toast('Configuração salva');
+  async salvarDias() {
+    const patch = {
+      diasBoasVindas: parseInt(document.getElementById('cfg-dias-bv').value) || 7,
+      diasAntesRenovacao: parseInt(document.getElementById('cfg-dias-renov').value) || 5,
+      diasInatividade: parseInt(document.getElementById('cfg-dias-inat').value) || 90
+    };
+    if (await Store.saveConfig(patch)) UI.toast('Configuração salva');
+    else this.carregar();
   }
 };
 
@@ -5352,6 +5384,20 @@ const Aceleradores = {
 //============================================================================
 const Telegram = {
   cfg() { return Store.data.config.telegram || {}; },
+  async cfgAtual() {
+    try {
+      const response = await fetch('/api/energia-config', { cache: 'no-store' });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success || !result.config) {
+        throw new Error(result?.error || `Servidor retornou ${response.status}`);
+      }
+      Store.data.config = result.config;
+      return this.cfg();
+    } catch (e) {
+      console.warn('Não foi possível atualizar a configuração do Telegram:', e.message || e);
+      return { ...this.cfg(), ativo: false };
+    }
+  },
   async _postTo(chatId, texto) {
     const c = this.cfg();
     if (!c.token || !chatId) return { ok: false, error: 'sem token/chatId' };
@@ -5389,7 +5435,7 @@ const Telegram = {
     for (const id of ids) await this._postTo(id, texto);
   },
   async enviar(texto) {
-    const c = this.cfg();
+    const c = await this.cfgAtual();
     if (!c.ativo) return;
     // Sem contexto de venda → manda para masters + global fallback
     return this.enviarParaVenda(null, texto);
@@ -5430,9 +5476,10 @@ const Telegram = {
       const chatId = u.message?.chat?.id || u.edited_message?.chat?.id || u.channel_post?.chat?.id || u.my_chat_member?.chat?.id;
       if (chatId) {
         document.getElementById('tg-chatid').value = chatId;
-        Store.data.config.telegram.chatId = String(chatId);
-        Store.save();
-        UI.toast('Chat ID detectado: ' + chatId);
+        const telegram = { ...this.cfg(), chatId: String(chatId) };
+        if (await Store.saveConfig({ telegram })) {
+          UI.toast('Chat ID detectado: ' + chatId);
+        }
       } else UI.toast('Não foi possível detectar o chat ID', 'error');
     } catch (e) { UI.toast('Erro: ' + e.message, 'error'); }
   },
@@ -5449,7 +5496,7 @@ const Telegram = {
     return m;
   },
   async notificarVenda(v, motivo) {
-    const c = this.cfg();
+    const c = await this.cfgAtual();
     if (!c.ativo) return;
     if (motivo === 'status' && !c.eventos?.vendaStatus) return;
     if (motivo === 'obs' && !c.eventos?.vendaObs) return;
@@ -5468,7 +5515,7 @@ const Telegram = {
     this.enviarParaVenda(v, msg);
   },
   async notificarPipeline(o, motivo) {
-    const c = this.cfg();
+    const c = await this.cfgAtual();
     if (!c.ativo || !c.eventos?.pipelineEtapa) return;
     const cli = Store.data.clientes.find(x => x.id === o.clienteId);
     const ven = o.vendedorId ? Store.data.vendedores.find(x => x.id === o.vendedorId) : null;
@@ -5499,8 +5546,10 @@ const ConfigTelegram = {
     if (el('tg-ev-pipeline')) el('tg-ev-pipeline').checked = c.eventos?.pipelineEtapa !== false;
     if (el('tg-ev-nova')) el('tg-ev-nova').checked = c.eventos?.novaVenda !== false;
   },
-  salvar() {
-    Store.data.config.telegram = {
+  async salvar() {
+    const button = document.querySelector('button[onclick="ConfigTelegram.salvar()"]');
+    if (button) button.disabled = true;
+    const telegram = {
       token: document.getElementById('tg-token').value.trim(),
       chatId: document.getElementById('tg-chatid').value.trim(),
       ativo: document.getElementById('tg-ativo').checked,
@@ -5511,8 +5560,16 @@ const ConfigTelegram = {
         novaVenda: document.getElementById('tg-ev-nova').checked
       }
     };
-    Store.save();
-    UI.toast('Configuração Telegram salva');
+    try {
+      if (await Store.saveConfig({ telegram })) {
+        this.carregar();
+        UI.toast(telegram.ativo ? 'Notificações do Telegram ativadas' : 'Notificações do Telegram desativadas');
+      } else {
+        this.carregar();
+      }
+    } finally {
+      if (button) button.disabled = false;
+    }
   }
 };
 

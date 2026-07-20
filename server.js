@@ -97,7 +97,7 @@ app.use(cors({
         }
         return callback(new Error('Origem não permitida pelo CORS'));
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-User-Id', 'X-User-Perfil', 'X-Allow-Data-Reset']
 }));
 
@@ -1010,35 +1010,71 @@ function carregarEnergiaPayload() {
     });
 }
 
-function backupEnergiaAtual(callback) {
-    carregarEnergiaPayload()
-        .then(({ payload }) => {
-            if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length === 0) {
-                return callback(null);
-            }
+let energiaWriteQueue = Promise.resolve();
 
-            criarBackupEnergiaArquivo(payload, 'before-write');
-            const backupPayload = JSON.stringify({
-                criadoEm: new Date().toISOString(),
-                counts: contarRegistrosEnergia(payload),
-                payload
-            });
+function enfileirarEscritaEnergia(operation) {
+    const scheduled = energiaWriteQueue.then(operation, operation);
+    energiaWriteQueue = scheduled.catch(() => {});
+    return scheduled;
+}
+
+function salvarBackupEnergiaNoBanco(payload) {
+    return new Promise((resolve) => {
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length === 0) {
+            return resolve();
+        }
+
+        criarBackupEnergiaArquivo(payload, 'before-write');
+        const backupPayload = JSON.stringify({
+            criadoEm: new Date().toISOString(),
+            counts: contarRegistrosEnergia(payload),
+            payload
+        });
+
+        energiaDb.run(
+            "INSERT INTO documents (collection, payload) VALUES (?, ?)",
+            ['energia-data-backup', backupPayload],
+            (err) => {
+                if (err) console.warn('Falha ao criar backup de energia-data:', err.message);
+                resolve();
+            }
+        );
+    });
+}
+
+function gravarEnergiaPayload(payload) {
+    return new Promise((resolve, reject) => {
+        energiaDb.run('BEGIN IMMEDIATE TRANSACTION', (beginErr) => {
+            if (beginErr) return reject(beginErr);
 
             energiaDb.run(
-                "INSERT INTO documents (collection, payload) VALUES (?, ?)",
-                ['energia-data-backup', backupPayload],
-                (err) => {
-                    if (err) {
-                        console.warn('⚠️ Falha ao criar backup de energia-data:', err.message);
+                "DELETE FROM documents WHERE collection = 'energia-data'",
+                (deleteErr) => {
+                    if (deleteErr) {
+                        return energiaDb.run('ROLLBACK', () => reject(deleteErr));
                     }
-                    callback(payload);
+
+                    energiaDb.run(
+                        "INSERT INTO documents (collection, payload) VALUES (?, ?)",
+                        ['energia-data', JSON.stringify(payload)],
+                        function(insertErr) {
+                            if (insertErr) {
+                                return energiaDb.run('ROLLBACK', () => reject(insertErr));
+                            }
+
+                            const id = this.lastID;
+                            energiaDb.run('COMMIT', (commitErr) => {
+                                if (commitErr) {
+                                    return energiaDb.run('ROLLBACK', () => reject(commitErr));
+                                }
+                                resolve(id);
+                            });
+                        }
+                    );
                 }
             );
-        })
-        .catch(err => {
-            console.warn('⚠️ Falha ao carregar energia-data para backup:', err.message);
-            callback(null);
         });
+    });
 }
 
 function substituirEnergiaPayloadAtomico(payloadString, res, okBodyFactory, options = {}) {
@@ -1052,45 +1088,56 @@ function substituirEnergiaPayloadAtomico(payloadString, res, okBodyFactory, opti
         return res.status(400).json({ error: 'Payload final inválido: ' + err.message });
     }
 
-    backupEnergiaAtual((payloadAtual) => {
+    enfileirarEscritaEnergia(async () => {
+        const { payload: payloadAtual } = await carregarEnergiaPayload();
+        await salvarBackupEnergiaNoBanco(payloadAtual);
+
+        let payloadFinal = parsed;
+        if (typeof options.transformPayload === 'function') {
+            payloadFinal = options.transformPayload(payloadAtual, parsed);
+        } else if (
+            options.preserveConfig &&
+            payloadAtual?.config &&
+            typeof payloadAtual.config === 'object' &&
+            !Array.isArray(payloadAtual.config)
+        ) {
+            payloadFinal = { ...parsed, config: payloadAtual.config };
+        }
+
         if (!options.allowDangerousOverwrite) {
-            const motivo = sobrescritaEnergiaPerigosa(payloadAtual, parsed);
+            const motivo = sobrescritaEnergiaPerigosa(payloadAtual, payloadFinal);
             if (motivo) {
-                console.warn('🛑 Salvamento do CRM Energia bloqueado:', motivo);
-                return res.status(409).json({
-                    error: 'Salvamento bloqueado para evitar perda de dados.',
-                    detail: motivo,
-                    currentCounts: contarRegistrosEnergia(payloadAtual),
-                    nextCounts: contarRegistrosEnergia(parsed)
-                });
+                const error = new Error(motivo);
+                error.statusCode = 409;
+                error.currentCounts = contarRegistrosEnergia(payloadAtual);
+                error.nextCounts = contarRegistrosEnergia(payloadFinal);
+                throw error;
             }
         }
 
-        energiaDb.serialize(() => {
-            energiaDb.run(
-                "DELETE FROM documents WHERE collection = 'energia-data'",
-                (deleteErr) => {
-                    if (deleteErr) {
-                        console.error('❌ Erro ao limpar energia-data antes de salvar:', deleteErr.message);
-                        return res.status(500).json({ error: deleteErr.message });
-                    }
-
-                    energiaDb.run(
-                        "INSERT INTO documents (collection, payload) VALUES (?, ?)",
-                        ['energia-data', JSON.stringify(parsed)],
-                        function(insertErr) {
-                            if (insertErr) {
-                                console.error('❌ Erro ao salvar energia-data:', insertErr.message);
-                                return res.status(500).json({ error: insertErr.message });
-                            }
-                            const body = typeof okBodyFactory === 'function' ? okBodyFactory.call(this, this.lastID) : { id: this.lastID };
-                            res.json(body);
-                        }
-                    );
-                }
-            );
+        const id = await gravarEnergiaPayload(payloadFinal);
+        return { id, payload: payloadFinal };
+    })
+        .then(({ id, payload }) => {
+            const context = { lastID: id, payload };
+            const body = typeof okBodyFactory === 'function'
+                ? okBodyFactory.call(context, id, payload)
+                : { id };
+            res.json(body);
+        })
+        .catch(err => {
+            if (err.statusCode === 409) {
+                console.warn('Salvamento do CRM Energia bloqueado:', err.message);
+                return res.status(409).json({
+                    error: 'Salvamento bloqueado para evitar perda de dados.',
+                    detail: err.message,
+                    currentCounts: err.currentCounts,
+                    nextCounts: err.nextCounts
+                });
+            }
+            console.error('Erro ao salvar energia-data:', err.message);
+            return res.status(500).json({ error: err.message });
         });
-    });
 }
 
 function normalizarTipoEnergia(usuario) {
@@ -1734,6 +1781,62 @@ app.get('/api/energia-data', requireEnergiaAuth, (req, res) => {
     );
 });
 
+app.get('/api/energia-config', requireEnergiaAuth, async (req, res) => {
+    try {
+        const { payload } = await carregarEnergiaPayload();
+        const config = payload?.config && typeof payload.config === 'object' && !Array.isArray(payload.config)
+            ? payload.config
+            : {};
+        return res.json({ success: true, config });
+    } catch (err) {
+        console.error('Erro ao carregar configurações do CRM Energia:', err.message);
+        return res.status(500).json({ success: false, error: 'Erro ao carregar configurações.' });
+    }
+});
+
+app.patch('/api/energia-config', requireEnergiaAuth, requireEnergiaMaster, (req, res) => {
+    const patch = req.body?.patch;
+    if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+        return res.status(400).json({ success: false, error: 'Configuração inválida.' });
+    }
+
+    const allowedKeys = new Set([
+        'autoFollowups',
+        'empresaNome',
+        'diasBoasVindas',
+        'diasAntesRenovacao',
+        'diasInatividade',
+        'slaMinutos',
+        'aceleradores',
+        'telegram'
+    ]);
+    const sanitizedPatch = Object.fromEntries(
+        Object.entries(patch).filter(([key]) => allowedKeys.has(key))
+    );
+
+    if (Object.keys(sanitizedPatch).length === 0) {
+        return res.status(400).json({ success: false, error: 'Nenhuma configuração válida foi enviada.' });
+    }
+
+    substituirEnergiaPayloadAtomico(JSON.stringify(sanitizedPatch), res, function(id, payload) {
+        return { success: true, id, config: payload.config };
+    }, {
+        allowDangerousOverwrite: true,
+        transformPayload(payloadAtual, configPatch) {
+            const configAtual = payloadAtual?.config && typeof payloadAtual.config === 'object' && !Array.isArray(payloadAtual.config)
+                ? payloadAtual.config
+                : {};
+            return {
+                ...payloadAtual,
+                config: {
+                    ...configAtual,
+                    ...configPatch
+                }
+            };
+        }
+    });
+});
+
 /**
  * POST /api/energia-data/chunks
  * Salva dados de energia em múltiplos pedaços menores para evitar limites de upload.
@@ -1810,13 +1913,19 @@ app.post('/api/energia-data/chunks', requireEnergiaAuth, (req, res) => {
                         .map(row => row.data)
                         .join('');
 
+                    const allowDangerousOverwrite = String(req.headers['x-allow-data-reset'] || '').toLowerCase() === 'true';
+                    if (allowDangerousOverwrite && req.energiaAuth?.perfil !== 'master') {
+                        return res.status(403).json({ error: 'Apenas o perfil master pode substituir todos os dados.' });
+                    }
+
                     substituirEnergiaPayloadAtomico(fullString, res, function(id) {
                         energiaDb.run("DELETE FROM documents WHERE collection = ?", [tempCollection], cleanupErr => {
                             if (cleanupErr) console.warn('⚠️ Falha ao limpar chunks temporários:', cleanupErr.message);
                         });
                         return { id, complete: true, totalChunks };
                     }, {
-                        allowDangerousOverwrite: String(req.headers['x-allow-data-reset'] || '').toLowerCase() === 'true'
+                        allowDangerousOverwrite,
+                        preserveConfig: !allowDangerousOverwrite
                     });
                 }
             );
@@ -1829,12 +1938,17 @@ app.post('/api/energia-data/chunks', requireEnergiaAuth, (req, res) => {
  * Criar novo registro de dados de energia
  */
 app.post('/api/energia-data', requireEnergiaAuth, (req, res) => {
-    console.log('📡 [energia] POST /api/energia-data recebido — headers:', JSON.stringify(req.headers));
+    console.log('📡 [energia] POST /api/energia-data recebido');
     const payload = JSON.stringify(req.body);
+    const allowDangerousOverwrite = String(req.headers['x-allow-data-reset'] || '').toLowerCase() === 'true';
+    if (allowDangerousOverwrite && req.energiaAuth?.perfil !== 'master') {
+        return res.status(403).json({ error: 'Apenas o perfil master pode substituir todos os dados.' });
+    }
     substituirEnergiaPayloadAtomico(payload, res, function(id) {
         return { id };
     }, {
-        allowDangerousOverwrite: String(req.headers['x-allow-data-reset'] || '').toLowerCase() === 'true'
+        allowDangerousOverwrite,
+        preserveConfig: !allowDangerousOverwrite
     });
 });
 
@@ -1843,12 +1957,17 @@ app.post('/api/energia-data', requireEnergiaAuth, (req, res) => {
  * Atualizar dados de energia existentes
  */
 app.put('/api/energia-data/:id', requireEnergiaAuth, (req, res) => {
-    console.log(`📡 [energia] PUT /api/energia-data/${req.params.id} recebido — headers:`, JSON.stringify(req.headers));
+    console.log(`📡 [energia] PUT /api/energia-data/${req.params.id} recebido`);
     const payload = JSON.stringify(req.body);
+    const allowDangerousOverwrite = String(req.headers['x-allow-data-reset'] || '').toLowerCase() === 'true';
+    if (allowDangerousOverwrite && req.energiaAuth?.perfil !== 'master') {
+        return res.status(403).json({ error: 'Apenas o perfil master pode substituir todos os dados.' });
+    }
     substituirEnergiaPayloadAtomico(payload, res, function(id) {
         return { success: true, id };
     }, {
-        allowDangerousOverwrite: String(req.headers['x-allow-data-reset'] || '').toLowerCase() === 'true'
+        allowDangerousOverwrite,
+        preserveConfig: !allowDangerousOverwrite
     });
 });
 
