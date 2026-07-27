@@ -73,6 +73,8 @@ test('protege cabeçalhos e não exibe o login antes de validar a sessão', asyn
     assert.equal(response.headers.get('x-frame-options'), 'DENY');
     assert.match(html, /id="boot-screen"/);
     assert.match(html, /id="login-screen"[^>]*style="[^"]*display:\s*none/);
+    assert.match(html, /Pipeline\.exportarPlanilha\(\)/);
+    assert.match(html, /Status atual/);
 });
 
 test('recusa dados e backup sem autenticação', async () => {
