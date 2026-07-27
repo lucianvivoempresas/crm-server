@@ -20,9 +20,15 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "nodemailer": "^9.0.3",
-    "sqlite3": "^6.0.1"
+    "sqlite3": "5.1.7"
   },
   "engines": {
     "node": ">=20.17.0"
+  },
+  "overrides": {
+    "sqlite3": {
+      "node-gyp": "12.4.0",
+      "tar": "7.5.22"
+    }
   }
 }
