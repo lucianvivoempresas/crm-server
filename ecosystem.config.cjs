@@ -17,7 +17,6 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 3000,
-        AUTH_TOKEN_SECRET: 'change-this-to-a-long-random-secret-2026-03-16',
         CORS_ALLOWED_ORIGINS: 'https://www.voltconect.com.br,https://voltconect.com.br,https://www.loconecta.com.br,https://loconecta.com.br',
         ALLOW_DEFAULT_USERS: 'false'
       },

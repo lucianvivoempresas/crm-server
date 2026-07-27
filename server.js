@@ -54,11 +54,20 @@ const app = express();
 
 const IS_PROD = process.env.NODE_ENV === 'production';
 const TOKEN_TTL_MS = 1000 * 60 * 60 * 12; // 12h
-const TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || crypto.createHash('sha256').update(`${__dirname}:crm-server-session`).digest('hex');
+const configuredTokenSecret = String(process.env.AUTH_TOKEN_SECRET || '').trim();
+const knownWeakSecrets = new Set([
+    'change-this-to-a-long-random-secret-2026-03-16',
+    'change-me',
+    'secret',
+    'changeme'
+]);
 
-if (IS_PROD && !TOKEN_SECRET) {
-    console.warn('⚠️ AUTH_TOKEN_SECRET não configurado. Defina no ambiente para habilitar autenticação segura.');
+if (IS_PROD && (configuredTokenSecret.length < 32 || knownWeakSecrets.has(configuredTokenSecret.toLowerCase()))) {
+    throw new Error('AUTH_TOKEN_SECRET ausente ou fraco. Configure pelo menos 32 caracteres aleatórios antes de iniciar em produção.');
 }
+const TOKEN_SECRET = configuredTokenSecret || crypto.randomBytes(48).toString('base64url');
+
+app.set('trust proxy', 1);
 
 const allowedOrigins = (
     process.env.CORS_ALLOWED_ORIGINS ||
@@ -104,8 +113,26 @@ app.use(cors({
 app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Referrer-Policy', 'no-referrer');
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+    res.setHeader(
+        'Content-Security-Policy',
+        [
+            "default-src 'self'",
+            "base-uri 'self'",
+            "object-src 'none'",
+            "frame-ancestors 'none'",
+            "form-action 'self'",
+            "script-src 'self' 'unsafe-inline' https://cdn.tailwindcss.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net",
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            "img-src 'self' data: blob:",
+            "font-src 'self' data: https://fonts.gstatic.com",
+            "connect-src 'self'",
+            "worker-src 'self' blob:"
+        ].join('; ')
+    );
     if (IS_PROD) {
         res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
     }
@@ -121,7 +148,52 @@ app.use((req, res, next) => {
     next();
 });
 
-app.use(express.json({ limit: '50mb' })); 
+app.use(express.json({
+    limit: '10mb',
+    strict: true,
+    type: ['application/json', 'application/*+json']
+}));
+
+function criarLimitador({ janelaMs, maximo, chave = req => req.ip || 'unknown' }) {
+    const buckets = new Map();
+    const timer = setInterval(() => {
+        const agora = Date.now();
+        for (const [key, value] of buckets) {
+            if (agora - value.inicio >= janelaMs) buckets.delete(key);
+        }
+    }, Math.min(janelaMs, 60000));
+    timer.unref();
+
+    return (req, res, next) => {
+        const agora = Date.now();
+        const key = String(chave(req));
+        let bucket = buckets.get(key);
+        if (!bucket || agora - bucket.inicio >= janelaMs) {
+            bucket = { inicio: agora, quantidade: 0 };
+        }
+        bucket.quantidade += 1;
+        buckets.set(key, bucket);
+        res.setHeader('RateLimit-Limit', String(maximo));
+        res.setHeader('RateLimit-Remaining', String(Math.max(0, maximo - bucket.quantidade)));
+        if (bucket.quantidade > maximo) {
+            res.setHeader('Retry-After', String(Math.ceil((janelaMs - (agora - bucket.inicio)) / 1000)));
+            return res.status(429).json({ success: false, error: 'Muitas requisições. Aguarde e tente novamente.' });
+        }
+        next();
+    };
+}
+
+const limitarEscritasApi = criarLimitador({ janelaMs: 60 * 1000, maximo: 240 });
+const limitarTelegram = criarLimitador({
+    janelaMs: 60 * 1000,
+    maximo: 12,
+    chave: req => `${req.ip || 'unknown'}:${req.energiaAuth?.userId || 'anonymous'}`
+});
+
+app.use('/api', (req, res, next) => {
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+    return limitarEscritasApi(req, res, next);
+});
 
 function noStoreHtml(req, res, next) {
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
@@ -191,12 +263,18 @@ app.get('/contato', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'contato.html'));
 });
 
-const DB_PATH = path.join(__dirname, 'crm_database.sqlite');
-const ENERGIA_DB_PATH = path.join(__dirname, 'energia_database.sqlite');
-const DB_BACKUP_DIR = path.join(__dirname, 'database-backups');
+function resolverCaminhoDados(configurado, padrao) {
+    if (!configurado) return path.join(__dirname, padrao);
+    return path.isAbsolute(configurado) ? configurado : path.join(__dirname, configurado);
+}
+
+const DB_PATH = resolverCaminhoDados(process.env.CRM_DB_PATH, 'crm_database.sqlite');
+const ENERGIA_DB_PATH = resolverCaminhoDados(process.env.ENERGIA_DB_PATH, 'energia_database.sqlite');
+const DB_BACKUP_DIR = resolverCaminhoDados(process.env.DB_BACKUP_DIR, 'database-backups');
 const ENERGIA_JSON_BACKUP_DIR = path.join(DB_BACKUP_DIR, 'energia-json');
 const ENERGIA_BACKUP_RETENTION = parseEnvInt(process.env.ENERGIA_BACKUP_RETENTION, 200);
 const ENERGIA_PERIODIC_BACKUP_MS = parseEnvInt(process.env.ENERGIA_PERIODIC_BACKUP_MINUTES, 180) * 60 * 1000;
+const SQLITE_BACKUP_RETENTION = parseEnvInt(process.env.SQLITE_BACKUP_RETENTION, 30);
 
 function ensureBackupDirectory() {
     try {
@@ -223,6 +301,30 @@ function contarRegistrosEnergia(payload) {
     });
     contagem.total = total;
     return contagem;
+}
+
+function revisaoEnergia(payload, scope = 'master', sellerId = null) {
+    if (scope === 'seller') {
+        return Number(payload?._sellerRevisions?.[String(sellerId || '')]) || 0;
+    }
+    return Number(payload?._revision) || 0;
+}
+
+function aplicarNovaRevisaoEnergia(payload, scope = 'master', sellerId = null) {
+    const next = { ...payload };
+    if (scope === 'seller') {
+        const key = String(sellerId || '');
+        next._sellerRevisions = {
+            ...(payload?._sellerRevisions && typeof payload._sellerRevisions === 'object' ? payload._sellerRevisions : {}),
+            [key]: revisaoEnergia(payload, 'seller', key) + 1
+        };
+    } else {
+        next._revision = revisaoEnergia(payload, 'master') + 1;
+        next._sellerRevisions = payload?._sellerRevisions && typeof payload._sellerRevisions === 'object'
+            ? payload._sellerRevisions
+            : {};
+    }
+    return next;
 }
 
 function limparBackupsEnergiaAntigos() {
@@ -311,70 +413,94 @@ function backupDatabaseFile(filePath, label, reason) {
     try {
         fs.copyFileSync(filePath, backupPath);
         console.log(`✅ Backup do ${label} criado em: ${backupPath}`);
-        console.log(`ℹ️ O arquivo antigo será recriado para evitar incompatibilidade.`);
     } catch (copyErr) {
         console.warn(`⚠️ Falha ao criar backup do ${label}:`, copyErr.message);
     }
 }
 
+function limparSnapshotsSqliteAntigos() {
+    try {
+        ensureBackupDirectory();
+        const arquivos = fs.readdirSync(DB_BACKUP_DIR)
+            .filter(nome => nome.endsWith('.sqlite'))
+            .map(nome => {
+                const fullPath = path.join(DB_BACKUP_DIR, nome);
+                return { fullPath, mtimeMs: fs.statSync(fullPath).mtimeMs };
+            })
+            .sort((a, b) => b.mtimeMs - a.mtimeMs);
+        arquivos.slice(SQLITE_BACKUP_RETENTION).forEach(item => fs.unlinkSync(item.fullPath));
+    } catch (err) {
+        console.warn('⚠️ Falha ao limpar snapshots antigos do SQLite:', err.message);
+    }
+}
+
+function criarSnapshotSqlite(dbInstance, label, reason = 'periodic') {
+    if (!dbInstance || typeof dbInstance.backup !== 'function') return Promise.resolve(null);
+    ensureBackupDirectory();
+    const safeLabel = String(label).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+    const safeReason = String(reason).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+    const destino = path.join(DB_BACKUP_DIR, `${safeLabel}_${safeReason}_${timestampArquivo()}.sqlite`);
+    return new Promise((resolve, reject) => {
+        dbInstance.backup(destino, err => {
+            if (err) {
+                try { if (fs.existsSync(destino)) fs.unlinkSync(destino); } catch (cleanupErr) {}
+                return reject(err);
+            }
+            limparSnapshotsSqliteAntigos();
+            console.log(`✅ Snapshot consistente do ${label} criado em: ${destino}`);
+            resolve(destino);
+        });
+    });
+}
+
+async function criarSnapshotsPeriodicos(reason = 'periodic') {
+    const results = await Promise.allSettled([
+        criarSnapshotSqlite(db, 'crm', reason),
+        criarSnapshotSqlite(energiaDb, 'energia', reason)
+    ]);
+    results.forEach(result => {
+        if (result.status === 'rejected') {
+            console.warn('⚠️ Falha ao criar snapshot SQLite:', result.reason?.message || result.reason);
+        }
+    });
+}
+
 function openDatabaseWithRecovery(dbPath, label) {
     return new Promise((resolve, reject) => {
-        let attemptedRecovery = false;
+        const dbInstance = new sqlite3.Database(dbPath, (err) => {
+            if (err) {
+                console.error(`❌ Erro ao abrir o banco ${label}:`, err.message);
+                if (fs.existsSync(dbPath)) backupDatabaseFile(dbPath, label, err.message);
+                return reject(err);
+            }
 
-        const openAttempt = () => {
-            const dbInstance = new sqlite3.Database(dbPath, (err) => {
-                if (err) {
-                    console.error(`❌ Erro ao abrir o banco ${label}:`, err.message);
-
-                    if (!attemptedRecovery && fs.existsSync(dbPath)) {
-                        attemptedRecovery = true;
-                        backupDatabaseFile(dbPath, label, err.message);
-
-                        try {
-                            fs.unlinkSync(dbPath);
-                            console.log(`ℹ️ Arquivo corrompido removido: ${dbPath}`);
-                        } catch (removeErr) {
-                            console.error(`❌ Falha ao remover arquivo corrompido ${dbPath}:`, removeErr.message);
-                            return reject(err);
-                        }
-
-                        return openAttempt();
-                    }
-
-                    return reject(err);
+            dbInstance.get('PRAGMA quick_check', [], (checkErr, row) => {
+                const integrityOk = !checkErr && row && row.quick_check === 'ok';
+                if (!integrityOk) {
+                    const reason = checkErr ? checkErr.message : `PRAGMA quick_check retornou ${String(row?.quick_check)}`;
+                    console.error(`❌ ${label} inválido ou corrompido: ${reason}`);
+                    if (fs.existsSync(dbPath)) backupDatabaseFile(dbPath, label, reason);
+                    return dbInstance.close(() => reject(checkErr || new Error(reason)));
                 }
 
-                dbInstance.get('PRAGMA quick_check', [], (checkErr, row) => {
-                    const integrityOk = !checkErr && row && row.quick_check === 'ok';
-                    if (!integrityOk) {
-                        const reason = checkErr ? checkErr.message : `PRAGMA quick_check retornou ${String(row?.quick_check)}`;
-                        console.warn(`⚠️ ${label} inválido ou corrompido: ${reason}`);
-
-                        if (!attemptedRecovery && fs.existsSync(dbPath)) {
-                            attemptedRecovery = true;
-                            backupDatabaseFile(dbPath, label, reason);
-                            return dbInstance.close(() => {
-                                try {
-                                    fs.unlinkSync(dbPath);
-                                    console.log(`ℹ️ Arquivo inválido removido: ${dbPath}`);
-                                } catch (removeErr) {
-                                    console.error(`❌ Falha ao remover arquivo inválido ${dbPath}:`, removeErr.message);
-                                    return reject(checkErr || new Error(reason));
-                                }
-                                openAttempt();
-                            });
+                dbInstance.exec(
+                    [
+                        'PRAGMA journal_mode = WAL',
+                        'PRAGMA synchronous = FULL',
+                        'PRAGMA busy_timeout = 10000',
+                        'PRAGMA foreign_keys = ON',
+                        'PRAGMA wal_autocheckpoint = 1000'
+                    ].join('; '),
+                    (pragmaErr) => {
+                        if (pragmaErr) {
+                            return dbInstance.close(() => reject(pragmaErr));
                         }
-
-                        return reject(checkErr || new Error(reason));
+                        console.log(`Conectado ao banco SQLite com segurança: ${dbPath}`);
+                        resolve(dbInstance);
                     }
-
-                    console.log(`Conectado ao banco SQLite com sucesso: ${dbPath}`);
-                    resolve(dbInstance);
-                });
+                );
             });
-        };
-
-        openAttempt();
+        });
     });
 }
 
@@ -448,18 +574,42 @@ function dbRunAsync(sql, params = []) {
 
 // ============ FUNÇÕES UTILITÁRIAS DE SEGURANÇA ============
 
-/**
- * Hash seguro de senha usando SHA-256
- */
 function hashSenha(senha) {
     return crypto.createHash('sha256').update(senha).digest('hex');
 }
 
-/**
- * Comparar senha com hash
- */
-function compararSenha(senha, hash) {
-    return hashSenha(senha) === hash;
+const PASSWORD_ITERATIONS = 310000;
+
+function hashSenhaForte(senha) {
+    const salt = crypto.randomBytes(16).toString('base64url');
+    return new Promise((resolve, reject) => {
+        crypto.pbkdf2(senha, salt, PASSWORD_ITERATIONS, 32, 'sha256', (err, derivedKey) => {
+            if (err) return reject(err);
+            resolve(`pbkdf2$${PASSWORD_ITERATIONS}$${salt}$${derivedKey.toString('base64url')}`);
+        });
+    });
+}
+
+async function compararSenha(senha, storedHash) {
+    const stored = String(storedHash || '');
+    if (!stored.startsWith('pbkdf2$')) {
+        const legacy = hashSenha(senha);
+        const a = Buffer.from(legacy);
+        const b = Buffer.from(stored);
+        return a.length === b.length && crypto.timingSafeEqual(a, b);
+    }
+
+    const [, iterationsRaw, salt, expectedRaw] = stored.split('$');
+    const iterations = Number(iterationsRaw);
+    if (!iterations || !salt || !expectedRaw) return false;
+    const actual = await new Promise((resolve, reject) => {
+        crypto.pbkdf2(senha, salt, iterations, 32, 'sha256', (err, derivedKey) => {
+            if (err) return reject(err);
+            resolve(derivedKey);
+        });
+    });
+    const expected = Buffer.from(expectedRaw, 'base64url');
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }
 
 /**
@@ -606,7 +756,32 @@ function normalizarVendedorId(payloadBody) {
 const SELLER_ID_SQL_EXPR = "COALESCE(CAST(json_extract(payload, '$.vendedor_id') AS INTEGER), CAST(json_extract(payload, '$.vendedorId') AS INTEGER), CAST(json_extract(payload, '$.usuario_id') AS INTEGER), CAST(json_extract(payload, '$.userId') AS INTEGER))";
 
 function isSellerScopedCollection(collection) {
-    return ['clientes', 'vendas', 'campanhas', 'campanha_leads'].includes(collection);
+    return ['clientes', 'vendas', 'campanhas', 'campanha_leads', 'campanha_distribuicao_historico'].includes(collection);
+}
+
+const ALLOWED_DATA_COLLECTIONS = new Set([
+    'clientes',
+    'vendas',
+    'comissoes',
+    'metas',
+    'campanhas',
+    'campanha_leads',
+    'campanha_distribuicao_historico'
+]);
+const MASTER_ONLY_WRITE_COLLECTIONS = new Set(['comissoes', 'metas']);
+
+function validarColecaoDados(req, res, next) {
+    if (!ALLOWED_DATA_COLLECTIONS.has(req.params.collection)) {
+        return res.status(404).json({ success: false, error: 'Coleção não encontrada.' });
+    }
+    next();
+}
+
+function autorizarEscritaColecao(req, res, next) {
+    if (MASTER_ONLY_WRITE_COLLECTIONS.has(req.params.collection) && req.auth?.perfil !== 'master') {
+        return res.status(403).json({ success: false, error: 'Operação restrita ao perfil master.' });
+    }
+    next();
 }
 
 function migrarCamposLegadosDocumentos() {
@@ -769,8 +944,32 @@ function setEnergiaSessionCookie(res, token) {
         `energia_session=${encodeURIComponent(token)}`,
         'Path=/',
         'HttpOnly',
-        'SameSite=Lax',
+        'SameSite=Strict',
         `Max-Age=${Math.floor(TOKEN_TTL_MS / 1000)}`
+    ];
+    if (IS_PROD) attrs.push('Secure');
+    res.setHeader('Set-Cookie', attrs.join('; '));
+}
+
+function setMainSessionCookie(res, token, persistent = false) {
+    const attrs = [
+        `crm_session=${encodeURIComponent(token)}`,
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Strict'
+    ];
+    if (persistent) attrs.push(`Max-Age=${Math.floor(TOKEN_TTL_MS / 1000)}`);
+    if (IS_PROD) attrs.push('Secure');
+    res.setHeader('Set-Cookie', attrs.join('; '));
+}
+
+function clearMainSessionCookie(res) {
+    const attrs = [
+        'crm_session=',
+        'Path=/',
+        'HttpOnly',
+        'SameSite=Strict',
+        'Max-Age=0'
     ];
     if (IS_PROD) attrs.push('Secure');
     res.setHeader('Set-Cookie', attrs.join('; '));
@@ -781,7 +980,7 @@ function clearEnergiaSessionCookie(res) {
         'energia_session=',
         'Path=/',
         'HttpOnly',
-        'SameSite=Lax',
+        'SameSite=Strict',
         'Max-Age=0'
     ];
     if (IS_PROD) attrs.push('Secure');
@@ -795,9 +994,10 @@ function extractBearerToken(req) {
 }
 
 function requireAuth(req, res, next) {
-    const token = extractBearerToken(req);
+    const token = readCookies(req).crm_session || extractBearerToken(req);
     const auth = validarTokenSessao(token);
     if (!auth || !auth.userId) {
+        clearMainSessionCookie(res);
         return res.status(401).json({ success: false, error: 'Não autenticado' });
     }
     req.auth = auth;
@@ -812,6 +1012,12 @@ function requireMaster(req, res, next) {
 }
 
 const loginAttempts = new Map();
+setInterval(() => {
+    const limite = Date.now() - (15 * 60 * 1000);
+    for (const [key, value] of loginAttempts) {
+        if (value.first < limite) loginAttempts.delete(key);
+    }
+}, 60 * 1000).unref();
 
 function rateLimitLogin(req, res, next) {
     const ip = req.ip || req.socket?.remoteAddress || 'unknown';
@@ -1077,6 +1283,62 @@ function gravarEnergiaPayload(payload) {
     });
 }
 
+function atualizarEnergiaDirecionado(transform, revisionScope = 'master', sellerId = null) {
+    return enfileirarEscritaEnergia(async () => {
+        const { payload: payloadAtual } = await carregarEnergiaPayload();
+        await salvarBackupEnergiaNoBanco(payloadAtual);
+        let payloadFinal = await transform(payloadAtual);
+        if (!payloadFinal || typeof payloadFinal !== 'object' || Array.isArray(payloadFinal)) {
+            throw new Error('Transformação de dados inválida.');
+        }
+        payloadFinal = aplicarNovaRevisaoEnergia(payloadFinal, revisionScope, sellerId);
+        if (revisionScope === 'seller') {
+            payloadFinal._revision = revisaoEnergia(payloadAtual, 'master');
+        }
+        const id = await gravarEnergiaPayload(payloadFinal);
+        return { id, payload: payloadFinal };
+    });
+}
+
+function validarEstruturaEnergia(payload) {
+    const idKeys = new Set([
+        'id',
+        'clienteId',
+        'produtoId',
+        'vendedorId',
+        'vendaId',
+        'followupId',
+        'oportunidadeId'
+    ]);
+    let nodes = 0;
+
+    function walk(value, key = '', depth = 0) {
+        nodes += 1;
+        if (nodes > 300000 || depth > 20) {
+            throw new Error('Payload excede a complexidade permitida.');
+        }
+        if (typeof value === 'string') {
+            if (value.length > 8 * 1024 * 1024) {
+                throw new Error(`Campo ${key || 'texto'} excede o tamanho permitido.`);
+            }
+            if (idKeys.has(key) && value && !/^[a-zA-Z0-9._:-]{1,128}$/.test(value)) {
+                throw new Error(`Identificador inválido no campo ${key}.`);
+            }
+            return;
+        }
+        if (Array.isArray(value)) {
+            if (value.length > 100000) throw new Error('Coleção excede o limite de registros.');
+            value.forEach(item => walk(item, key, depth + 1));
+            return;
+        }
+        if (value && typeof value === 'object') {
+            Object.entries(value).forEach(([childKey, child]) => walk(child, childKey, depth + 1));
+        }
+    }
+
+    walk(payload);
+}
+
 function substituirEnergiaPayloadAtomico(payloadString, res, okBodyFactory, options = {}) {
     let parsed;
     try {
@@ -1084,6 +1346,7 @@ function substituirEnergiaPayloadAtomico(payloadString, res, okBodyFactory, opti
         if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
             throw new Error('Payload final inválido');
         }
+        validarEstruturaEnergia(parsed);
     } catch (err) {
         return res.status(400).json({ error: 'Payload final inválido: ' + err.message });
     }
@@ -1102,6 +1365,27 @@ function substituirEnergiaPayloadAtomico(payloadString, res, okBodyFactory, opti
             !Array.isArray(payloadAtual.config)
         ) {
             payloadFinal = { ...parsed, config: payloadAtual.config };
+        }
+
+        if (options.revisionScope) {
+            const sellerId = options.sellerId || null;
+            const currentRevision = revisaoEnergia(payloadAtual, options.revisionScope, sellerId);
+            if (options.enforceRevision && Number(parsed._revision) !== currentRevision) {
+                const error = new Error('Os dados foram alterados por outra sessão. Recarregue a página antes de salvar novamente.');
+                error.statusCode = 409;
+                error.errorCode = 'STALE_REVISION';
+                throw error;
+            }
+            delete payloadFinal._revision;
+            delete payloadFinal._sellerRevisions;
+            payloadFinal = aplicarNovaRevisaoEnergia(payloadFinal, options.revisionScope, sellerId);
+            if (options.revisionScope === 'seller') {
+                payloadFinal._revision = revisaoEnergia(payloadAtual, 'master');
+                payloadFinal._sellerRevisions = {
+                    ...(payloadAtual?._sellerRevisions || {}),
+                    ...(payloadFinal._sellerRevisions || {})
+                };
+            }
         }
 
         if (!options.allowDangerousOverwrite) {
@@ -1130,10 +1414,14 @@ function substituirEnergiaPayloadAtomico(payloadString, res, okBodyFactory, opti
                 console.warn('Salvamento do CRM Energia bloqueado:', err.message);
                 return res.status(409).json({
                     error: 'Salvamento bloqueado para evitar perda de dados.',
+                    code: err.errorCode || 'DANGEROUS_OVERWRITE',
                     detail: err.message,
                     currentCounts: err.currentCounts,
                     nextCounts: err.nextCounts
                 });
+            }
+            if (err.statusCode && err.statusCode >= 400 && err.statusCode < 500) {
+                return res.status(err.statusCode).json({ error: err.message });
             }
             console.error('Erro ao salvar energia-data:', err.message);
             return res.status(500).json({ error: err.message });
@@ -1157,6 +1445,188 @@ function usuarioEnergiaSeguro(usuario) {
         vendedorId: usuario.vendedorId || null,
         ativo: usuario.ativo !== false,
         chatIdTelegram: usuario.chatIdTelegram || null
+    };
+}
+
+function configEnergiaSegura(config, incluirSegredos = false) {
+    const safe = config && typeof config === 'object' && !Array.isArray(config)
+        ? JSON.parse(JSON.stringify(config))
+        : {};
+    if (safe.telegram && typeof safe.telegram === 'object' && !incluirSegredos) {
+        safe.telegram.token = '';
+    }
+    return safe;
+}
+
+function vendedorIdRegistro(registro) {
+    return String(registro?.vendedorId ?? registro?.vendedor_id ?? '');
+}
+
+function filtrarPayloadEnergiaParaAuth(payload, auth) {
+    const source = payload && typeof payload === 'object' ? payload : {};
+    const isMaster = auth?.perfil === 'master';
+    if (isMaster) {
+        return {
+            ...source,
+            _revision: revisaoEnergia(source, 'master'),
+            _sellerRevisions: undefined,
+            usuarios: Array.isArray(source.usuarios) ? source.usuarios.map(usuarioEnergiaSeguro) : [],
+            config: configEnergiaSegura(source.config, false)
+        };
+    }
+
+    const sellerId = String(auth?.usuario?.vendedorId || '');
+    const vendas = (Array.isArray(source.vendas) ? source.vendas : [])
+        .filter(item => vendedorIdRegistro(item) === sellerId);
+    const oportunidades = (Array.isArray(source.oportunidades) ? source.oportunidades : [])
+        .filter(item => vendedorIdRegistro(item) === sellerId);
+    const clienteIds = new Set([
+        ...vendas.map(item => item.clienteId),
+        ...oportunidades.map(item => item.clienteId)
+    ].filter(Boolean).map(String));
+    const clientes = (Array.isArray(source.clientes) ? source.clientes : [])
+        .filter(item => vendedorIdRegistro(item) === sellerId || clienteIds.has(String(item.id)));
+    clientes.forEach(item => clienteIds.add(String(item.id)));
+    const vendaIds = new Set(vendas.map(item => String(item.id)));
+
+    return {
+        clientes,
+        produtos: Array.isArray(source.produtos) ? source.produtos : [],
+        vendas,
+        vendedores: (Array.isArray(source.vendedores) ? source.vendedores : [])
+            .filter(item => String(item.id) === sellerId),
+        followups: (Array.isArray(source.followups) ? source.followups : [])
+            .filter(item => vendedorIdRegistro(item) === sellerId || clienteIds.has(String(item.clienteId))),
+        pagamentos: (Array.isArray(source.pagamentos) ? source.pagamentos : [])
+            .filter(item => vendaIds.has(String(item.vendaId))),
+        metas: (Array.isArray(source.metas) ? source.metas : [])
+            .filter(item => !vendedorIdRegistro(item) || vendedorIdRegistro(item) === sellerId),
+        usuarios: [usuarioEnergiaSeguro(auth.usuario)].filter(Boolean),
+        oportunidades,
+        config: configEnergiaSegura(source.config, false),
+        _revision: revisaoEnergia(source, 'seller', sellerId)
+    };
+}
+
+function mergeColecaoDoVendedor(atual, recebido, sellerId, options = {}) {
+    const current = Array.isArray(atual) ? atual : [];
+    const incoming = Array.isArray(recebido) ? recebido : [];
+    const ownCurrentIds = new Set(
+        current
+            .filter(item => options.isOwned ? options.isOwned(item) : vendedorIdRegistro(item) === sellerId)
+            .map(item => String(item.id))
+    );
+    const allCurrentIds = new Set(current.map(item => String(item.id)));
+    const preserved = current.filter(item => !ownCurrentIds.has(String(item.id)));
+    const accepted = [];
+
+    for (const raw of incoming) {
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) continue;
+        const item = { ...raw };
+        const id = String(item.id || '');
+        if (!id || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) {
+            const error = new Error('Registro com identificador inválido.');
+            error.statusCode = 400;
+            throw error;
+        }
+        if (allCurrentIds.has(id) && !ownCurrentIds.has(id)) {
+            const error = new Error('Tentativa de alterar registro de outro vendedor.');
+            error.statusCode = 403;
+            throw error;
+        }
+        if (options.forceSeller !== false) {
+            item.vendedorId = sellerId;
+            delete item.vendedor_id;
+        }
+        accepted.push(item);
+    }
+
+    return [...preserved, ...accepted];
+}
+
+function mesclarPayloadEnergiaVendedor(payloadAtual, recebido, auth) {
+    const sellerId = String(auth?.usuario?.vendedorId || '');
+    if (!sellerId) {
+        const error = new Error('Usuário vendedor sem vínculo com um vendedor.');
+        error.statusCode = 403;
+        throw error;
+    }
+
+    const ownSales = (Array.isArray(payloadAtual.vendas) ? payloadAtual.vendas : [])
+        .filter(item => vendedorIdRegistro(item) === sellerId);
+    const ownOpps = (Array.isArray(payloadAtual.oportunidades) ? payloadAtual.oportunidades : [])
+        .filter(item => vendedorIdRegistro(item) === sellerId);
+    const ownClientIds = new Set([
+        ...(Array.isArray(payloadAtual.clientes) ? payloadAtual.clientes : [])
+            .filter(item => vendedorIdRegistro(item) === sellerId)
+            .map(item => item.id),
+        ...ownSales.map(item => item.clienteId),
+        ...ownOpps.map(item => item.clienteId)
+    ].filter(Boolean).map(String));
+    const ownSaleIds = new Set(ownSales.map(item => String(item.id)));
+
+    const vendas = mergeColecaoDoVendedor(payloadAtual.vendas, recebido.vendas, sellerId);
+    const oportunidades = mergeColecaoDoVendedor(payloadAtual.oportunidades, recebido.oportunidades, sellerId);
+    const clientes = mergeColecaoDoVendedor(payloadAtual.clientes, recebido.clientes, sellerId, {
+        isOwned: item => vendedorIdRegistro(item) === sellerId || ownClientIds.has(String(item.id))
+    });
+    const followups = mergeColecaoDoVendedor(payloadAtual.followups, recebido.followups, sellerId, {
+        isOwned: item => vendedorIdRegistro(item) === sellerId || ownClientIds.has(String(item.clienteId))
+    });
+    const pagamentos = mergeColecaoDoVendedor(payloadAtual.pagamentos, recebido.pagamentos, sellerId, {
+        isOwned: item => ownSaleIds.has(String(item.vendaId)),
+        forceSeller: false
+    });
+
+    return {
+        ...payloadAtual,
+        clientes,
+        vendas,
+        followups,
+        pagamentos,
+        oportunidades,
+        produtos: Array.isArray(payloadAtual.produtos) ? payloadAtual.produtos : [],
+        vendedores: Array.isArray(payloadAtual.vendedores) ? payloadAtual.vendedores : [],
+        metas: Array.isArray(payloadAtual.metas) ? payloadAtual.metas : [],
+        usuarios: Array.isArray(payloadAtual.usuarios) ? payloadAtual.usuarios : [],
+        config: payloadAtual.config && typeof payloadAtual.config === 'object' ? payloadAtual.config : {}
+    };
+}
+
+function responderPayloadEnergia(res, payload, id, auth) {
+    const safe = filtrarPayloadEnergiaParaAuth(payload, auth);
+    return res.json([{ id, ...safe }]);
+}
+
+function opcoesEscritaEnergia(req, allowDangerousOverwrite = false) {
+    if (allowDangerousOverwrite) {
+        return { allowDangerousOverwrite: true };
+    }
+
+    if (req.energiaAuth?.perfil === 'master') {
+        return {
+            allowDangerousOverwrite: false,
+            revisionScope: 'master',
+            enforceRevision: true,
+            transformPayload(payloadAtual, recebido) {
+                return {
+                    ...recebido,
+                    usuarios: Array.isArray(payloadAtual.usuarios) ? payloadAtual.usuarios : [],
+                    config: payloadAtual.config && typeof payloadAtual.config === 'object' ? payloadAtual.config : {},
+                    _sellerRevisions: payloadAtual._sellerRevisions || {}
+                };
+            }
+        };
+    }
+
+    return {
+        allowDangerousOverwrite: false,
+        revisionScope: 'seller',
+        sellerId: String(req.energiaAuth?.usuario?.vendedorId || ''),
+        enforceRevision: true,
+        transformPayload(payloadAtual, recebido) {
+            return mesclarPayloadEnergiaVendedor(payloadAtual, recebido, req.energiaAuth);
+        }
     };
 }
 
@@ -1222,7 +1692,7 @@ function criarUsuariosPadroes() {
  * Autentica usuário e retorna dados do usuário
  */
 app.post('/auth/login', rateLimitLogin, (req, res) => {
-    const { email, senha } = req.body;
+    const { email, senha, lembrarSessao } = req.body;
     
     console.log(`🔐 Tentativa de login: ${email}`);
     
@@ -1238,7 +1708,7 @@ app.post('/auth/login', rateLimitLogin, (req, res) => {
     db.get(
         'SELECT * FROM usuarios WHERE email = ? AND ativo = 1',
         [email],
-        (err, user) => {
+        async (err, user) => {
             if (err) {
                 console.error('❌ Erro ao buscar usuário:', err.message);
                 return res.status(500).json({ 
@@ -1257,7 +1727,7 @@ app.post('/auth/login', rateLimitLogin, (req, res) => {
             }
             
             // Validar senha
-            if (!compararSenha(senha, user.senha)) {
+            if (!await compararSenha(senha, user.senha)) {
                 console.warn(`❌ Senha incorreta para: ${email}`);
                 return res.json({ 
                     success: false, 
@@ -1268,6 +1738,12 @@ app.post('/auth/login', rateLimitLogin, (req, res) => {
             // Login bem-sucedido
             console.log(`✅ Login bem-sucedido: ${email} (${user.perfil})`);
             clearLoginAttempts(req);
+
+            if (!String(user.senha || '').startsWith('pbkdf2$')) {
+                hashSenhaForte(senha)
+                    .then(upgraded => db.run('UPDATE usuarios SET senha = ? WHERE id = ?', [upgraded, user.id]))
+                    .catch(upgradeErr => console.warn('Falha ao atualizar hash legado:', upgradeErr.message));
+            }
             
             // Atualizar último acesso
             const agora = new Date().toISOString();
@@ -1283,6 +1759,7 @@ app.post('/auth/login', rateLimitLogin, (req, res) => {
                     error: 'Servidor sem AUTH_TOKEN_SECRET configurado'
                 });
             }
+            setMainSessionCookie(res, token, lembrarSessao === true);
 
             // Retornar dados do usuário (sem a senha)
             res.json({
@@ -1292,8 +1769,7 @@ app.post('/auth/login', rateLimitLogin, (req, res) => {
                     nome: user.nome,
                     email: user.email,
                     perfil: user.perfil
-                },
-                token
+                }
             });
         }
     );
@@ -1305,6 +1781,7 @@ app.post('/auth/login', rateLimitLogin, (req, res) => {
  */
 app.post('/auth/logout', requireAuth, (req, res) => {
     console.log(`👋 Logout realizado`);
+    clearMainSessionCookie(res);
     res.json({ success: true });
 });
 
@@ -1352,7 +1829,7 @@ app.get('/api/usuarios', requireAuth, requireMaster, (req, res) => {
  * POST /api/usuarios
  * Cria um novo usuário
  */
-app.post('/api/usuarios', requireAuth, requireMaster, (req, res) => {
+app.post('/api/usuarios', requireAuth, requireMaster, async (req, res) => {
     const { nome, email, senha, perfil = 'vendedor', ativo = 1 } = req.body;
     
     // Validações
@@ -1363,16 +1840,16 @@ app.post('/api/usuarios', requireAuth, requireMaster, (req, res) => {
         });
     }
     
-    if (!email.includes('@')) {
+    if (!email.includes('@') || senha.length < 10) {
         return res.json({ 
             success: false, 
-            error: 'Email inválido' 
+            error: senha.length < 10 ? 'Senha deve ter pelo menos 10 caracteres' : 'Email inválido'
         });
     }
     
     console.log(`➕ Criando novo usuário: ${email} (${perfil})`);
     
-    const senhaHash = hashSenha(senha);
+    const senhaHash = await hashSenhaForte(senha);
     
     db.run(
         'INSERT INTO usuarios (nome, email, senha, perfil, ativo) VALUES (?, ?, ?, ?, ?)',
@@ -1402,7 +1879,7 @@ app.post('/api/usuarios', requireAuth, requireMaster, (req, res) => {
  * PUT /api/usuarios/:id
  * Atualiza um usuário
  */
-app.put('/api/usuarios/:id', requireAuth, requireMaster, (req, res) => {
+app.put('/api/usuarios/:id', requireAuth, requireMaster, async (req, res) => {
     const id = req.params.id;
     const { nome, email, senha, perfil, ativo } = req.body;
     
@@ -1421,8 +1898,11 @@ app.put('/api/usuarios/:id', requireAuth, requireMaster, (req, res) => {
         valores.push(email);
     }
     if (senha && senha.trim()) {
+        if (senha.length < 10) {
+            return res.status(400).json({ success: false, error: 'Senha deve ter pelo menos 10 caracteres' });
+        }
         campos.push('senha = ?');
-        valores.push(hashSenha(senha));
+        valores.push(await hashSenhaForte(senha));
     }
     if (perfil) {
         campos.push('perfil = ?');
@@ -1613,15 +2093,37 @@ app.post('/api/energia-login', rateLimitLogin, async (req, res) => {
         const { payload } = await carregarEnergiaPayload();
         const usuarios = Array.isArray(payload.usuarios) ? payload.usuarios : [];
         const usuario = usuarios.find(u => String(u.login || '').trim().toLowerCase() === login && u.ativo !== false);
-        if (!usuario || !usuario.salt || !usuario.senhaHash) {
+        if (!usuario || (!usuario.senhaSegura && (!usuario.salt || !usuario.senhaHash))) {
             clearEnergiaSessionCookie(res);
             return res.status(401).json({ success: false, error: 'Login ou senha inválidos.' });
         }
 
-        const senhaHash = crypto.createHash('sha256').update(senha + '::' + usuario.salt).digest('hex');
-        if (senhaHash !== usuario.senhaHash) {
+        let senhaValida = false;
+        if (usuario.senhaSegura) {
+            senhaValida = await compararSenha(senha, usuario.senhaSegura);
+        } else {
+            const senhaHash = crypto.createHash('sha256').update(senha + '::' + usuario.salt).digest('hex');
+            const actual = Buffer.from(senhaHash);
+            const expected = Buffer.from(String(usuario.senhaHash || ''));
+            senhaValida = actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+        }
+        if (!senhaValida) {
             clearEnergiaSessionCookie(res);
             return res.status(401).json({ success: false, error: 'Login ou senha inválidos.' });
+        }
+
+        if (!usuario.senhaSegura) {
+            hashSenhaForte(senha)
+                .then(senhaSegura => atualizarEnergiaDirecionado(payloadAtual => {
+                    const usuariosAtuais = Array.isArray(payloadAtual.usuarios) ? payloadAtual.usuarios : [];
+                    return {
+                        ...payloadAtual,
+                        usuarios: usuariosAtuais.map(item => item.id === usuario.id
+                            ? { ...item, senhaSegura, salt: undefined, senhaHash: undefined }
+                            : item)
+                    };
+                }))
+                .catch(upgradeErr => console.warn('Falha ao atualizar senha legada do Energia:', upgradeErr.message));
         }
 
         const tipo = normalizarTipoEnergia(usuario);
@@ -1643,10 +2145,9 @@ app.post('/api/energia-setup', rateLimitLogin, async (req, res) => {
     try {
         const nome = String(req.body?.nome || '').trim();
         const login = String(req.body?.login || '').trim().toLowerCase();
-        const salt = String(req.body?.salt || '').trim();
-        const senhaHash = String(req.body?.senhaHash || '').trim();
+        const senha = String(req.body?.senha || '');
 
-        if (!nome || !/^[a-z0-9._-]{3,}$/.test(login) || !salt || !senhaHash) {
+        if (!nome || !/^[a-z0-9._-]{3,}$/.test(login) || senha.length < 10) {
             return res.status(400).json({ success: false, error: 'Dados inválidos para criação do master.' });
         }
 
@@ -1660,8 +2161,7 @@ app.post('/api/energia-setup', rateLimitLogin, async (req, res) => {
             id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}${crypto.randomBytes(6).toString('hex')}`,
             nome,
             login,
-            salt,
-            senhaHash,
+            senhaSegura: await hashSenhaForte(senha),
             tipo: 'master',
             vendedorId: null,
             ativo: true,
@@ -1696,13 +2196,168 @@ app.post('/api/energia-setup', rateLimitLogin, async (req, res) => {
     }
 });
 
+app.post('/api/energia-usuarios', requireEnergiaAuth, requireEnergiaMaster, async (req, res) => {
+    try {
+        const nome = String(req.body?.nome || '').trim();
+        const login = String(req.body?.login || '').trim().toLowerCase();
+        const senha = String(req.body?.senha || '');
+        const tipo = req.body?.tipo === 'master' ? 'master' : 'vendedor';
+        const vendedorId = tipo === 'vendedor' ? String(req.body?.vendedorId || '').trim() : null;
+        const chatIdTelegram = String(req.body?.chatIdTelegram || '').trim() || null;
+        const ativo = req.body?.ativo !== false;
+        if (!nome || !/^[a-z0-9._-]{3,}$/.test(login) || senha.length < 10 || (tipo === 'vendedor' && !vendedorId)) {
+            return res.status(400).json({ success: false, error: 'Dados de usuário inválidos. A senha deve ter ao menos 10 caracteres.' });
+        }
+
+        const usuario = {
+            id: crypto.randomUUID(),
+            nome,
+            login,
+            senhaSegura: await hashSenhaForte(senha),
+            tipo,
+            vendedorId,
+            chatIdTelegram,
+            ativo,
+            criadoEm: new Date().toISOString()
+        };
+        const result = await atualizarEnergiaDirecionado(payloadAtual => {
+            const usuarios = Array.isArray(payloadAtual.usuarios) ? payloadAtual.usuarios : [];
+            if (usuarios.some(item => String(item.login || '').trim().toLowerCase() === login)) {
+                const error = new Error('Login já está em uso.');
+                error.statusCode = 409;
+                throw error;
+            }
+            return { ...payloadAtual, usuarios: [...usuarios, usuario] };
+        });
+        return res.json({
+            success: true,
+            id: result.id,
+            revision: revisaoEnergia(result.payload, 'master'),
+            usuario: usuarioEnergiaSeguro(usuario)
+        });
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ success: false, error: err.statusCode ? err.message : 'Erro ao criar usuário.' });
+    }
+});
+
+app.put('/api/energia-usuarios/:id', requireEnergiaAuth, requireEnergiaMaster, async (req, res) => {
+    try {
+        const id = String(req.params.id || '');
+        const nome = String(req.body?.nome || '').trim();
+        const login = String(req.body?.login || '').trim().toLowerCase();
+        const senha = String(req.body?.senha || '');
+        const tipo = req.body?.tipo === 'master' ? 'master' : 'vendedor';
+        const vendedorId = tipo === 'vendedor' ? String(req.body?.vendedorId || '').trim() : null;
+        const chatIdTelegram = String(req.body?.chatIdTelegram || '').trim() || null;
+        const ativo = req.body?.ativo !== false;
+        if (!id || !nome || !/^[a-z0-9._-]{3,}$/.test(login) || (senha && senha.length < 10) || (tipo === 'vendedor' && !vendedorId)) {
+            return res.status(400).json({ success: false, error: 'Dados de usuário inválidos.' });
+        }
+        if (id === req.energiaAuth.userId && !ativo) {
+            return res.status(400).json({ success: false, error: 'Você não pode desativar o próprio usuário.' });
+        }
+
+        const senhaSegura = senha ? await hashSenhaForte(senha) : null;
+        let usuarioAtualizado = null;
+        const result = await atualizarEnergiaDirecionado(payloadAtual => {
+            const usuarios = Array.isArray(payloadAtual.usuarios) ? payloadAtual.usuarios : [];
+            if (usuarios.some(item => item.id !== id && String(item.login || '').trim().toLowerCase() === login)) {
+                const error = new Error('Login já está em uso.');
+                error.statusCode = 409;
+                throw error;
+            }
+            if (!usuarios.some(item => item.id === id)) {
+                const error = new Error('Usuário não encontrado.');
+                error.statusCode = 404;
+                throw error;
+            }
+            return {
+                ...payloadAtual,
+                usuarios: usuarios.map(item => {
+                    if (item.id !== id) return item;
+                    usuarioAtualizado = {
+                        ...item,
+                        nome,
+                        login,
+                        tipo,
+                        vendedorId,
+                        chatIdTelegram,
+                        ativo,
+                        ...(senhaSegura ? { senhaSegura, salt: undefined, senhaHash: undefined } : {})
+                    };
+                    return usuarioAtualizado;
+                })
+            };
+        });
+        return res.json({
+            success: true,
+            id: result.id,
+            revision: revisaoEnergia(result.payload, 'master'),
+            usuario: usuarioEnergiaSeguro(usuarioAtualizado)
+        });
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ success: false, error: err.statusCode ? err.message : 'Erro ao atualizar usuário.' });
+    }
+});
+
+app.delete('/api/energia-usuarios/:id', requireEnergiaAuth, requireEnergiaMaster, async (req, res) => {
+    try {
+        const id = String(req.params.id || '');
+        if (!id || id === req.energiaAuth.userId) {
+            return res.status(400).json({ success: false, error: 'Você não pode excluir o próprio usuário.' });
+        }
+        const result = await atualizarEnergiaDirecionado(payloadAtual => {
+            const usuarios = Array.isArray(payloadAtual.usuarios) ? payloadAtual.usuarios : [];
+            if (!usuarios.some(item => item.id === id)) {
+                const error = new Error('Usuário não encontrado.');
+                error.statusCode = 404;
+                throw error;
+            }
+            return { ...payloadAtual, usuarios: usuarios.filter(item => item.id !== id) };
+        });
+        return res.json({
+            success: true,
+            id: result.id,
+            revision: revisaoEnergia(result.payload, 'master')
+        });
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ success: false, error: err.statusCode ? err.message : 'Erro ao excluir usuário.' });
+    }
+});
+
+app.patch('/api/energia-me/telegram', requireEnergiaAuth, async (req, res) => {
+    try {
+        const chatIdTelegram = String(req.body?.chatIdTelegram || '').trim() || null;
+        const scope = req.energiaAuth.perfil === 'master' ? 'master' : 'seller';
+        const sellerId = req.energiaAuth.usuario?.vendedorId || null;
+        let usuarioAtualizado = null;
+        const result = await atualizarEnergiaDirecionado(payloadAtual => ({
+            ...payloadAtual,
+            usuarios: (Array.isArray(payloadAtual.usuarios) ? payloadAtual.usuarios : []).map(item => {
+                if (item.id !== req.energiaAuth.userId) return item;
+                usuarioAtualizado = { ...item, chatIdTelegram };
+                return usuarioAtualizado;
+            })
+        }), scope, sellerId);
+        return res.json({
+            success: true,
+            revision: revisaoEnergia(result.payload, scope, sellerId),
+            usuario: usuarioEnergiaSeguro(usuarioAtualizado)
+        });
+    } catch (err) {
+        return res.status(500).json({ success: false, error: 'Erro ao salvar Telegram pessoal.' });
+    }
+});
+
 app.get('/api/energia-session', async (req, res) => {
     try {
         const token = readCookies(req).energia_session;
         const session = validarTokenSessao(token);
         if (!session || !session.userId) {
             clearEnergiaSessionCookie(res);
-            return res.status(401).json({ success: false, error: 'Sessão expirada.' });
+            const { payload } = await carregarEnergiaPayload();
+            const setupRequired = !Array.isArray(payload.usuarios) || payload.usuarios.length === 0;
+            return res.status(401).json({ success: false, error: 'Sessão expirada.', setupRequired });
         }
 
         const { payload } = await carregarEnergiaPayload();
@@ -1713,6 +2368,8 @@ app.get('/api/energia-session', async (req, res) => {
             return res.status(401).json({ success: false, error: 'Usuário não encontrado.' });
         }
 
+        const renewedToken = gerarTokenSessao({ id: usuario.id, perfil: normalizarTipoEnergia(usuario) });
+        if (renewedToken) setEnergiaSessionCookie(res, renewedToken);
         return res.json({ success: true, usuario: usuarioEnergiaSeguro(usuario) });
     } catch (err) {
         console.error('Erro ao validar sessão Energia:', err.message);
@@ -1758,13 +2415,13 @@ app.get('/api/energia-data', requireEnergiaAuth, (req, res) => {
                 const fullString = ordered.map(r => r.payload.data).join('');
                 try {
                     const parsed = JSON.parse(fullString);
-                    return res.json([{ id: ordered[0].id, ...parsed }]);
+                    return responderPayloadEnergia(res, parsed, ordered[0].id, req.energiaAuth);
                 } catch (e) {
                     console.error('❌ Erro ao montar chunks de energia-data:', e.message);
                     const normalRowsFallback = parsedRows.filter(row => !row.payload || row.payload.chunked !== true);
                     const latestFallback = normalRowsFallback.sort((a, b) => b.id - a.id)[0];
                     if (latestFallback && latestFallback.payload && typeof latestFallback.payload === 'object' && !Array.isArray(latestFallback.payload)) {
-                        return res.json([{ id: latestFallback.id, ...latestFallback.payload }]);
+                        return responderPayloadEnergia(res, latestFallback.payload, latestFallback.id, req.energiaAuth);
                     }
                     return res.json([]);
                 }
@@ -1776,7 +2433,7 @@ app.get('/api/energia-data', requireEnergiaAuth, (req, res) => {
                 return res.json([]);
             }
 
-            return res.json([{ id: latest.id, ...latest.payload }]);
+            return responderPayloadEnergia(res, latest.payload, latest.id, req.energiaAuth);
         }
     );
 });
@@ -1787,7 +2444,10 @@ app.get('/api/energia-config', requireEnergiaAuth, async (req, res) => {
         const config = payload?.config && typeof payload.config === 'object' && !Array.isArray(payload.config)
             ? payload.config
             : {};
-        return res.json({ success: true, config });
+        return res.json({
+            success: true,
+            config: configEnergiaSegura(config, req.energiaAuth.perfil === 'master')
+        });
     } catch (err) {
         console.error('Erro ao carregar configurações do CRM Energia:', err.message);
         return res.status(500).json({ success: false, error: 'Erro ao carregar configurações.' });
@@ -1819,9 +2479,15 @@ app.patch('/api/energia-config', requireEnergiaAuth, requireEnergiaMaster, (req,
     }
 
     substituirEnergiaPayloadAtomico(JSON.stringify(sanitizedPatch), res, function(id, payload) {
-        return { success: true, id, config: payload.config };
+        return {
+            success: true,
+            id,
+            revision: revisaoEnergia(payload, 'master'),
+            config: configEnergiaSegura(payload.config, true)
+        };
     }, {
         allowDangerousOverwrite: true,
+        revisionScope: 'master',
         transformPayload(payloadAtual, configPatch) {
             const configAtual = payloadAtual?.config && typeof payloadAtual.config === 'object' && !Array.isArray(payloadAtual.config)
                 ? payloadAtual.config
@@ -1837,7 +2503,86 @@ app.patch('/api/energia-config', requireEnergiaAuth, requireEnergiaMaster, (req,
     });
 });
 
-app.post('/api/energia-telegram/notificar', requireEnergiaAuth, async (req, res) => {
+async function chamarTelegram(token, method, body) {
+    if (!/^\d+:[A-Za-z0-9_-]+$/.test(String(token || '').trim())) {
+        const err = new Error('Token do Telegram inválido ou não configurado.');
+        err.statusCode = 400;
+        throw err;
+    }
+    const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+        method: body ? 'POST' : 'GET',
+        headers: body ? { 'Content-Type': 'application/json' } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(10000)
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.ok) {
+        const err = new Error(result?.description || `Telegram retornou ${response.status}.`);
+        err.statusCode = 502;
+        throw err;
+    }
+    return result;
+}
+
+app.post('/api/energia-telegram/testar', requireEnergiaAuth, limitarTelegram, async (req, res) => {
+    try {
+        const { payload } = await carregarEnergiaPayload();
+        const telegram = payload?.config?.telegram || {};
+        const destino = String(req.body?.destino || '');
+        let chatId = '';
+
+        if (destino === 'global') {
+            if (req.energiaAuth.perfil !== 'master') {
+                return res.status(403).json({ success: false, error: 'Acesso restrito ao perfil master.' });
+            }
+            chatId = String(telegram.chatId || '').trim();
+        } else if (destino === 'pessoal') {
+            chatId = String(req.body?.chatId || '').trim();
+        }
+
+        if (!/^-?\d{5,20}$/.test(chatId)) {
+            return res.status(400).json({ success: false, error: 'Chat ID inválido.' });
+        }
+
+        await chamarTelegram(telegram.token, 'sendMessage', {
+            chat_id: chatId,
+            text: destino === 'global'
+                ? 'Teste de conexão do CRM Energia concluído com sucesso.'
+                : 'Seu Telegram pessoal está configurado no CRM Energia.',
+            disable_web_page_preview: true
+        });
+        return res.json({ success: true });
+    } catch (err) {
+        console.error('Erro ao testar Telegram:', err.message);
+        return res.status(err.statusCode || 500).json({ success: false, error: err.message || 'Erro ao testar Telegram.' });
+    }
+});
+
+app.post('/api/energia-telegram/detectar', requireEnergiaAuth, requireEnergiaMaster, limitarTelegram, async (req, res) => {
+    try {
+        const { payload } = await carregarEnergiaPayload();
+        const telegram = payload?.config?.telegram || {};
+        const result = await chamarTelegram(telegram.token, 'getUpdates');
+        const updates = Array.isArray(result.result) ? result.result : [];
+        const update = updates[updates.length - 1];
+        const chatId = update?.message?.chat?.id
+            || update?.edited_message?.chat?.id
+            || update?.channel_post?.chat?.id
+            || update?.my_chat_member?.chat?.id;
+        if (!chatId) {
+            return res.status(404).json({
+                success: false,
+                error: 'Envie uma mensagem ao bot e tente detectar novamente.'
+            });
+        }
+        return res.json({ success: true, chatId: String(chatId) });
+    } catch (err) {
+        console.error('Erro ao detectar Chat ID do Telegram:', err.message);
+        return res.status(err.statusCode || 500).json({ success: false, error: err.message || 'Erro ao detectar Chat ID.' });
+    }
+});
+
+app.post('/api/energia-telegram/notificar', requireEnergiaAuth, limitarTelegram, async (req, res) => {
     const evento = String(req.body?.evento || '').trim();
     const texto = String(req.body?.texto || '');
     const eventosPermitidos = new Set(['geral', 'pipeline', 'venda-nova', 'venda-status', 'venda-obs']);
@@ -1891,19 +2636,13 @@ app.post('/api/energia-telegram/notificar', requireEnergiaAuth, async (req, res)
         const errors = [];
         for (const chatId of destinatarios) {
             try {
-                const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: chatId,
-                        text: texto,
-                        parse_mode: 'HTML',
-                        disable_web_page_preview: true
-                    })
+                await chamarTelegram(token, 'sendMessage', {
+                    chat_id: chatId,
+                    text: texto,
+                    parse_mode: 'HTML',
+                    disable_web_page_preview: true
                 });
-                const result = await response.json().catch(() => null);
-                if (response.ok && result?.ok) sent += 1;
-                else errors.push(result?.description || `Telegram retornou ${response.status}`);
+                sent += 1;
             } catch (err) {
                 errors.push(err.message || String(err));
             }
@@ -2005,11 +2744,14 @@ app.post('/api/energia-data/chunks', requireEnergiaAuth, (req, res) => {
                         energiaDb.run("DELETE FROM documents WHERE collection = ?", [tempCollection], cleanupErr => {
                             if (cleanupErr) console.warn('⚠️ Falha ao limpar chunks temporários:', cleanupErr.message);
                         });
-                        return { id, complete: true, totalChunks };
-                    }, {
-                        allowDangerousOverwrite,
-                        preserveConfig: !allowDangerousOverwrite
-                    });
+                        const scope = req.energiaAuth?.perfil === 'master' ? 'master' : 'seller';
+                        return {
+                            id,
+                            complete: true,
+                            totalChunks,
+                            revision: revisaoEnergia(this.payload, scope, req.energiaAuth?.usuario?.vendedorId)
+                        };
+                    }, opcoesEscritaEnergia(req, allowDangerousOverwrite));
                 }
             );
         }
@@ -2028,11 +2770,12 @@ app.post('/api/energia-data', requireEnergiaAuth, (req, res) => {
         return res.status(403).json({ error: 'Apenas o perfil master pode substituir todos os dados.' });
     }
     substituirEnergiaPayloadAtomico(payload, res, function(id) {
-        return { id };
-    }, {
-        allowDangerousOverwrite,
-        preserveConfig: !allowDangerousOverwrite
-    });
+        const scope = req.energiaAuth?.perfil === 'master' ? 'master' : 'seller';
+        return {
+            id,
+            revision: revisaoEnergia(this.payload, scope, req.energiaAuth?.usuario?.vendedorId)
+        };
+    }, opcoesEscritaEnergia(req, allowDangerousOverwrite));
 });
 
 /**
@@ -2047,30 +2790,27 @@ app.put('/api/energia-data/:id', requireEnergiaAuth, (req, res) => {
         return res.status(403).json({ error: 'Apenas o perfil master pode substituir todos os dados.' });
     }
     substituirEnergiaPayloadAtomico(payload, res, function(id) {
-        return { success: true, id };
-    }, {
-        allowDangerousOverwrite,
-        preserveConfig: !allowDangerousOverwrite
-    });
+        const scope = req.energiaAuth?.perfil === 'master' ? 'master' : 'seller';
+        return {
+            success: true,
+            id,
+            revision: revisaoEnergia(this.payload, scope, req.energiaAuth?.usuario?.vendedorId)
+        };
+    }, opcoesEscritaEnergia(req, allowDangerousOverwrite));
 });
 
-/**
- * DELETE /api/energia-data/:id
- * Deletar dados de energia
- */
-app.delete('/api/energia-data/:id', requireEnergiaAuth, requireEnergiaMaster, (req, res) => {
-    const id = req.params.id;
-    energiaDb.run(
-        "DELETE FROM documents WHERE collection = 'energia-data' AND id = ?",
-        [id],
-        function(err) {
-            if (err) {
-                console.error('❌ Erro ao deletar dados de energia:', err.message);
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ success: true });
-        }
-    );
+app.get('/api/energia-backup', requireEnergiaAuth, requireEnergiaMaster, async (req, res) => {
+    try {
+        const { payload } = await carregarEnergiaPayload();
+        const filename = `crm-energia-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Cache-Control', 'no-store');
+        return res.send(JSON.stringify(payload, null, 2));
+    } catch (err) {
+        console.error('Erro ao exportar backup do CRM Energia:', err.message);
+        return res.status(500).json({ success: false, error: 'Erro ao exportar backup.' });
+    }
 });
 
 /**
@@ -2091,7 +2831,7 @@ app.post('/api/energia-import-backup', requireEnergiaAuth, requireEnergiaMaster,
     });
 });
 
-app.get('/api/:collection', requireAuth, (req, res) => {
+app.get('/api/:collection', requireAuth, validarColecaoDados, (req, res) => {
     const collection = req.params.collection;
     const userId = req.auth.userId;
     const perfil = req.auth.perfil;
@@ -2126,7 +2866,7 @@ app.get('/healthz', (req, res) => {
 });
 
 // ROTA: Adicionar um novo dado
-app.post('/api/:collection', requireAuth, (req, res) => {
+app.post('/api/:collection', requireAuth, validarColecaoDados, autorizarEscritaColecao, (req, res) => {
     const collection = req.params.collection;
     const userId = req.auth.userId;
     const perfil = req.auth.perfil;
@@ -2146,7 +2886,7 @@ app.post('/api/:collection', requireAuth, (req, res) => {
 });
 
 // ROTA: Atualizar um dado existente
-app.put('/api/:collection/:id', requireAuth, (req, res) => {
+app.put('/api/:collection/:id', requireAuth, validarColecaoDados, autorizarEscritaColecao, (req, res) => {
     const collection = req.params.collection;
     const id = req.params.id;
     const userId = req.auth.userId;
@@ -2160,14 +2900,24 @@ app.put('/api/:collection/:id', requireAuth, (req, res) => {
     }
 
     const payload = JSON.stringify(payloadBody);
-    db.run("UPDATE documents SET payload = ? WHERE collection = ? AND id = ?", [payload, collection, id], function(err) {
+    let sql = "UPDATE documents SET payload = ? WHERE collection = ? AND id = ?";
+    const params = [payload, collection, id];
+    if (isSellerScopedCollection(collection) && userId && perfil !== 'master') {
+        sql += ` AND ${SELLER_ID_SQL_EXPR} = ?`;
+        params.push(userId);
+    }
+
+    db.run(sql, params, function(err) {
         if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) {
+            return res.status(404).json({ success: false, error: 'Registro não encontrado ou sem permissão.' });
+        }
         res.json({ success: true });
     });
 });
 
 // ROTA: Deletar um dado
-app.delete('/api/:collection/:id', requireAuth, (req, res) => {
+app.delete('/api/:collection/:id', requireAuth, validarColecaoDados, autorizarEscritaColecao, (req, res) => {
     const collection = req.params.collection;
     const id = req.params.id;
     const userId = req.auth.userId;
@@ -2184,6 +2934,9 @@ app.delete('/api/:collection/:id', requireAuth, (req, res) => {
 
     db.run(sql, params, function(err) {
         if (err) return res.status(500).json({ error: err.message });
+        if (this.changes === 0) {
+            return res.status(404).json({ success: false, error: 'Registro não encontrado ou sem permissão.' });
+        }
         res.json({ success: true });
     });
 });
@@ -2563,7 +3316,9 @@ function startServer() {
         console.log(`📡 Acesse remotamente via: https://loconecta.com.br (com Nginx como proxy)`);
         console.log(`💡 Certifique-se de que Nginx está configurado apontando para localhost:${PORT}`);
         criarBackupEnergiaPeriodico('startup');
+        criarSnapshotsPeriodicos('startup');
         setInterval(() => criarBackupEnergiaPeriodico('periodic'), ENERGIA_PERIODIC_BACKUP_MS).unref();
+        setInterval(() => criarSnapshotsPeriodicos('periodic'), ENERGIA_PERIODIC_BACKUP_MS).unref();
     });
 }
 
@@ -2574,10 +3329,11 @@ Promise.all([dbReady, energiaDbReady])
         console.log('✅ Todos os bancos de dados foram inicializados e a migração foi concluída.');
         startServer();
     })
-    .catch((err) => {
+    .catch(async (err) => {
         console.error('❌ Não foi possível inicializar todos os bancos de dados ou concluir a migração:', err.message || err);
-        console.error('⚠️ O servidor ainda será iniciado, mas algumas funcionalidades podem não funcionar corretamente.');
-        startServer();
+        console.error('⛔ Inicialização interrompida para evitar operar com banco indisponível ou corrompido.');
+        await Promise.all([fecharBanco(db, 'CRM'), fecharBanco(energiaDb, 'Energia')]);
+        process.exit(1);
     });
 
 process.on('unhandledRejection', (reason) => {
@@ -2590,16 +3346,28 @@ process.on('uncaughtException', (err) => {
     setTimeout(() => process.exit(1), 500);
 });
 
+async function fecharBanco(dbInstance, label) {
+    if (!dbInstance) return;
+    await new Promise(resolve => {
+        dbInstance.exec('PRAGMA wal_checkpoint(TRUNCATE)', checkpointErr => {
+            if (checkpointErr) console.warn(`⚠️ Falha no checkpoint de ${label}:`, checkpointErr.message);
+            dbInstance.close(closeErr => {
+                if (closeErr) console.warn(`⚠️ Falha ao fechar ${label}:`, closeErr.message);
+                resolve();
+            });
+        });
+    });
+}
+
 function gracefulShutdown(signal) {
     console.log(`⚠️ Recebido ${signal}. Encerrando servidor...`);
-    if (server) {
-        server.close(() => {
-            console.log('✅ Servidor encerrado com sucesso.');
-            process.exit(0);
-        });
-    } else {
+    const finalizar = async () => {
+        await Promise.all([fecharBanco(db, 'CRM'), fecharBanco(energiaDb, 'Energia')]);
+        console.log('✅ Servidor e bancos encerrados com sucesso.');
         process.exit(0);
-    }
+    };
+    if (server) return server.close(finalizar);
+    finalizar();
 }
 
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));

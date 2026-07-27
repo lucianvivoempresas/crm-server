@@ -6,7 +6,7 @@ window.addEventListener('load', async () => {
     if (window.lucide) lucide.createIcons();
     
     // Verificar se usuário está autenticado
-    if (estaLogado()) {
+    if (await estaLogado()) {
       // Usuário logado - inicializar aplicação
       console.log('👤 Usuário autenticado. Inicializando aplicação...');
       await initDB();

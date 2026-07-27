@@ -1,9 +1,6 @@
 // js/auth.js
 // Gerenciamento de autenticação e sessão do usuário
 
-const AUTH_STORAGE_KEY = 'CRM_USER_SESSION';
-const AUTH_TOKEN_KEY = 'CRM_AUTH_TOKEN';
-
 // Estado da autenticação
 let usuarioLogado = null;
 
@@ -22,7 +19,7 @@ async function login(email, senha, lembrarSessao = false) {
         const response = await fetch(`${API_URL.replace('/api', '')}/auth/login`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, senha })
+            body: JSON.stringify({ email, senha, lembrarSessao })
         });
         
         const result = await response.json();
@@ -34,19 +31,8 @@ async function login(email, senha, lembrarSessao = false) {
         
         console.log('✅ Login bem-sucedido:', result.usuario.nome);
         
-        // Salvar dados do usuário na sessão atual ou de forma persistente (lembrar-me)
+        // A sessão fica em cookie HttpOnly; nenhum token é exposto ao JavaScript.
         usuarioLogado = result.usuario;
-        if (lembrarSessao) {
-            localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.usuario));
-            if (result.token) localStorage.setItem(AUTH_TOKEN_KEY, result.token);
-            sessionStorage.removeItem(AUTH_STORAGE_KEY);
-            sessionStorage.removeItem(AUTH_TOKEN_KEY);
-        } else {
-            sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(result.usuario));
-            if (result.token) sessionStorage.setItem(AUTH_TOKEN_KEY, result.token);
-            localStorage.removeItem(AUTH_STORAGE_KEY);
-            localStorage.removeItem(AUTH_TOKEN_KEY);
-        }
         
         return true;
     } catch (err) {
@@ -62,14 +48,7 @@ async function logout() {
     try {
         console.log('👋 Fazendo logout para:', usuarioLogado?.email);
         
-        // Limpar dados locais
-        usuarioLogado = null;
-        sessionStorage.removeItem(AUTH_STORAGE_KEY);
-        sessionStorage.removeItem(AUTH_TOKEN_KEY);
-        localStorage.removeItem(AUTH_STORAGE_KEY);
-        localStorage.removeItem(AUTH_TOKEN_KEY);
-        
-        // Notificar backend (opcional)
+        // Invalidar o cookie HttpOnly no servidor.
         try {
             await fetch(`${API_URL.replace('/api', '')}/auth/logout`, {
                 method: 'POST',
@@ -78,6 +57,7 @@ async function logout() {
         } catch (e) {
             // Não falha se o backend não responder
         }
+        usuarioLogado = null;
         
         console.log('✅ Logout bem-sucedido');
         return true;
@@ -90,23 +70,13 @@ async function logout() {
 /**
  * Recuperar usuário da sessão salva
  */
-function recuperarSessao() {
+async function recuperarSessao() {
     try {
-        const savedSession = sessionStorage.getItem(AUTH_STORAGE_KEY);
-        if (savedSession) {
-            usuarioLogado = JSON.parse(savedSession);
-            console.log('🔄 Sessão recuperada para:', usuarioLogado.nome);
-            return usuarioLogado;
-        }
-
-        const savedLocal = localStorage.getItem(AUTH_STORAGE_KEY);
-        if (savedLocal) {
-            usuarioLogado = JSON.parse(savedLocal);
-            console.log('🔄 Sessão recuperada para:', usuarioLogado.nome);
-            return usuarioLogado;
-        }
-
-        return null;
+        const response = await fetch(`${API_URL.replace('/api', '')}/auth/me`, { cache: 'no-store' });
+        if (!response.ok) return null;
+        const result = await response.json();
+        usuarioLogado = result?.success ? result.usuario : null;
+        return usuarioLogado;
     } catch (err) {
         console.error('Erro ao recuperar sessão:', err);
         return null;
@@ -116,16 +86,15 @@ function recuperarSessao() {
 /**
  * Verificar se usuário está logado
  */
-function estaLogado() {
-    return usuarioLogado !== null || recuperarSessao() !== null;
+async function estaLogado() {
+    return usuarioLogado !== null || await recuperarSessao() !== null;
 }
 
 /**
  * Obter usuário atualmente logado
  */
 function obterUsuarioLogado() {
-    if (usuarioLogado) return usuarioLogado;
-    return recuperarSessao();
+    return usuarioLogado;
 }
 
 /**
@@ -161,10 +130,10 @@ function obterNomeUsuario() {
 }
 
 /**
- * Obter token de autenticação salvo na sessão/localStorage
+ * Compatibilidade: a autenticação agora usa cookie HttpOnly.
  */
 function obterAuthToken() {
-    return sessionStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(AUTH_TOKEN_KEY) || null;
+    return null;
 }
 
 /**
