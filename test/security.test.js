@@ -184,3 +184,52 @@ test('isola dados do vendedor e bloqueia ações de master', async () => {
         'seller-1'
     );
 });
+
+test('limpa dados com snapshot e preserva somente o master autenticado', async () => {
+    const sellerLogin = await request('/api/energia-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ login: 'seller-test', senha: 'senha-vendedor-123' })
+    });
+    const sellerCookie = cookieFrom(sellerLogin);
+
+    const sellerReset = await request('/api/energia-reset', {
+        method: 'POST',
+        headers: { Cookie: sellerCookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmacao: 'APAGAR TODOS OS DADOS', senha: 'senha-vendedor-123' })
+    });
+    assert.equal(sellerReset.status, 403);
+
+    const badPhrase = await request('/api/energia-reset', {
+        method: 'POST',
+        headers: { Cookie: masterCookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmacao: 'APAGAR', senha: 'senha-teste-forte-123' })
+    });
+    assert.equal(badPhrase.status, 400);
+
+    const badPassword = await request('/api/energia-reset', {
+        method: 'POST',
+        headers: { Cookie: masterCookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmacao: 'APAGAR TODOS OS DADOS', senha: 'senha-incorreta' })
+    });
+    assert.equal(badPassword.status, 401);
+
+    const reset = await request('/api/energia-reset', {
+        method: 'POST',
+        headers: { Cookie: masterCookie, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmacao: 'APAGAR TODOS OS DADOS', senha: 'senha-teste-forte-123' })
+    });
+    assert.equal(reset.status, 200, await reset.text());
+
+    const dataResponse = await request('/api/energia-data', { headers: { Cookie: masterCookie } });
+    const data = (await dataResponse.json())[0];
+    for (const collection of ['clientes', 'produtos', 'vendas', 'vendedores', 'followups', 'pagamentos', 'metas', 'oportunidades']) {
+        assert.deepEqual(data[collection], [], `${collection} deveria estar vazia`);
+    }
+    assert.equal(data.usuarios.length, 1);
+    assert.equal(data.usuarios[0].login, 'admin-test');
+    assert.equal(data.usuarios[0].senhaSegura, undefined);
+
+    const snapshots = fs.readdirSync(path.join(runtime, 'database-backups'));
+    assert.ok(snapshots.some(name => /^energia_before-reset_.*\.sqlite$/.test(name)));
+});

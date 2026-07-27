@@ -612,6 +612,19 @@ async function compararSenha(senha, storedHash) {
     return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
 }
 
+async function compararSenhaUsuarioEnergia(usuario, senha) {
+    if (!usuario) return false;
+    if (usuario.senhaSegura) {
+        return compararSenha(senha, usuario.senhaSegura);
+    }
+    if (!usuario.salt || !usuario.senhaHash) return false;
+
+    const senhaHash = crypto.createHash('sha256').update(senha + '::' + usuario.salt).digest('hex');
+    const actual = Buffer.from(senhaHash);
+    const expected = Buffer.from(String(usuario.senhaHash || ''));
+    return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+}
+
 /**
  * Faz parse de JSON com segurança para evitar queda do processo.
  */
@@ -2098,15 +2111,7 @@ app.post('/api/energia-login', rateLimitLogin, async (req, res) => {
             return res.status(401).json({ success: false, error: 'Login ou senha inválidos.' });
         }
 
-        let senhaValida = false;
-        if (usuario.senhaSegura) {
-            senhaValida = await compararSenha(senha, usuario.senhaSegura);
-        } else {
-            const senhaHash = crypto.createHash('sha256').update(senha + '::' + usuario.salt).digest('hex');
-            const actual = Buffer.from(senhaHash);
-            const expected = Buffer.from(String(usuario.senhaHash || ''));
-            senhaValida = actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
-        }
+        const senhaValida = await compararSenhaUsuarioEnergia(usuario, senha);
         if (!senhaValida) {
             clearEnergiaSessionCookie(res);
             return res.status(401).json({ success: false, error: 'Login ou senha inválidos.' });
@@ -2810,6 +2815,72 @@ app.get('/api/energia-backup', requireEnergiaAuth, requireEnergiaMaster, async (
     } catch (err) {
         console.error('Erro ao exportar backup do CRM Energia:', err.message);
         return res.status(500).json({ success: false, error: 'Erro ao exportar backup.' });
+    }
+});
+
+app.post('/api/energia-reset', requireEnergiaAuth, requireEnergiaMaster, async (req, res) => {
+    try {
+        const confirmacao = String(req.body?.confirmacao || '').trim();
+        const senha = String(req.body?.senha || '');
+        if (confirmacao !== 'APAGAR TODOS OS DADOS') {
+            return res.status(400).json({
+                success: false,
+                error: 'Digite exatamente APAGAR TODOS OS DADOS para confirmar.'
+            });
+        }
+        if (!senha) {
+            return res.status(400).json({ success: false, error: 'Informe sua senha atual.' });
+        }
+
+        const { payload } = await carregarEnergiaPayload();
+        const usuarioMaster = (Array.isArray(payload.usuarios) ? payload.usuarios : [])
+            .find(usuario => usuario.id === req.energiaAuth.userId
+                && normalizarTipoEnergia(usuario) === 'master'
+                && usuario.ativo !== false);
+        if (!usuarioMaster || !(await compararSenhaUsuarioEnergia(usuarioMaster, senha))) {
+            return res.status(401).json({ success: false, error: 'Senha atual incorreta.' });
+        }
+
+        const snapshot = await criarSnapshotSqlite(energiaDb, 'energia', 'before-reset');
+        if (!snapshot) {
+            throw new Error('Não foi possível criar o snapshot de segurança.');
+        }
+
+        const resultado = await atualizarEnergiaDirecionado(async payloadAtual => {
+            const masterAtual = (Array.isArray(payloadAtual.usuarios) ? payloadAtual.usuarios : [])
+                .find(usuario => usuario.id === req.energiaAuth.userId
+                    && normalizarTipoEnergia(usuario) === 'master'
+                    && usuario.ativo !== false);
+            if (!masterAtual || !(await compararSenhaUsuarioEnergia(masterAtual, senha))) {
+                throw new Error('O usuário master ou sua senha foram alterados durante a limpeza.');
+            }
+
+            return {
+                clientes: [],
+                produtos: [],
+                vendas: [],
+                vendedores: [],
+                followups: [],
+                pagamentos: [],
+                metas: [],
+                oportunidades: [],
+                usuarios: [masterAtual],
+                config: {}
+            };
+        }, 'master');
+
+        return res.json({
+            success: true,
+            id: resultado.id,
+            revision: revisaoEnergia(resultado.payload, 'master'),
+            usuario: usuarioEnergiaSeguro(resultado.payload.usuarios[0])
+        });
+    } catch (err) {
+        console.error('Erro ao limpar dados do CRM Energia:', err.message);
+        return res.status(500).json({
+            success: false,
+            error: 'A limpeza foi cancelada porque não foi possível concluí-la com segurança.'
+        });
     }
 });
 
