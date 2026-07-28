@@ -2017,8 +2017,15 @@ const Format = {
   cpf(v) { v = (v || '').replace(/\D/g, '').slice(0, 11); return v.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1-$2'); },
   cnpj(v) { v = (v || '').replace(/\D/g, '').slice(0, 14); return v.replace(/^(\d{2})(\d)/, '$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d)/, '.$1/$2').replace(/(\d{4})(\d)/, '$1-$2'); },
   doc(v, tipo) { return tipo === 'cnpj' ? this.cnpj(v) : this.cpf(v); },
+  telefoneNacional(v) {
+    let digits = (v || '').replace(/\D/g, '');
+    if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) {
+      digits = digits.slice(2);
+    }
+    return digits.slice(0, 11);
+  },
   telefone(v) {
-    v = (v || '').replace(/\D/g, '').slice(0, 11);
+    v = this.telefoneNacional(v);
     if (v.length <= 10) return v.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{4})(\d)/, '$1-$2');
     return v.replace(/^(\d{2})(\d)/, '($1) $2').replace(/(\d{5})(\d)/, '$1-$2');
   },
@@ -2977,9 +2984,12 @@ const Vendas = {
     return (v.comissao || 0) * (1 - red / 100);
   },
   telefoneWhatsApp(telefone) {
-    const digitos = String(telefone || '').replace(/\D/g, '');
+    const original = String(telefone || '').replace(/\D/g, '');
+    if (original.startsWith('55') && (original.length === 12 || original.length === 13)) {
+      return original;
+    }
+    const digitos = Format.telefoneNacional(original);
     if (!digitos) return '';
-    if (digitos.startsWith('55') && digitos.length >= 12) return digitos;
     return `55${digitos}`;
   },
   enviarStatusWhatsApp(id) {
@@ -4446,7 +4456,7 @@ const Templates = {
   enviar() {
     const c = this._cliente; if (!c) return;
     const msg = document.getElementById('tpl-mensagem').value;
-    const tel = (c.telefone || '').replace(/\D/g, '');
+    const tel = Format.telefoneNacional(c.telefone);
     if (!tel) return UI.toast('Sem telefone', 'error');
     const numero = (tel.length === 11 || tel.length === 10) ? '55' + tel : tel;
     const url = `https://wa.me/${numero}?text=${encodeURIComponent(msg)}`;

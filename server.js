@@ -1348,6 +1348,14 @@ function digitosIntegracao(value, maxLength = 20) {
     return String(value || '').replace(/\D/g, '').slice(0, maxLength);
 }
 
+function telefoneNacionalIntegracao(value) {
+    let digits = digitosIntegracao(value, 15);
+    if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) {
+        digits = digits.slice(2);
+    }
+    return digits.slice(0, 11);
+}
+
 function idIntegracao(prefix, value) {
     const digest = crypto
         .createHash('sha256')
@@ -1373,7 +1381,7 @@ function validarLeadChatwoot(body) {
     const accountId = Number(chatwoot.accountId || 1);
     const contactId = Number(chatwoot.contactId);
     const conversationId = Number(chatwoot.conversationId);
-    const phone = digitosIntegracao(contact.phone, 15);
+    const phone = telefoneNacionalIntegracao(contact.phone);
     const document = digitosIntegracao(contact.document, 14);
     const product = textoIntegracao(lead.product, 80);
 
@@ -1433,7 +1441,7 @@ function upsertLeadChatwootEnergia(payloadAtual, input) {
     }
     if (!cliente) {
         cliente = clientes.find(item =>
-            digitosIntegracao(item.telefone, 15) === input.contact.phone
+            telefoneNacionalIntegracao(item.telefone) === input.contact.phone
         );
     }
 
@@ -1444,7 +1452,7 @@ function upsertLeadChatwootEnergia(payloadAtual, input) {
             ...cliente,
             nome: cliente.nome || input.contact.company || input.contact.name,
             documento: cliente.documento || input.contact.document,
-            telefone: cliente.telefone || input.contact.phone,
+            telefone: telefoneNacionalIntegracao(cliente.telefone || input.contact.phone),
             origem: cliente.origem || 'whatsapp-chatwoot',
             chatwootContactId: input.contactId,
             chatwootConversationId: input.conversationId,

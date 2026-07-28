@@ -255,6 +255,8 @@ test('sincroniza lead do Chatwoot com idempotência e sem sessão de usuário', 
     );
     assert.equal(clients.length, 1);
     assert.equal(opportunities.length, 1);
+    assert.equal(clients[0].telefone, '71999999999');
+    assert.equal(opportunities[0].clienteDados.telefone, '71999999999');
     assert.equal(opportunities[0].etapa, 'lead-novo');
     assert.equal(opportunities[0].chatwootResumo, 'Resumo atualizado sem duplicar.');
 });
