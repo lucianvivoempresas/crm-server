@@ -190,6 +190,33 @@ const limitarTelegram = criarLimitador({
     chave: req => `${req.ip || 'unknown'}:${req.energiaAuth?.userId || 'anonymous'}`
 });
 
+const CHATWOOT_INTEGRATION_TOKEN = String(
+    process.env.CHATWOOT_INTEGRATION_TOKEN || ''
+).trim();
+const CHATWOOT_PUBLIC_URL = String(
+    process.env.CHATWOOT_PUBLIC_URL || 'https://chat.voltconect.com.br'
+).replace(/\/+$/, '');
+
+function requireChatwootIntegration(req, res, next) {
+    if (CHATWOOT_INTEGRATION_TOKEN.length < 32) {
+        return res.status(503).json({
+            success: false,
+            error: 'Integração com Chatwoot não configurada.'
+        });
+    }
+
+    const provided = String(req.get('Authorization') || '').replace(/^Bearer\s+/i, '');
+    const expectedBuffer = Buffer.from(CHATWOOT_INTEGRATION_TOKEN);
+    const providedBuffer = Buffer.from(provided);
+    if (
+        expectedBuffer.length !== providedBuffer.length ||
+        !crypto.timingSafeEqual(expectedBuffer, providedBuffer)
+    ) {
+        return res.status(401).json({ success: false, error: 'Token de integração inválido.' });
+    }
+    return next();
+}
+
 app.use('/api', (req, res, next) => {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
     return limitarEscritasApi(req, res, next);
@@ -1313,6 +1340,222 @@ function atualizarEnergiaDirecionado(transform, revisionScope = 'master', seller
     });
 }
 
+function textoIntegracao(value, maxLength = 500) {
+    return String(value || '').trim().slice(0, maxLength);
+}
+
+function digitosIntegracao(value, maxLength = 20) {
+    return String(value || '').replace(/\D/g, '').slice(0, maxLength);
+}
+
+function idIntegracao(prefix, value) {
+    const digest = crypto
+        .createHash('sha256')
+        .update(String(value))
+        .digest('hex')
+        .slice(0, 24);
+    return `${prefix}-${digest}`;
+}
+
+function validarLeadChatwoot(body) {
+    const source = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
+    const chatwoot = source.chatwoot && typeof source.chatwoot === 'object'
+        ? source.chatwoot
+        : {};
+    const contact = source.contact && typeof source.contact === 'object'
+        ? source.contact
+        : {};
+    const lead = source.lead && typeof source.lead === 'object'
+        ? source.lead
+        : {};
+
+    const eventId = textoIntegracao(source.eventId, 180);
+    const accountId = Number(chatwoot.accountId || 1);
+    const contactId = Number(chatwoot.contactId);
+    const conversationId = Number(chatwoot.conversationId);
+    const phone = digitosIntegracao(contact.phone, 15);
+    const document = digitosIntegracao(contact.document, 14);
+    const product = textoIntegracao(lead.product, 80);
+
+    if (!eventId || !Number.isInteger(accountId) || accountId <= 0) {
+        throw new Error('Identificador da conta do Chatwoot inválido.');
+    }
+    if (!Number.isInteger(contactId) || contactId <= 0) {
+        throw new Error('Identificador do contato do Chatwoot inválido.');
+    }
+    if (!Number.isInteger(conversationId) || conversationId <= 0) {
+        throw new Error('Identificador da conversa do Chatwoot inválido.');
+    }
+    if (phone.length < 10 || phone.length > 15) {
+        throw new Error('Telefone do contato inválido.');
+    }
+    if (document && document.length !== 14) {
+        throw new Error('CNPJ do contato inválido.');
+    }
+    if (!/energia/i.test(product)) {
+        throw new Error('Somente oportunidades de Energia são aceitas por esta integração.');
+    }
+
+    return {
+        eventId,
+        accountId,
+        contactId,
+        conversationId,
+        contact: {
+            name: textoIntegracao(contact.name, 100) || 'Contato WhatsApp',
+            company: textoIntegracao(contact.company, 150),
+            phone,
+            document,
+            city: textoIntegracao(contact.city, 100)
+        },
+        lead: {
+            product: 'Energia',
+            monthlyBill: textoIntegracao(lead.monthlyBill, 60),
+            summary: textoIntegracao(lead.summary, 1000)
+        }
+    };
+}
+
+function upsertLeadChatwootEnergia(payloadAtual, input) {
+    const now = new Date().toISOString();
+    const clientes = Array.isArray(payloadAtual.clientes) ? [...payloadAtual.clientes] : [];
+    const oportunidades = Array.isArray(payloadAtual.oportunidades)
+        ? [...payloadAtual.oportunidades]
+        : [];
+
+    let cliente = clientes.find(item =>
+        Number(item.chatwootContactId) === input.contactId
+    );
+    if (!cliente && input.contact.document) {
+        cliente = clientes.find(item =>
+            digitosIntegracao(item.documento, 14) === input.contact.document
+        );
+    }
+    if (!cliente) {
+        cliente = clientes.find(item =>
+            digitosIntegracao(item.telefone, 15) === input.contact.phone
+        );
+    }
+
+    let clienteCreated = false;
+    if (cliente) {
+        const index = clientes.findIndex(item => item.id === cliente.id);
+        cliente = {
+            ...cliente,
+            nome: cliente.nome || input.contact.company || input.contact.name,
+            documento: cliente.documento || input.contact.document,
+            telefone: cliente.telefone || input.contact.phone,
+            origem: cliente.origem || 'whatsapp-chatwoot',
+            chatwootContactId: input.contactId,
+            chatwootConversationId: input.conversationId,
+            cidadeUf: cliente.cidadeUf || input.contact.city,
+            contatoResponsavel: cliente.contatoResponsavel || input.contact.name,
+            atualizadoEm: now
+        };
+        clientes[index] = cliente;
+    } else if (input.contact.document) {
+        clienteCreated = true;
+        cliente = {
+            id: idIntegracao('cw-client', input.contactId),
+            tipo: 'cnpj',
+            documento: input.contact.document,
+            nome: input.contact.company || input.contact.name,
+            telefone: input.contact.phone,
+            email: '',
+            contrato: '',
+            endereco: '',
+            origem: 'whatsapp-chatwoot',
+            indicadoPor: null,
+            vendedorId: null,
+            primeiroContato: now,
+            notas: [],
+            arquivos: [],
+            chatwootContactId: input.contactId,
+            chatwootConversationId: input.conversationId,
+            cidadeUf: input.contact.city,
+            contatoResponsavel: input.contact.name,
+            criadoEm: now,
+            atualizadoEm: now
+        };
+        clientes.push(cliente);
+    }
+
+    let oportunidade = oportunidades.find(item =>
+        Number(item.chatwootConversationId) === input.conversationId
+    );
+    const clienteDados = {
+        ...(oportunidade?.clienteDados || {}),
+        nome: input.contact.company || input.contact.name,
+        documento: input.contact.document,
+        telefone: input.contact.phone,
+        gestor: input.contact.name,
+        cidadeUf: input.contact.city,
+        valorContaEnergia: input.lead.monthlyBill
+    };
+    const produtoEnergia = (Array.isArray(payloadAtual.produtos) ? payloadAtual.produtos : [])
+        .find(item => /energia/i.test(String(item.nome || '')));
+
+    let oportunidadeCreated = false;
+    if (oportunidade) {
+        const index = oportunidades.findIndex(item => item.id === oportunidade.id);
+        oportunidade = {
+            ...oportunidade,
+            clienteId: oportunidade.clienteId || cliente?.id || null,
+            clienteDados,
+            chatwootContactId: input.contactId,
+            chatwootConversationId: input.conversationId,
+            chatwootEventId: input.eventId,
+            chatwootUrl: `${CHATWOOT_PUBLIC_URL}/app/accounts/${input.accountId}/conversations/${input.conversationId}`,
+            chatwootResumo: input.lead.summary,
+            valorContaEnergia: input.lead.monthlyBill,
+            atualizadoEm: now
+        };
+        oportunidades[index] = oportunidade;
+    } else {
+        oportunidadeCreated = true;
+        oportunidade = {
+            id: idIntegracao('cw-opp', input.conversationId),
+            titulo: `Energia - ${input.contact.company || input.contact.name}`,
+            clienteId: cliente?.id || null,
+            clienteDados,
+            vendedorId: null,
+            produtoId: produtoEnergia?.id || null,
+            valor: 0,
+            etapa: 'lead-novo',
+            probabilidade: null,
+            dataAbertura: now.slice(0, 10),
+            dataPrevisao: null,
+            dataFechamento: null,
+            motivoPerda: null,
+            observacoes: input.lead.summary,
+            origem: 'whatsapp-chatwoot',
+            chatwootContactId: input.contactId,
+            chatwootConversationId: input.conversationId,
+            chatwootEventId: input.eventId,
+            chatwootUrl: `${CHATWOOT_PUBLIC_URL}/app/accounts/${input.accountId}/conversations/${input.conversationId}`,
+            chatwootResumo: input.lead.summary,
+            valorContaEnergia: input.lead.monthlyBill,
+            criadoEm: now,
+            atualizadoEm: now
+        };
+        oportunidades.push(oportunidade);
+    }
+
+    return {
+        payload: {
+            ...payloadAtual,
+            clientes,
+            oportunidades
+        },
+        result: {
+            clienteId: cliente?.id || null,
+            oportunidadeId: oportunidade.id,
+            clienteCreated,
+            oportunidadeCreated
+        }
+    };
+}
+
 function validarEstruturaEnergia(payload) {
     const idKeys = new Set([
         'id',
@@ -2094,6 +2337,39 @@ app.post('/api/clientes/bulk-upsert', requireAuth, (req, res) => {
 
 // ============ ENDPOINTS PARA CRM ENERGIA (SEM AUTENTICAÇÃO) ============
 // Estas rotas DEVEM estar ANTES das rotas genéricas /api/:collection para não serem capturadas por elas
+
+app.post(
+    '/api/integrations/chatwoot/leads',
+    requireChatwootIntegration,
+    async (req, res) => {
+        let input;
+        try {
+            input = validarLeadChatwoot(req.body);
+        } catch (error) {
+            return res.status(400).json({ success: false, error: error.message });
+        }
+
+        try {
+            let syncResult;
+            const { payload } = await atualizarEnergiaDirecionado((payloadAtual) => {
+                const upsert = upsertLeadChatwootEnergia(payloadAtual, input);
+                syncResult = upsert.result;
+                return upsert.payload;
+            });
+            return res.status(syncResult.oportunidadeCreated ? 201 : 200).json({
+                success: true,
+                ...syncResult,
+                revision: revisaoEnergia(payload, 'master')
+            });
+        } catch (error) {
+            console.error('Erro ao sincronizar lead do Chatwoot:', error.message);
+            return res.status(500).json({
+                success: false,
+                error: 'Não foi possível sincronizar o lead.'
+            });
+        }
+    }
+);
 
 app.post('/api/energia-login', rateLimitLogin, async (req, res) => {
     try {

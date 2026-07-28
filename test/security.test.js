@@ -44,6 +44,8 @@ test.before(async () => {
             NODE_ENV: 'production',
             PORT: String(port),
             AUTH_TOKEN_SECRET: 'test-only-secret-with-at-least-32-characters',
+            CHATWOOT_INTEGRATION_TOKEN: 'chatwoot-integration-test-token-32-characters',
+            CHATWOOT_PUBLIC_URL: 'https://chat.example.test',
             ALLOW_DEFAULT_USERS: 'false',
             NODE_PATH: path.join(root, 'node_modules')
         },
@@ -183,6 +185,78 @@ test('isola dados do vendedor e bloqueia ações de master', async () => {
         masterData.clientes.find(item => item.id === 'client-seller-1').vendedorId,
         'seller-1'
     );
+});
+
+test('sincroniza lead do Chatwoot com idempotência e sem sessão de usuário', async () => {
+    const payload = {
+        version: 1,
+        eventId: 'chatwoot:1:conversation:321',
+        chatwoot: {
+            accountId: 1,
+            contactId: 123,
+            conversationId: 321
+        },
+        contact: {
+            name: 'Maria Compradora',
+            company: 'Empresa Solar Ltda',
+            phone: '5571999999999',
+            document: '12345678000199',
+            city: 'Salvador/BA'
+        },
+        lead: {
+            product: 'Energia',
+            monthlyBill: 'R$ 1.500,00',
+            summary: 'Lead qualificado automaticamente pelo WhatsApp.'
+        }
+    };
+
+    const unauthorized = await request('/api/integrations/chatwoot/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+    assert.equal(unauthorized.status, 401);
+
+    const headers = {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer chatwoot-integration-test-token-32-characters'
+    };
+    const first = await request('/api/integrations/chatwoot/leads', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+    });
+    const firstText = await first.text();
+    assert.equal(first.status, 201, firstText);
+    const firstBody = JSON.parse(firstText);
+    assert.equal(firstBody.success, true);
+    assert.equal(firstBody.oportunidadeCreated, true);
+
+    const second = await request('/api/integrations/chatwoot/leads', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+            ...payload,
+            lead: { ...payload.lead, summary: 'Resumo atualizado sem duplicar.' }
+        })
+    });
+    const secondText = await second.text();
+    assert.equal(second.status, 200, secondText);
+    const secondBody = JSON.parse(secondText);
+    assert.equal(secondBody.oportunidadeCreated, false);
+
+    const dataResponse = await request('/api/energia-data', {
+        headers: { Cookie: masterCookie }
+    });
+    const data = (await dataResponse.json())[0];
+    const clients = data.clientes.filter(item => item.chatwootContactId === 123);
+    const opportunities = data.oportunidades.filter(
+        item => item.chatwootConversationId === 321
+    );
+    assert.equal(clients.length, 1);
+    assert.equal(opportunities.length, 1);
+    assert.equal(opportunities[0].etapa, 'lead-novo');
+    assert.equal(opportunities[0].chatwootResumo, 'Resumo atualizado sem duplicar.');
 });
 
 test('limpa dados com snapshot e preserva somente o master autenticado', async () => {
