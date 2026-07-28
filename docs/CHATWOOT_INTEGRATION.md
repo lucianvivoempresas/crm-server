@@ -33,3 +33,7 @@ observações editados manualmente.
 Uma criação retorna HTTP `201`; uma atualização idempotente retorna HTTP `200`.
 Falhas do CRM não bloqueiam o atendimento no Chatwoot, pois o gateway mantém
 uma fila persistente e tenta novamente.
+
+Cada nova oportunidade também cria um follow-up interno de alta prioridade.
+Esse follow-up exige aprovação humana e nunca envia mensagem automaticamente
+ao cliente.

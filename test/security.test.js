@@ -253,12 +253,19 @@ test('sincroniza lead do Chatwoot com idempotência e sem sessão de usuário', 
     const opportunities = data.oportunidades.filter(
         item => item.chatwootConversationId === 321
     );
+    const followups = data.followups.filter(
+        item => item.chatwootConversationId === 321
+    );
     assert.equal(clients.length, 1);
     assert.equal(opportunities.length, 1);
+    assert.equal(followups.length, 1);
     assert.equal(clients[0].telefone, '71999999999');
     assert.equal(opportunities[0].clienteDados.telefone, '71999999999');
     assert.equal(opportunities[0].etapa, 'lead-novo');
     assert.equal(opportunities[0].chatwootResumo, 'Resumo atualizado sem duplicar.');
+    assert.equal(followups[0].status, 'pendente');
+    assert.equal(followups[0].aprovacaoHumanaObrigatoria, true);
+    assert.equal(followups[0].envioAutomatico, false);
 });
 
 test('limpa dados com snapshot e preserva somente o master autenticado', async () => {

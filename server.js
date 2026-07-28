@@ -1430,6 +1430,9 @@ function upsertLeadChatwootEnergia(payloadAtual, input) {
     const oportunidades = Array.isArray(payloadAtual.oportunidades)
         ? [...payloadAtual.oportunidades]
         : [];
+    const followups = Array.isArray(payloadAtual.followups)
+        ? [...payloadAtual.followups]
+        : [];
 
     let cliente = clientes.find(item =>
         Number(item.chatwootContactId) === input.contactId
@@ -1549,17 +1552,59 @@ function upsertLeadChatwootEnergia(payloadAtual, input) {
         oportunidades.push(oportunidade);
     }
 
+    let followup = followups.find(item =>
+        Number(item.chatwootConversationId) === input.conversationId &&
+        item.origem === 'chatwoot-qualificacao'
+    );
+    let followupCreated = false;
+    if (followup) {
+        const index = followups.findIndex(item => item.id === followup.id);
+        followup = {
+            ...followup,
+            clienteId: followup.clienteId || cliente?.id || null,
+            vendedorId: followup.vendedorId || oportunidade.vendedorId || null,
+            chatwootResumo: input.lead.summary,
+            atualizadoEm: now
+        };
+        followups[index] = followup;
+    } else {
+        followupCreated = true;
+        followup = {
+            id: idIntegracao('cw-followup', input.conversationId),
+            titulo: 'Revisar lead de Energia recebido pelo WhatsApp',
+            data: now.slice(0, 10),
+            hora: '',
+            tipo: 'whatsapp',
+            prioridade: 'alta',
+            clienteId: cliente?.id || null,
+            vendedorId: oportunidade.vendedorId || null,
+            descricao: input.lead.summary,
+            status: 'pendente',
+            origem: 'chatwoot-qualificacao',
+            chatwootConversationId: input.conversationId,
+            chatwootResumo: input.lead.summary,
+            aprovacaoHumanaObrigatoria: true,
+            envioAutomatico: false,
+            criadoEm: now,
+            atualizadoEm: now
+        };
+        followups.push(followup);
+    }
+
     return {
         payload: {
             ...payloadAtual,
             clientes,
-            oportunidades
+            oportunidades,
+            followups
         },
         result: {
             clienteId: cliente?.id || null,
             oportunidadeId: oportunidade.id,
+            followupId: followup.id,
             clienteCreated,
-            oportunidadeCreated
+            oportunidadeCreated,
+            followupCreated
         }
     };
 }

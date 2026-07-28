@@ -3354,6 +3354,7 @@ const Followups = {
           <div class="flex items-start justify-between gap-2 mb-1.5">
             <div class="font-semibold text-slate-900 ${concluido ? 'line-through' : ''}">${Format.html(f.titulo)}</div>
             <div class="flex items-center gap-1.5 flex-shrink-0">
+              ${f.aprovacaoHumanaObrigatoria ? '<span class="chip chip-amber">Interno · aprovação humana</span>' : ''}
               <span class="chip ${this.PRIO_CHIP[f.prioridade]}">${this.PRIO_LABEL[f.prioridade]}</span>
               <span class="chip chip-blue">${this.TIPO_ICONS[f.tipo] || ''}${this.TIPO_LABEL[f.tipo]}</span>
             </div>
@@ -3408,7 +3409,9 @@ const Followups = {
     const data = document.getElementById('followup-data').value;
     if (!titulo) return UI.toast('Título é obrigatório', 'error');
     if (!data) return UI.toast('Data é obrigatória', 'error');
+    const anterior = id ? Store.data.followups.find(x => x.id === id) : null;
     const f = {
+      ...(anterior || {}),
       id: id || Store.uuid(), titulo, data,
       hora: document.getElementById('followup-hora').value,
       tipo: document.getElementById('followup-tipo').value,
@@ -3416,8 +3419,8 @@ const Followups = {
       clienteId: document.getElementById('followup-cliente').value || null,
       vendedorId: document.getElementById('followup-vendedor').value || null,
       descricao: document.getElementById('followup-desc').value.trim(),
-      status: id ? Store.data.followups.find(x => x.id === id)?.status || 'pendente' : 'pendente',
-      criadoEm: id ? Store.data.followups.find(x => x.id === id)?.criadoEm : new Date().toISOString(),
+      status: anterior?.status || 'pendente',
+      criadoEm: anterior?.criadoEm || new Date().toISOString(),
       atualizadoEm: new Date().toISOString()
     };
     if (id) Store.data.followups[Store.data.followups.findIndex(x => x.id === id)] = f;
