@@ -598,6 +598,14 @@
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-6">
+        <!-- Aniversariantes -->
+        <div class="card overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-100">
+            <h3 class="font-semibold text-slate-900 text-sm">Aniversariantes de hoje</h3>
+            <p class="text-xs text-slate-500" id="dashboard-aniversarios-sub">Clientes aniversariantes</p>
+          </div>
+          <div id="dashboard-aniversarios-list" class="max-h-[320px] overflow-y-auto"></div>
+        </div>
         <!-- Follow-ups widget -->
         <div class="card overflow-hidden">
           <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -611,7 +619,7 @@
         </div>
 
         <!-- Últimas vendas -->
-        <div class="card overflow-hidden lg:col-span-2">
+        <div class="card overflow-hidden">
           <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h3 class="font-semibold text-slate-900 text-sm">Últimas Vendas</h3>
@@ -876,7 +884,7 @@
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <div>
             <h3 class="font-semibold text-slate-900 text-sm">Produtos</h3>
-            <p class="text-xs text-slate-500">Cadastre os produtos vendidos e o percentual de comissão de cada um</p>
+            <p class="text-xs text-slate-500">Cadastre produtos com comissão percentual ou Turismo com comissão definida por venda</p>
           </div>
           <button onclick="Produtos.openModal()" class="btn-primary">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
@@ -1000,6 +1008,9 @@
             Apagar Todos os Dados
           </button>
         </div>
+        <div id="backup-status" class="mt-4 border border-slate-200 rounded-lg p-3 text-xs text-slate-600">
+          Verificando proteção automática dos dados...
+        </div>
       </div>
     </section>
 
@@ -1044,6 +1055,13 @@
         <div>
           <label class="label">Email</label>
           <input id="cliente-email" type="email" class="input" />
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div>
+          <label class="label">Data de nascimento <span class="text-slate-400 font-normal normal-case">(opcional)</span></label>
+          <input id="cliente-nascimento" type="date" class="input" />
+          <p class="text-xs text-slate-500 mt-1">Usada para avisos anuais no dashboard e nos follow-ups.</p>
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
@@ -1143,6 +1161,11 @@
           <label class="label">Data *</label>
           <input id="venda-data" type="date" class="input" />
         </div>
+      </div>
+      <div id="venda-comissao-manual-wrap" class="mb-4 master-only hidden">
+        <label class="label">Comissão do Turismo</label>
+        <input id="venda-comissao-manual" type="text" inputmode="decimal" class="input" placeholder="R$ 0,00" />
+        <p class="text-xs text-slate-500 mt-1">Valor da comissão desta venda, definido manualmente pelo master.</p>
       </div>
       <div class="grid grid-cols-2 gap-4 mb-4">
         <div>
@@ -1276,6 +1299,7 @@
             <option value="whatsapp">WhatsApp</option>
             <option value="email">Email</option>
             <option value="visita">Visita</option>
+            <option value="aniversario">Aniversário</option>
             <option value="outro">Outro</option>
           </select>
         </div>
@@ -1322,10 +1346,18 @@
     <div class="px-6 py-5">
       <input type="hidden" id="produto-id" />
       <div class="mb-4">
+        <label class="label">Tipo do Produto *</label>
+        <select id="produto-tipo" class="select">
+          <option value="padrao">Produto padrão</option>
+          <option value="turismo">Produto Turismo</option>
+        </select>
+        <p class="text-xs text-slate-500 mt-1">No Turismo, a comissão é definida em reais em cada venda.</p>
+      </div>
+      <div class="mb-4">
         <label class="label">Nome do Produto *</label>
         <input id="produto-nome" type="text" class="input" placeholder="Ex: Energia Solar Residencial" />
       </div>
-      <div class="mb-4">
+      <div id="produto-comissao-wrap" class="mb-4">
         <label class="label">Fator de Comissão (%) *</label>
         <div class="relative">
           <input id="produto-comissao" type="number" step="0.01" min="0" class="input pr-8" placeholder="0,00" />
@@ -1333,7 +1365,7 @@
         </div>
         <p class="text-xs text-slate-500 mt-1">Percentual aplicado sobre o valor de cada venda. Sem limite máximo.</p>
       </div>
-      <div class="mb-4">
+      <div id="produto-recorrencia-wrap" class="mb-4">
         <label class="label">Recorrência <span class="text-slate-400 font-normal normal-case">(opcional)</span></label>
         <select id="produto-recorrencia" class="select">
           <option value="">Sem recorrência (venda única)</option>
@@ -2142,6 +2174,7 @@ const UI = {
       if (typeof ConfigAuto !== 'undefined') ConfigAuto.carregar();
       if (typeof Usuarios !== 'undefined') Usuarios.render();
       if (typeof ConfigTelegram !== 'undefined') ConfigTelegram.carregar();
+      if (typeof Backup !== 'undefined') Backup.carregarStatus();
     }
     if (!options.skipHistory && window.location.hash !== '#' + tab) {
       history.replaceState(null, '', window.location.pathname + window.location.search + '#' + tab);
@@ -2284,6 +2317,28 @@ const Dashboard = {
       safeText('stat-faturamento', Format.brlCompact(fat));
       safeText('stat-comissoes', Format.brlCompact(com));
       safeText('stat-ticket', `ticket médio: ${Format.brlCompact(ticket)}`);
+
+      // Aniversariantes do dia
+      const aniversariantes = renderSafe('Aniversarios.hoje', () => typeof Aniversarios !== 'undefined' ? Aniversarios.hoje() : []) || [];
+      safeText('dashboard-aniversarios-sub', aniversariantes.length === 0
+        ? 'Nenhum aniversário hoje'
+        : `${aniversariantes.length} cliente${aniversariantes.length === 1 ? '' : 's'} para parabenizar`);
+      const aniversariosList = document.getElementById('dashboard-aniversarios-list');
+      if (aniversariosList) {
+        aniversariosList.innerHTML = aniversariantes.length === 0
+          ? '<div class="px-5 py-8 text-center text-sm text-slate-500">Nenhum aniversariante hoje</div>'
+          : `<div class="divide-y divide-slate-100">${aniversariantes.map(cliente => {
+              const idade = Aniversarios.idade(cliente);
+              return `<div class="px-5 py-3 flex items-center gap-3 hover:bg-slate-50/50">
+                <div class="w-9 h-9 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center font-bold">${Format.initials(cliente.nome)}</div>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-medium text-slate-900 truncate">${Format.html(cliente.nome)}</div>
+                  <div class="text-xs text-slate-500">${idade ? `${idade} anos` : 'Aniversário hoje'}${cliente.telefone ? ' · ' + Format.telefone(cliente.telefone) : ''}</div>
+                </div>
+                <button onclick="Clientes.view('${cliente.id}')" class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg" title="Ver cliente">${ICONS.eye}</button>
+              </div>`;
+            }).join('')}</div>`;
+      }
 
       // Follow-ups
       const fuList = document.getElementById('dashboard-followups-list');
@@ -2523,6 +2578,7 @@ const Clientes = {
       document.getElementById('cliente-nome').value = c.nome || '';
       document.getElementById('cliente-telefone').value = Format.telefone(c.telefone);
       document.getElementById('cliente-email').value = c.email || '';
+      document.getElementById('cliente-nascimento').value = c.dataNascimento || '';
       document.getElementById('cliente-contrato').value = c.contrato || '';
       document.getElementById('cliente-endereco').value = c.endereco || '';
       document.getElementById('cliente-origem').value = c.origem || '';
@@ -2596,11 +2652,14 @@ const Clientes = {
     if (documento.length !== docLen) return UI.toast(`${tipo.toUpperCase()} inválido`, 'error');
     const dup = Store.data.clientes.find(c => c.documento === documento && c.id !== id);
     if (dup) return UI.toast(`Já existe um cliente com este ${tipo.toUpperCase()}`, 'error');
+    const dataNascimento = document.getElementById('cliente-nascimento').value || null;
+    if (dataNascimento && dataNascimento > Aniversarios.hojeIso()) return UI.toast('A data de nascimento não pode estar no futuro', 'error');
     const existente = id ? Store.data.clientes.find(c => c.id === id) : null;
     const cli = {
       id: id || Store.uuid(), tipo, documento, nome,
       telefone: document.getElementById('cliente-telefone').value.replace(/\D/g, ''),
       email: document.getElementById('cliente-email').value.trim(),
+      dataNascimento,
       contrato: document.getElementById('cliente-contrato').value.trim(),
       endereco: document.getElementById('cliente-endereco').value.trim(),
       origem: document.getElementById('cliente-origem').value || null,
@@ -2614,6 +2673,7 @@ const Clientes = {
     };
     if (id) Store.data.clientes[Store.data.clientes.findIndex(c => c.id === id)] = cli;
     else Store.data.clientes.push(cli);
+    Aniversarios.sincronizarFollowups({ clienteIds: [cli.id], salvar: false });
     if (Store.save()) { UI.toast(id ? 'Cliente atualizado!' : 'Cliente cadastrado!'); this.closeModal(); this.render(); UI.updateBadges(); }
   },
   editar(id) { this.openModal(id); },
@@ -2678,6 +2738,7 @@ const Clientes = {
       <div class="space-y-2 mb-6">
         ${c.telefone ? `<div class="flex gap-3 text-sm"><span class="text-slate-500 w-24 flex-shrink-0">Telefone</span><span class="text-slate-900">${Format.telefone(c.telefone)}</span></div>` : ''}
         ${c.email ? `<div class="flex gap-3 text-sm"><span class="text-slate-500 w-24 flex-shrink-0">Email</span><span class="text-slate-900">${Format.html(c.email)}</span></div>` : ''}
+        ${c.dataNascimento ? `<div class="flex gap-3 text-sm"><span class="text-slate-500 w-24 flex-shrink-0">Nascimento</span><span class="text-slate-900">${Format.date(c.dataNascimento)}</span></div>` : ''}
         ${c.contrato ? `<div class="flex gap-3 text-sm"><span class="text-slate-500 w-24 flex-shrink-0">Contrato</span><span class="text-slate-900">${c.contrato}</span></div>` : ''}
         ${c.endereco ? `<div class="flex gap-3 text-sm"><span class="text-slate-500 w-24 flex-shrink-0">Endereço</span><span class="text-slate-900">${c.endereco}</span></div>` : ''}
       </div>
@@ -2703,6 +2764,81 @@ const Clientes = {
 };
 
 //============================================================================
+// ANIVERSÁRIOS
+//============================================================================
+const Aniversarios = {
+  hojeIso() {
+    const hoje = new Date();
+    return `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+  },
+  dataNoAno(dataNascimento, ano) {
+    const match = String(dataNascimento || '').match(/^\d{4}-(\d{2})-(\d{2})$/);
+    if (!match) return null;
+    let mes = Number(match[1]);
+    let dia = Number(match[2]);
+    if (mes === 2 && dia === 29 && new Date(ano, 1, 29).getMonth() !== 1) dia = 28;
+    const data = new Date(ano, mes - 1, dia);
+    if (data.getMonth() !== mes - 1 || data.getDate() !== dia) return null;
+    return `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+  },
+  proximaData(dataNascimento) {
+    const hoje = this.hojeIso();
+    const ano = Number(hoje.slice(0, 4));
+    const nesteAno = this.dataNoAno(dataNascimento, ano);
+    if (!nesteAno) return null;
+    return nesteAno >= hoje ? nesteAno : this.dataNoAno(dataNascimento, ano + 1);
+  },
+  hoje() {
+    const mmdd = this.hojeIso().slice(5);
+    return Clientes.dadosVisiveis()
+      .filter(cliente => String(cliente.dataNascimento || '').slice(5) === mmdd)
+      .sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+  },
+  idade(cliente) {
+    const ano = Number(String(cliente?.dataNascimento || '').slice(0, 4));
+    return ano ? Number(this.hojeIso().slice(0, 4)) - ano : null;
+  },
+  sincronizarFollowups({ clienteIds = null, salvar = true } = {}) {
+    const ids = clienteIds ? new Set(clienteIds.map(String)) : null;
+    const clientes = Clientes.dadosVisiveis().filter(cliente => !ids || ids.has(String(cliente.id)));
+    let alterou = false;
+
+    clientes.forEach(cliente => {
+      const proxima = this.proximaData(cliente.dataNascimento);
+      const origem = proxima ? `auto:aniversario:${proxima.slice(0, 4)}:${cliente.dataNascimento}` : null;
+      const antes = Store.data.followups.length;
+      Store.data.followups = Store.data.followups.filter(followup => !(
+        followup.clienteId === cliente.id &&
+        String(followup.origem || '').startsWith('auto:aniversario:') &&
+        followup.status === 'pendente' &&
+        followup.origem !== origem
+      ));
+      if (Store.data.followups.length !== antes) alterou = true;
+      if (!proxima || Store.data.followups.some(followup => followup.clienteId === cliente.id && followup.origem === origem)) return;
+
+      Store.data.followups.push({
+        id: Store.uuid(),
+        titulo: `Aniversário: ${cliente.nome}`,
+        descricao: 'Parabenizar o cliente pelo aniversário e fortalecer o relacionamento.',
+        data: proxima,
+        hora: '',
+        tipo: 'aniversario',
+        prioridade: 'media',
+        clienteId: cliente.id,
+        vendedorId: cliente.vendedorId ?? cliente.vendedor_id ?? null,
+        origem,
+        status: 'pendente',
+        criadoEm: new Date().toISOString()
+      });
+      alterou = true;
+    });
+
+    if (alterou && salvar) Store.save();
+    return alterou;
+  }
+};
+
+//============================================================================
 // PRODUTOS
 //============================================================================
 const Produtos = {
@@ -2724,14 +2860,16 @@ const Produtos = {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <div class="font-semibold text-slate-900">${Format.html(p.nome)}</div>
+            ${p.tipo === 'turismo' ? '<span class="chip chip-blue">Turismo</span>' : ''}
             ${p.recorrencia ? `<span class="chip chip-violet">↻ ${this.recorrenciaLabel(p.recorrencia)}${p.comissaoRecorrencia != null ? ' · ' + Number(p.comissaoRecorrencia).toFixed(2) + '%' : ''}</span>` : ''}
           </div>
           ${p.descricao ? `<div class="text-xs text-slate-500 truncate">${p.descricao}</div>` : ''}
           <div class="text-xs text-slate-500 mt-0.5">${usos} venda${usos === 1 ? '' : 's'}</div>
         </div>
         <div class="text-right flex-shrink-0">
-          <div class="text-base font-bold text-emerald-600 number-display">${Number(p.comissao).toFixed(2)}%</div>
-          <div class="text-[11px] text-slate-500 uppercase tracking-wide">venda</div>
+          ${p.tipo === 'turismo'
+            ? '<div class="text-sm font-bold text-blue-600">Por venda</div><div class="text-[11px] text-slate-500 uppercase tracking-wide">comissão manual</div>'
+            : `<div class="text-base font-bold text-emerald-600 number-display">${Number(p.comissao).toFixed(2)}%</div><div class="text-[11px] text-slate-500 uppercase tracking-wide">venda</div>`}
           ${p.recorrencia ? `<div class="text-xs font-semibold text-violet-600 mt-1 number-display">${Number(p.comissaoRecorrencia != null ? p.comissaoRecorrencia : p.comissao).toFixed(2)}%</div><div class="text-[11px] text-slate-500 uppercase tracking-wide">recorrência</div>` : ''}
         </div>
         <div class="flex items-center gap-1">
@@ -2742,6 +2880,7 @@ const Produtos = {
   },
   openModal(id = null) {
     document.getElementById('produto-id').value = '';
+    document.getElementById('produto-tipo').value = 'padrao';
     document.getElementById('produto-nome').value = '';
     document.getElementById('produto-comissao').value = '';
     document.getElementById('produto-recorrencia').value = '';
@@ -2752,6 +2891,7 @@ const Produtos = {
       const p = Store.data.produtos.find(x => x.id === id); if (!p) return;
       document.getElementById('modal-produto-titulo').textContent = 'Editar Produto';
       document.getElementById('produto-id').value = p.id;
+      document.getElementById('produto-tipo').value = p.tipo === 'turismo' ? 'turismo' : 'padrao';
       document.getElementById('produto-nome').value = p.nome;
       document.getElementById('produto-comissao').value = p.comissao;
       document.getElementById('produto-recorrencia').value = p.recorrencia || '';
@@ -2759,18 +2899,27 @@ const Produtos = {
       document.getElementById('produto-prazo-pagamento').value = p.prazoPagamento != null ? String(p.prazoPagamento) : '1';
       document.getElementById('produto-descricao').value = p.descricao || '';
     } else { document.getElementById('modal-produto-titulo').textContent = 'Novo Produto'; }
-    this.toggleRecCampo();
+    this.toggleTipo();
     UI.openModal('modal-produto');
+  },
+  toggleTipo() {
+    const turismo = document.getElementById('produto-tipo').value === 'turismo';
+    document.getElementById('produto-comissao-wrap').classList.toggle('hidden', turismo);
+    document.getElementById('produto-recorrencia-wrap').classList.toggle('hidden', turismo);
+    if (turismo) document.getElementById('produto-recorrencia').value = '';
+    this.toggleRecCampo();
   },
   toggleRecCampo() {
     const rec = document.getElementById('produto-recorrencia').value;
-    document.getElementById('produto-comissao-rec-wrap').classList.toggle('hidden', !rec);
+    const turismo = document.getElementById('produto-tipo').value === 'turismo';
+    document.getElementById('produto-comissao-rec-wrap').classList.toggle('hidden', turismo || !rec);
   },
   closeModal() { UI.closeModal('modal-produto'); },
   salvar() {
     const id = document.getElementById('produto-id').value;
     const nome = document.getElementById('produto-nome').value.trim();
-    const com = parseFloat(document.getElementById('produto-comissao').value);
+    const tipo = document.getElementById('produto-tipo').value === 'turismo' ? 'turismo' : 'padrao';
+    const com = tipo === 'turismo' ? 0 : parseFloat(document.getElementById('produto-comissao').value);
     if (!nome) return UI.toast('Nome é obrigatório', 'error');
     if (isNaN(com) || com < 0) return UI.toast('Informe uma comissão válida (maior ou igual a 0)', 'error');
     const recorrencia = document.getElementById('produto-recorrencia').value || null;
@@ -2780,6 +2929,7 @@ const Produtos = {
     const p = {
       id: id || Store.uuid(),
       nome,
+      tipo,
       comissao: com,
       recorrencia,
       comissaoRecorrencia: recorrencia ? comRec : null,
@@ -2788,7 +2938,7 @@ const Produtos = {
     };
     // Detecta mudança de taxa para auto-recálculo de vendas
     let taxaMudou = false;
-    if (id) {
+    if (id && tipo !== 'turismo') {
       const ant = Store.data.produtos.find(x => x.id === id);
       if (ant && Math.abs((ant.comissao || 0) - com) > 0.001) taxaMudou = true;
     }
@@ -2823,6 +2973,7 @@ const Produtos = {
   // Recalcula comissão de todas as vendas vinculadas a um produto após alteração de taxa
   recalcularVendasDoProduto(produtoId) {
     const p = Store.data.produtos.find(x => x.id === produtoId); if (!p) return 0;
+    if (p.tipo === 'turismo') return 0;
     let atualizadas = 0;
     Store.data.vendas.forEach(v => {
       if (v.produtoId === produtoId) {
@@ -3112,7 +3263,7 @@ const Vendas = {
     const cs = [...clientesDisponiveis].sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('venda-cliente').innerHTML = '<option value="">Selecione...</option>' + cs.map(c => `<option value="${Format.html(c.id)}">${Format.html(c.nome)} (${Format.doc(c.documento, c.tipo)})</option>`).join('');
     const ps = [...Store.data.produtos].sort((a, b) => a.nome.localeCompare(b.nome));
-    document.getElementById('venda-produto').innerHTML = '<option value="">Selecione...</option>' + ps.map(p => `<option value="${Format.html(p.id)}">${Format.html(p.nome)} (${Number(p.comissao).toFixed(2)}%)</option>`).join('');
+    document.getElementById('venda-produto').innerHTML = '<option value="">Selecione...</option>' + ps.map(p => `<option value="${Format.html(p.id)}">${Format.html(p.nome)} (${p.tipo === 'turismo' ? 'comissão manual' : Number(p.comissao).toFixed(2) + '%'})</option>`).join('');
     const vens = Store.data.vendedores.filter(v => v.ativo !== false).sort((a, b) => a.nome.localeCompare(b.nome));
     document.getElementById('venda-vendedor').innerHTML = '<option value="">Sem vendedor</option>' + vens.map(v => `<option value="${Format.html(v.id)}">${Format.html(v.nome)}</option>`).join('');
 
@@ -3123,6 +3274,7 @@ const Vendas = {
     const venDefault = (typeof Auth !== 'undefined' && Auth.isVendedor()) ? Auth.vendedorIdAtual() : '';
     document.getElementById('venda-vendedor').value = venDefault;
     document.getElementById('venda-valor').value = '';
+    document.getElementById('venda-comissao-manual').value = '';
     document.getElementById('venda-data').value = new Date().toISOString().slice(0, 10);
     document.getElementById('venda-status').value = 'pendente';
     document.getElementById('venda-reducao').value = '';
@@ -3135,6 +3287,7 @@ const Vendas = {
       document.getElementById('venda-produto').value = v.produtoId;
       document.getElementById('venda-vendedor').value = v.vendedorId || '';
       document.getElementById('venda-valor').value = Format.moeda(String(Math.round(v.valor * 100)));
+      document.getElementById('venda-comissao-manual').value = Format.moeda(String(Math.round((v.comissao || 0) * 100)));
       document.getElementById('venda-data').value = v.data;
       document.getElementById('venda-status').value = v.status;
       document.getElementById('venda-reducao').value = v.reducaoComissao != null ? v.reducaoComissao : '';
@@ -3149,11 +3302,18 @@ const Vendas = {
     const valor = Format.parseMoeda(document.getElementById('venda-valor').value);
     const p = Store.data.produtos.find(x => x.id === pid);
     if (p) {
+      const turismo = p.tipo === 'turismo';
+      const comManual = Format.parseMoeda(document.getElementById('venda-comissao-manual').value);
+      document.getElementById('venda-comissao-manual-wrap').classList.toggle('hidden', !turismo);
       const rec = p.recorrencia ? ` · Recorrência ${Produtos.recorrenciaLabel(p.recorrencia)}` : '';
-      document.getElementById('venda-produto-info').textContent = `Comissão: ${Number(p.comissao).toFixed(2)}%${rec}${p.descricao ? ' · ' + p.descricao : ''}`;
-      const com = valor * (p.comissao / 100);
+      document.getElementById('venda-produto-info').textContent = turismo
+        ? `Turismo · comissão definida manualmente nesta venda${p.descricao ? ' · ' + p.descricao : ''}`
+        : `Comissão: ${Number(p.comissao).toFixed(2)}%${rec}${p.descricao ? ' · ' + p.descricao : ''}`;
+      const com = turismo ? comManual : valor * (p.comissao / 100);
       document.getElementById('venda-comissao-display').textContent = Format.brl(com);
-      document.getElementById('venda-comissao-formula').textContent = `${Format.brl(valor)} × ${Number(p.comissao).toFixed(2)}% = ${Format.brl(com)}`;
+      document.getElementById('venda-comissao-formula').textContent = turismo
+        ? `Comissão manual desta venda: ${Format.brl(com)}`
+        : `${Format.brl(valor)} × ${Number(p.comissao).toFixed(2)}% = ${Format.brl(com)}`;
       // Card de recorrência
       const recCard = document.getElementById('venda-rec-card');
       if (p.recorrencia) {
@@ -3199,6 +3359,7 @@ const Vendas = {
         venCard.classList.add('hidden');
       }
     } else {
+      document.getElementById('venda-comissao-manual-wrap').classList.add('hidden');
       document.getElementById('venda-rec-card').classList.add('hidden');
       document.getElementById('venda-vendedor-card').classList.add('hidden');
       document.getElementById('venda-prazo-info').classList.add('hidden');
@@ -3218,7 +3379,10 @@ const Vendas = {
     if (!valor || valor <= 0) return UI.toast('Informe um valor válido', 'error');
     if (!data) return UI.toast('Informe a data', 'error');
     const p = Store.data.produtos.find(x => x.id === pid);
-    const com = valor * (p.comissao / 100);
+    const turismo = p.tipo === 'turismo';
+    const com = turismo
+      ? Format.parseMoeda(document.getElementById('venda-comissao-manual').value)
+      : valor * (p.comissao / 100);
     const redRaw = document.getElementById('venda-reducao').value;
     const reducao = redRaw === '' ? null : parseFloat(redRaw);
     if (reducao !== null && (isNaN(reducao) || reducao < 0 || reducao > 100)) return UI.toast('Redução inválida (0-100%)', 'error');
@@ -3228,7 +3392,7 @@ const Vendas = {
     const v = {
       id: id || Store.uuid(), clienteId: cid, produtoId: pid,
       vendedorId,
-      valor, comissao: com, fatorComissao: p.comissao, data,
+      valor, comissao: com, fatorComissao: turismo ? null : p.comissao, comissaoManual: turismo, data,
       status: document.getElementById('venda-status').value,
       reducaoComissao: reducao,
       observacoes: document.getElementById('venda-obs').value.trim(),
@@ -3279,11 +3443,12 @@ const Followups = {
     whatsapp: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>',
     email: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>',
     visita: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>',
+    aniversario: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 15a4 4 0 01-4 4H7a4 4 0 01-4-4m18 0H3m18 0v-3a2 2 0 00-2-2H5a2 2 0 00-2 2v3m9-5V6m0 0c-1.5 0-2.5-.8-2.5-2S10.5 2 12 3.5C13.5 2 14.5 2.8 14.5 4S13.5 6 12 6z"/></svg>',
     outro: '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>'
   },
   PRIO_CHIP: { alta: 'chip-red', media: 'chip-amber', baixa: 'chip-gray' },
   PRIO_LABEL: { alta: 'Alta', media: 'Média', baixa: 'Baixa' },
-  TIPO_LABEL: { ligacao: 'Ligação', whatsapp: 'WhatsApp', email: 'Email', visita: 'Visita', outro: 'Outro' },
+  TIPO_LABEL: { ligacao: 'Ligação', whatsapp: 'WhatsApp', email: 'Email', visita: 'Visita', aniversario: 'Aniversário', outro: 'Outro' },
   filtrar(aba) {
     const hoje = new Date().toISOString().slice(0, 10);
     const em7 = new Date(); em7.setDate(em7.getDate() + 7);
@@ -3502,7 +3667,7 @@ const Relatorios = {
           <td>${p?.nome || '<span class="text-slate-400">—</span>'}</td>
           ${ehMaster ? `<td>${ven?.nome || '<span class="text-slate-400">—</span>'}</td>` : ''}
           <td class="text-right font-semibold whitespace-nowrap number-display">${Format.brl(v.valor)}</td>
-          ${ehMaster ? `<td class="text-right whitespace-nowrap">${Number(v.fatorComissao || 0).toFixed(2)}%</td>` : ''}
+          ${ehMaster ? `<td class="text-right whitespace-nowrap">${v.comissaoManual ? 'Manual' : Number(v.fatorComissao || 0).toFixed(2) + '%'}</td>` : ''}
           <td class="text-right text-emerald-700 font-semibold whitespace-nowrap number-display">${Format.brl(comExib)}</td>
           <td class="text-center"><span class="chip ${Vendas.statusChip(v.status)}">${v.status}</span></td>
         </tr>`;}).join('')}</tbody>
@@ -3540,7 +3705,7 @@ const Relatorios = {
         Format.date(v.data), c?.nome || '', c ? Format.doc(c.documento, c.tipo) : '',
         p?.nome || '', ven?.nome || '',
         (v.valor || 0).toFixed(2).replace('.', ','),
-        Number(v.fatorComissao || 0).toFixed(2).replace('.', ','),
+        v.comissaoManual ? 'Manual' : Number(v.fatorComissao || 0).toFixed(2).replace('.', ','),
         (v.comissao || 0).toFixed(2).replace('.', ','),
         v.status, (v.observacoes || '').replace(/\n/g, ' ')
       ]);
@@ -3601,7 +3766,7 @@ const Comissoes = {
       mesPagamento: this.addMeses(mesVenda, prazo),
       mesReferencia: mesVenda,
       tipo: 'inicial',
-      taxa: v.fatorComissao || p.comissao,
+      taxa: v.comissaoManual ? null : (v.fatorComissao || p.comissao),
       valor: v.valor,
       comissaoBruta: comBruta,
       reducao,
@@ -4606,6 +4771,7 @@ const Auth = {
     document.getElementById('user-role').textContent = u.tipo;
     this.esconderLogin();
     try {
+      if (typeof Aniversarios !== 'undefined') Aniversarios.sincronizarFollowups();
       const requestedTab = String(window.location.hash || '').replace(/^#/, '') || 'dashboard';
       UI.switchTab(requestedTab);
       UI.updateBadges();
@@ -5124,11 +5290,13 @@ const Pipeline = {
       if (p) {
         const cid = this.garantirClienteDaOportunidade(o);
         const valorVenda = o.valor || o.clienteDados?.valorPago || 0;
-        const com = valorVenda * (p.comissao / 100);
+        const turismo = p.tipo === 'turismo';
+        const com = turismo ? 0 : valorVenda * (p.comissao / 100);
         Store.data.vendas.push({
           id: Store.uuid(), clienteId: cid, produtoId: o.produtoId,
           vendedorId: o.vendedorId, valor: valorVenda, comissao: com,
-          fatorComissao: p.comissao,
+          fatorComissao: turismo ? null : p.comissao,
+          comissaoManual: turismo,
           data: new Date().toISOString().slice(0, 10),
           status: 'fechada',
           observacoes: 'Convertida do pipeline: ' + o.titulo,
@@ -5136,7 +5304,9 @@ const Pipeline = {
           criadoEm: new Date().toISOString(),
           atualizadoEm: new Date().toISOString()
         });
-        toastExtra = ' Cliente e venda criados automaticamente.';
+        toastExtra = turismo
+          ? ' Cliente e venda criados. Defina manualmente a comissão da venda de Turismo.'
+          : ' Cliente e venda criados automaticamente.';
       }
     } else if (etapa === 'fechado-ganho' && !o.produtoId && !jaTemVenda) {
       toastExtra = ' Selecione um produto para criar a venda automaticamente.';
@@ -5768,6 +5938,37 @@ const MeuTelegram = {
 // BACKUP
 //============================================================================
 const Backup = {
+  async carregarStatus() {
+    const box = document.getElementById('backup-status');
+    if (!box || !Auth.isMaster()) return;
+    box.className = 'mt-4 border border-slate-200 rounded-lg p-3 text-xs text-slate-600';
+    box.textContent = 'Verificando proteção automática dos dados...';
+
+    const dataHora = valor => valor
+      ? new Date(valor).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+      : 'ainda não criado';
+    try {
+      const response = await fetch('/api/energia-backup-status', { cache: 'no-store' });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Falha na verificação');
+
+      const saudavel = result.saudavel === true;
+      box.className = `mt-4 border rounded-lg p-3 text-xs ${saudavel
+        ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+        : 'border-amber-200 bg-amber-50 text-amber-900'}`;
+      box.innerHTML = `
+        <div class="font-semibold text-sm mb-1">${saudavel ? 'Proteção automática verificada' : 'Proteção automática requer atenção'}</div>
+        <div>Banco: ${result.integridade === 'ok' ? 'íntegro' : Format.html(result.integridade || 'não verificado')} · cópia obrigatória antes de cada alteração</div>
+        <div>JSON: ${Number(result.json?.quantidade || 0)} cópias · última em ${dataHora(result.json?.ultimo?.criadoEm)}</div>
+        <div>SQLite: ${Number(result.sqlite?.quantidade || 0)} snapshots · último em ${dataHora(result.sqlite?.ultimo?.criadoEm)}</div>
+        <div>Histórico interno: últimas ${Number(result.retencaoInterna || 0)} versões</div>
+        <div>Rotina periódica: a cada ${Number(result.intervaloMinutos || 0)} minutos</div>`;
+    } catch (e) {
+      box.className = 'mt-4 border border-red-200 bg-red-50 rounded-lg p-3 text-xs text-red-800';
+      box.innerHTML = '<div class="font-semibold text-sm mb-1">Não foi possível validar os backups</div><div>Verifique o servidor antes de continuar alterando dados.</div>';
+    }
+  },
+
   abrirLimpeza() {
     if (!Auth.isMaster()) return UI.toast('Apenas o perfil master pode limpar o sistema.', 'error');
     document.getElementById('limpar-master-login').textContent = Auth.current?.login || '';
@@ -5976,10 +6177,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('cliente-origem')) document.getElementById('cliente-origem').addEventListener('change', () => Clientes.toggleIndicadoPor());
   document.getElementById('vendedor-telefone').addEventListener('input', e => { e.target.value = Format.telefone(e.target.value); });
   document.getElementById('produto-recorrencia').addEventListener('change', () => Produtos.toggleRecCampo());
+  document.getElementById('produto-tipo').addEventListener('change', () => Produtos.toggleTipo());
   document.getElementById('venda-produto').addEventListener('change', () => Vendas.atualizarCalculo());
   document.getElementById('venda-vendedor').addEventListener('change', () => Vendas.atualizarCalculo());
   document.getElementById('venda-reducao').addEventListener('input', () => Vendas.atualizarCalculo());
   document.getElementById('venda-valor').addEventListener('input', e => { e.target.value = Format.moeda(e.target.value); Vendas.atualizarCalculo(); });
+  document.getElementById('venda-comissao-manual').addEventListener('input', e => { e.target.value = Format.moeda(e.target.value); Vendas.atualizarCalculo(); });
   document.getElementById('venda-busca').addEventListener('input', e => { Vendas.filtroBusca = e.target.value; Vendas.render(); });
   document.getElementById('venda-filtro-status').addEventListener('change', e => { Vendas.filtroStatus = e.target.value; Vendas.render(); });
   document.getElementById('com-mes').addEventListener('change', () => Comissoes.aplicar());

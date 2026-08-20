@@ -300,6 +300,7 @@ const ENERGIA_DB_PATH = resolverCaminhoDados(process.env.ENERGIA_DB_PATH, 'energ
 const DB_BACKUP_DIR = resolverCaminhoDados(process.env.DB_BACKUP_DIR, 'database-backups');
 const ENERGIA_JSON_BACKUP_DIR = path.join(DB_BACKUP_DIR, 'energia-json');
 const ENERGIA_BACKUP_RETENTION = parseEnvInt(process.env.ENERGIA_BACKUP_RETENTION, 200);
+const ENERGIA_INTERNAL_BACKUP_RETENTION = parseEnvInt(process.env.ENERGIA_INTERNAL_BACKUP_RETENTION, 20);
 const ENERGIA_PERIODIC_BACKUP_MS = parseEnvInt(process.env.ENERGIA_PERIODIC_BACKUP_MINUTES, 180) * 60 * 1000;
 const SQLITE_BACKUP_RETENTION = parseEnvInt(process.env.SQLITE_BACKUP_RETENTION, 30);
 
@@ -1265,12 +1266,17 @@ function enfileirarEscritaEnergia(operation) {
 }
 
 function salvarBackupEnergiaNoBanco(payload) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
         if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length === 0) {
             return resolve();
         }
 
-        criarBackupEnergiaArquivo(payload, 'before-write');
+        const arquivoBackup = criarBackupEnergiaArquivo(payload, 'before-write');
+        if (!arquivoBackup) {
+            const error = new Error('Backup de segurança anterior à escrita não pôde ser criado.');
+            error.code = 'BACKUP_REQUIRED';
+            return reject(error);
+        }
         const backupPayload = JSON.stringify({
             criadoEm: new Date().toISOString(),
             counts: contarRegistrosEnergia(payload),
@@ -1281,8 +1287,26 @@ function salvarBackupEnergiaNoBanco(payload) {
             "INSERT INTO documents (collection, payload) VALUES (?, ?)",
             ['energia-data-backup', backupPayload],
             (err) => {
-                if (err) console.warn('Falha ao criar backup de energia-data:', err.message);
-                resolve();
+                if (err) {
+                    console.warn('Falha ao criar backup de energia-data:', err.message);
+                    const error = new Error('Backup interno anterior à escrita não pôde ser criado.');
+                    error.code = 'BACKUP_REQUIRED';
+                    return reject(error);
+                }
+                energiaDb.run(
+                    `DELETE FROM documents
+                     WHERE collection = 'energia-data-backup'
+                       AND id NOT IN (
+                         SELECT id FROM documents
+                         WHERE collection = 'energia-data-backup'
+                         ORDER BY id DESC LIMIT ?
+                       )`,
+                    [ENERGIA_INTERNAL_BACKUP_RETENTION],
+                    cleanupErr => {
+                        if (cleanupErr) console.warn('Falha ao rotacionar backups internos de energia-data:', cleanupErr.message);
+                        resolve();
+                    }
+                );
             }
         );
     });
@@ -2517,6 +2541,7 @@ app.post('/api/energia-setup', rateLimitLogin, async (req, res) => {
         };
 
         substituirEnergiaPayloadAtomico(JSON.stringify(nextPayload), res, function(id) {
+            criarBackupEnergiaArquivo(this.payload, 'setup');
             const token = gerarTokenSessao({ id: usuario.id, perfil: 'master' });
             if (token) setEnergiaSessionCookie(res, token);
             clearLoginAttempts(req);
@@ -3144,6 +3169,63 @@ app.get('/api/energia-backup', requireEnergiaAuth, requireEnergiaMaster, async (
     } catch (err) {
         console.error('Erro ao exportar backup do CRM Energia:', err.message);
         return res.status(500).json({ success: false, error: 'Erro ao exportar backup.' });
+    }
+});
+
+app.get('/api/energia-backup-status', requireEnergiaAuth, requireEnergiaMaster, async (req, res) => {
+    try {
+        res.setHeader('Cache-Control', 'no-store');
+        ensureBackupDirectory();
+        const listar = (diretorio, filtro) => fs.readdirSync(diretorio)
+            .filter(filtro)
+            .map(nome => {
+                const stat = fs.statSync(path.join(diretorio, nome));
+                return { nome, tamanho: stat.size, criadoEm: stat.mtime.toISOString(), mtimeMs: stat.mtimeMs };
+            })
+            .sort((a, b) => b.mtimeMs - a.mtimeMs);
+
+        const jsonBackups = listar(ENERGIA_JSON_BACKUP_DIR, nome => nome.endsWith('.json'));
+        const snapshots = listar(DB_BACKUP_DIR, nome => nome.startsWith('energia_') && nome.endsWith('.sqlite'));
+        let jsonValido = false;
+        if (jsonBackups[0]) {
+            try {
+                const conteudo = JSON.parse(fs.readFileSync(path.join(ENERGIA_JSON_BACKUP_DIR, jsonBackups[0].nome), 'utf8'));
+                jsonValido = Boolean(conteudo?.payload && typeof conteudo.payload === 'object' && !Array.isArray(conteudo.payload));
+            } catch (err) {
+                jsonValido = false;
+            }
+        }
+
+        const integridade = await new Promise((resolve, reject) => {
+            energiaDb.get('PRAGMA quick_check', [], (err, row) => {
+                if (err) return reject(err);
+                resolve(String(row?.quick_check || '').toLowerCase());
+            });
+        });
+        const intervaloMinutos = Math.round(ENERGIA_PERIODIC_BACKUP_MS / 60000);
+        const saudavel = integridade === 'ok' && jsonValido && snapshots.length > 0;
+
+        return res.json({
+            success: true,
+            saudavel,
+            integridade: integridade === 'ok' ? 'ok' : integridade,
+            automaticoAtivo: true,
+            antesDeCadaEscrita: true,
+            retencaoInterna: ENERGIA_INTERNAL_BACKUP_RETENTION,
+            intervaloMinutos,
+            json: {
+                valido: jsonValido,
+                quantidade: jsonBackups.length,
+                ultimo: jsonBackups[0] ? { criadoEm: jsonBackups[0].criadoEm, tamanho: jsonBackups[0].tamanho } : null
+            },
+            sqlite: {
+                quantidade: snapshots.length,
+                ultimo: snapshots[0] ? { criadoEm: snapshots[0].criadoEm, tamanho: snapshots[0].tamanho } : null
+            }
+        });
+    } catch (err) {
+        console.error('Erro ao verificar backups do CRM Energia:', err.message);
+        return res.status(500).json({ success: false, saudavel: false, error: 'Não foi possível validar os backups automáticos.' });
     }
 });
 

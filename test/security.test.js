@@ -77,11 +77,17 @@ test('protege cabeçalhos e não exibe o login antes de validar a sessão', asyn
     assert.match(html, /id="login-screen"[^>]*style="[^"]*display:\s*none/);
     assert.match(html, /Pipeline\.exportarPlanilha\(\)/);
     assert.match(html, /Status atual/);
+    assert.match(html, /id="cliente-nascimento"/);
+    assert.match(html, /id="dashboard-aniversarios-list"/);
+    assert.match(html, /id="produto-tipo"/);
+    assert.match(html, /Produto Turismo/);
+    assert.match(html, /id="venda-comissao-manual"/);
 });
 
 test('recusa dados e backup sem autenticação', async () => {
     assert.equal((await request('/api/energia-data')).status, 401);
     assert.equal((await request('/api/energia-backup')).status, 401);
+    assert.equal((await request('/api/energia-backup-status')).status, 401);
     const session = await request('/api/energia-session');
     assert.equal(session.status, 401);
     assert.equal((await session.json()).setupRequired, true);
@@ -122,6 +128,24 @@ test('mantém sessão HttpOnly após F5 sem expor segredos', async () => {
     const backup = await request('/api/energia-backup', { headers: { Cookie: cookie } });
     assert.equal(backup.status, 200);
     assert.match(backup.headers.get('content-disposition'), /attachment/);
+
+    const deadline = Date.now() + 5000;
+    let backupStatus;
+    do {
+        const response = await request('/api/energia-backup-status', { headers: { Cookie: cookie } });
+        const text = await response.text();
+        assert.equal(response.status, 200, text);
+        backupStatus = JSON.parse(text);
+        if (backupStatus.saudavel) break;
+        await new Promise(resolve => setTimeout(resolve, 100));
+    } while (Date.now() < deadline);
+    assert.equal(backupStatus.integridade, 'ok');
+    assert.equal(backupStatus.automaticoAtivo, true);
+    assert.equal(backupStatus.antesDeCadaEscrita, true);
+    assert.equal(backupStatus.retencaoInterna, 20);
+    assert.equal(backupStatus.json.valido, true);
+    assert.ok(backupStatus.json.quantidade >= 1);
+    assert.ok(backupStatus.sqlite.quantidade >= 1);
 });
 
 test('isola dados do vendedor e bloqueia ações de master', async () => {
@@ -159,6 +183,7 @@ test('isola dados do vendedor e bloqueia ações de master', async () => {
     const sellerCookie = cookieFrom(login);
 
     assert.equal((await request('/api/energia-backup', { headers: { Cookie: sellerCookie } })).status, 403);
+    assert.equal((await request('/api/energia-backup-status', { headers: { Cookie: sellerCookie } })).status, 403);
     assert.equal((await request('/api/energia-config', { headers: { Cookie: sellerCookie } })).status, 200);
 
     const sellerDataResponse = await request('/api/energia-data', { headers: { Cookie: sellerCookie } });
