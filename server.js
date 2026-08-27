@@ -1389,6 +1389,63 @@ function idIntegracao(prefix, value) {
     return `${prefix}-${digest}`;
 }
 
+function numeroIntegracao(value, min = 0, max = 1000000000) {
+    if (value === null || value === undefined || value === '') return null;
+    const number = Number(value);
+    return Number.isFinite(number) && number >= min && number <= max ? number : null;
+}
+
+function simulacaoEnergiaIntegracao(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const groups = (Array.isArray(value.groups) ? value.groups : []).slice(0, 30).map(group => ({
+        state: textoIntegracao(group.state, 2).toUpperCase(),
+        groupAverageKwh: numeroIntegracao(group.groupAverageKwh),
+        baseDiscountRate: numeroIntegracao(group.baseDiscountRate, 0, 100),
+        status: group.status === 'eligible' ? 'eligible' : 'operator_review',
+        reviewReasons: (Array.isArray(group.reviewReasons) ? group.reviewReasons : [])
+            .map(item => textoIntegracao(item, 80))
+            .filter(Boolean)
+            .slice(0, 20),
+        monthlySavings: numeroIntegracao(group.monthlySavings),
+        annualSavings: numeroIntegracao(group.annualSavings),
+        units: (Array.isArray(group.units) ? group.units : []).slice(0, 100).map(unit => ({
+            id: textoIntegracao(unit.id, 100),
+            state: textoIntegracao(unit.state, 2).toUpperCase(),
+            averageKwh: numeroIntegracao(unit.averageKwh),
+            monthsUsed: numeroIntegracao(unit.monthsUsed, 0, 6),
+            consumptions: (Array.isArray(unit.consumptions) ? unit.consumptions : [])
+                .map(item => numeroIntegracao(item))
+                .filter(item => item !== null)
+                .slice(0, 6),
+            billTotal: numeroIntegracao(unit.billTotal),
+            publicLighting: numeroIntegracao(unit.publicLighting),
+            compensableAmount: numeroIntegracao(unit.compensableAmount),
+            baseDiscountRate: numeroIntegracao(unit.baseDiscountRate, 0, 100),
+            pisRate: numeroIntegracao(unit.pisRate, 0, 100),
+            cofinsRate: numeroIntegracao(unit.cofinsRate, 0, 100),
+            finalDiscountRate: numeroIntegracao(unit.finalDiscountRate, 0, 300),
+            monthlySavings: numeroIntegracao(unit.monthlySavings),
+            annualSavings: numeroIntegracao(unit.annualSavings),
+            estimatedBill: numeroIntegracao(unit.estimatedBill)
+        }))
+    }));
+    if (!groups.length) return null;
+    const startsAt = /^\d{4}-\d{2}-\d{2}$/.test(String(value.validity?.startsAt || ''))
+        ? value.validity.startsAt
+        : null;
+    const endsAt = /^\d{4}-\d{2}-\d{2}$/.test(String(value.validity?.endsAt || ''))
+        ? value.validity.endsAt
+        : null;
+    return {
+        version: 1,
+        status: value.status === 'eligible' ? 'eligible' : 'operator_review',
+        validity: { startsAt, endsAt },
+        monthlySavings: numeroIntegracao(value.monthlySavings),
+        annualSavings: numeroIntegracao(value.annualSavings),
+        groups
+    };
+}
+
 function validarLeadChatwoot(body) {
     const source = body && typeof body === 'object' && !Array.isArray(body) ? body : {};
     const chatwoot = source.chatwoot && typeof source.chatwoot === 'object'
@@ -1443,7 +1500,8 @@ function validarLeadChatwoot(body) {
         lead: {
             product: 'Energia',
             monthlyBill: textoIntegracao(lead.monthlyBill, 60),
-            summary: textoIntegracao(lead.summary, 1000)
+            summary: textoIntegracao(lead.summary, 3000),
+            energySimulation: simulacaoEnergiaIntegracao(lead.energySimulation)
         }
     };
 }
@@ -1518,6 +1576,7 @@ function upsertLeadChatwootEnergia(payloadAtual, input) {
     let oportunidade = oportunidades.find(item =>
         Number(item.chatwootConversationId) === input.conversationId
     );
+    const simulacaoEnergia = input.lead.energySimulation || oportunidade?.simulacaoEnergia || null;
     const clienteDados = {
         ...(oportunidade?.clienteDados || {}),
         nome: input.contact.company || input.contact.name,
@@ -1525,7 +1584,8 @@ function upsertLeadChatwootEnergia(payloadAtual, input) {
         telefone: input.contact.phone,
         gestor: input.contact.name,
         cidadeUf: input.contact.city,
-        valorContaEnergia: input.lead.monthlyBill
+        valorContaEnergia: input.lead.monthlyBill,
+        simulacaoEnergia
     };
     const produtoEnergia = (Array.isArray(payloadAtual.produtos) ? payloadAtual.produtos : [])
         .find(item => /energia/i.test(String(item.nome || '')));
@@ -1543,6 +1603,10 @@ function upsertLeadChatwootEnergia(payloadAtual, input) {
             chatwootUrl: `${CHATWOOT_PUBLIC_URL}/app/accounts/${input.accountId}/conversations/${input.conversationId}`,
             chatwootResumo: input.lead.summary,
             valorContaEnergia: input.lead.monthlyBill,
+            simulacaoEnergia,
+            economiaMensalEstimada: simulacaoEnergia?.monthlySavings ?? oportunidade.economiaMensalEstimada ?? null,
+            economiaAnualEstimada: simulacaoEnergia?.annualSavings ?? oportunidade.economiaAnualEstimada ?? null,
+            validadeSimulacao: simulacaoEnergia?.validity?.endsAt ?? oportunidade.validadeSimulacao ?? null,
             atualizadoEm: now
         };
         oportunidades[index] = oportunidade;
@@ -1570,6 +1634,10 @@ function upsertLeadChatwootEnergia(payloadAtual, input) {
             chatwootUrl: `${CHATWOOT_PUBLIC_URL}/app/accounts/${input.accountId}/conversations/${input.conversationId}`,
             chatwootResumo: input.lead.summary,
             valorContaEnergia: input.lead.monthlyBill,
+            simulacaoEnergia,
+            economiaMensalEstimada: simulacaoEnergia?.monthlySavings ?? null,
+            economiaAnualEstimada: simulacaoEnergia?.annualSavings ?? null,
+            validadeSimulacao: simulacaoEnergia?.validity?.endsAt ?? null,
             criadoEm: now,
             atualizadoEm: now
         };

@@ -28,6 +28,20 @@ campos da integração sem criar registros duplicados.
 Uma oportunidade existente mantém etapa, vendedor, valor, previsão, produto e
 observações editados manualmente.
 
+## Simulação de energia
+
+Quando o payload contém `lead.energySimulation`, o CRM salva na oportunidade:
+
+- detalhamento por estado e unidade;
+- consumos usados e média em kWh;
+- desconto-base, PIS/COFINS e desconto final;
+- valor compensável e conta estimada;
+- economia mensal e anual;
+- validade e necessidade de avaliação humana.
+
+Esses campos complementam a oportunidade sem alterar manualmente etapa,
+vendedor, valor ou observações.
+
 ## Resposta
 
 Uma criação retorna HTTP `201`; uma atualização idempotente retorna HTTP `200`.

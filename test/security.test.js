@@ -231,7 +231,40 @@ test('sincroniza lead do Chatwoot com idempotência e sem sessão de usuário', 
         lead: {
             product: 'Energia',
             monthlyBill: 'R$ 1.500,00',
-            summary: 'Lead qualificado automaticamente pelo WhatsApp.'
+            summary: 'Lead qualificado automaticamente pelo WhatsApp.',
+            energySimulation: {
+                version: 1,
+                status: 'eligible',
+                validity: { startsAt: '2026-08-27', endsAt: '2026-08-31' },
+                monthlySavings: 263.69,
+                annualSavings: 3164.28,
+                groups: [{
+                    state: 'BA',
+                    groupAverageKwh: 1215.33,
+                    baseDiscountRate: 18,
+                    status: 'eligible',
+                    reviewReasons: [],
+                    monthlySavings: 263.69,
+                    annualSavings: 3164.28,
+                    units: [{
+                        id: 'UC-1',
+                        state: 'BA',
+                        averageKwh: 1215.33,
+                        monthsUsed: 6,
+                        consumptions: [812, 958, 1199, 1526, 1471, 1326],
+                        billTotal: 1207.15,
+                        publicLighting: 145.58,
+                        compensableAmount: 1061.57,
+                        baseDiscountRate: 18,
+                        pisRate: 1.22,
+                        cofinsRate: 5.62,
+                        finalDiscountRate: 24.84,
+                        monthlySavings: 263.69,
+                        annualSavings: 3164.28,
+                        estimatedBill: 943.46
+                    }]
+                }]
+            }
         }
     };
 
@@ -288,6 +321,10 @@ test('sincroniza lead do Chatwoot com idempotência e sem sessão de usuário', 
     assert.equal(opportunities[0].clienteDados.telefone, '71999999999');
     assert.equal(opportunities[0].etapa, 'lead-novo');
     assert.equal(opportunities[0].chatwootResumo, 'Resumo atualizado sem duplicar.');
+    assert.equal(opportunities[0].economiaMensalEstimada, 263.69);
+    assert.equal(opportunities[0].economiaAnualEstimada, 3164.28);
+    assert.equal(opportunities[0].validadeSimulacao, '2026-08-31');
+    assert.equal(opportunities[0].simulacaoEnergia.groups[0].units[0].finalDiscountRate, 24.84);
     assert.equal(followups[0].status, 'pendente');
     assert.equal(followups[0].aprovacaoHumanaObrigatoria, true);
     assert.equal(followups[0].envioAutomatico, false);
