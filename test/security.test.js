@@ -376,5 +376,7 @@ test('limpa dados com snapshot e preserva somente o master autenticado', async (
     assert.equal(data.usuarios[0].senhaSegura, undefined);
 
     const snapshots = fs.readdirSync(path.join(runtime, 'database-backups'));
-    assert.ok(snapshots.some(name => /^energia_before-reset_.*\.sqlite$/.test(name)));
+    const resetSnapshot = snapshots.find(name => /^energia_before-reset_.*\.sqlite$/.test(name));
+    assert.ok(resetSnapshot);
+    assert.ok(fs.statSync(path.join(runtime, 'database-backups', resetSnapshot)).size > 0);
 });

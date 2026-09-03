@@ -463,20 +463,42 @@ function limparSnapshotsSqliteAntigos() {
 }
 
 function criarSnapshotSqlite(dbInstance, label, reason = 'periodic') {
-    if (!dbInstance || typeof dbInstance.backup !== 'function') return Promise.resolve(null);
+    if (!dbInstance || typeof dbInstance.run !== 'function') return Promise.resolve(null);
     ensureBackupDirectory();
     const safeLabel = String(label).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
     const safeReason = String(reason).replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
     const destino = path.join(DB_BACKUP_DIR, `${safeLabel}_${safeReason}_${timestampArquivo()}.sqlite`);
     return new Promise((resolve, reject) => {
-        dbInstance.backup(destino, err => {
+        dbInstance.run('VACUUM INTO ?', [destino], err => {
             if (err) {
                 try { if (fs.existsSync(destino)) fs.unlinkSync(destino); } catch (cleanupErr) {}
                 return reject(err);
             }
-            limparSnapshotsSqliteAntigos();
-            console.log(`✅ Snapshot consistente do ${label} criado em: ${destino}`);
-            resolve(destino);
+
+            const tamanho = fs.existsSync(destino) ? fs.statSync(destino).size : 0;
+            if (tamanho <= 0) {
+                try { if (fs.existsSync(destino)) fs.unlinkSync(destino); } catch (cleanupErr) {}
+                return reject(new Error(`Snapshot vazio do banco ${label}.`));
+            }
+
+            const snapshotDb = new sqlite3.Database(destino, sqlite3.OPEN_READONLY, openErr => {
+                if (openErr) {
+                    try { if (fs.existsSync(destino)) fs.unlinkSync(destino); } catch (cleanupErr) {}
+                    return reject(openErr);
+                }
+                snapshotDb.get('PRAGMA quick_check', [], (checkErr, row) => {
+                    const valido = !checkErr && row?.quick_check === 'ok';
+                    snapshotDb.close(() => {
+                        if (!valido) {
+                            try { if (fs.existsSync(destino)) fs.unlinkSync(destino); } catch (cleanupErr) {}
+                            return reject(checkErr || new Error(`Snapshot inválido do banco ${label}.`));
+                        }
+                        limparSnapshotsSqliteAntigos();
+                        console.log(`✅ Snapshot consistente do ${label} criado em: ${destino}`);
+                        resolve(destino);
+                    });
+                });
+            });
         });
     });
 }
@@ -3271,7 +3293,7 @@ app.get('/api/energia-backup-status', requireEnergiaAuth, requireEnergiaMaster, 
             });
         });
         const intervaloMinutos = Math.round(ENERGIA_PERIODIC_BACKUP_MS / 60000);
-        const saudavel = integridade === 'ok' && jsonValido && snapshots.length > 0;
+        const saudavel = integridade === 'ok' && jsonValido && snapshots.length > 0 && snapshots[0].tamanho > 0;
 
         return res.json({
             success: true,
